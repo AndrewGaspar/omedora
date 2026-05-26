@@ -534,10 +534,11 @@ Per-file status as of the current tip of `dev`. The roadmap in `testing.md` §10
 | `install/config/hardware/nvidia-fedora.sh` | New | planned (step 9) | Hyprland NVIDIA env vars only (no dracut writes — Fedora's akmod-nvidia handles drivers) |
 | `default/wayland-sessions/omedora.desktop` | New | planned (step 11) | The session entry GDM/SDDM displays as "Omedora" |
 | `install/config/wayland-session-fedora.sh` | New | planned (step 11) | Installs `omedora.desktop` to `/usr/share/wayland-sessions/` (or user fallback) |
-| `test/fedora/omedora-session/Dockerfile` | New | planned (step 12) | `FROM omedora-test:fedora44`, runs `install.sh` end-to-end as the `omedora` user |
-| `test/fedora/omedora-session/boot-session.sh` | New | planned (step 12) | Container-side launcher — supports `interactive` / `smoke` / `headless` (Xvfb) modes |
-| `test/fedora/omedora-session/smoke-assertions.sh` | New | planned (step 12) | hyprctl-driven assertions for the running session |
-| `test/fedora/run-session.sh` | New | planned (step 12) | Host-side L4-nested runner; mounts Wayland socket, `/dev/dri`, render/video GIDs |
+| `test/fedora/omedora-session/Dockerfile` | New | shipped | `FROM omedora-test:fedora44`, runs `install.sh` end-to-end as the `omedora` user (two-RUN pattern around BuildKit's 2MB log cap) |
+| `test/fedora/omedora-session/boot-session.sh` | New | shipped | Container-side launcher — `interactive` (uwsm → hyprland.desktop), `smoke` (hyprctl-driven), `headless` (Xvfb path planned) |
+| `test/fedora/omedora-session/systemctl-shim.sh` | New | shipped | No-op `systemctl` (enable/disable/restart) so build-time scripts that try to enable units don't fail under no-PID-1 |
+| `test/fedora/omedora-session/smoke-assertions.sh` | New | planned | hyprctl-driven assertions for the running session — follow-up |
+| `test/fedora/run-session.sh` | New | shipped | Host-side L4-nested runner; mounts Wayland socket, `/dev/dri`, render/video GIDs; flags `--interactive` / `--smoke` / `--headless` / `--shell` / `--rebuild` |
 
 ### Files explicitly NOT touched
 

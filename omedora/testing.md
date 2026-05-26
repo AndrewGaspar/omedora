@@ -4,7 +4,7 @@ This doc is the canonical strategy for testing omedora. It defines a four-layer 
 
 For the higher-level architecture this strategy serves, see [`architecture.md`](architecture.md). For agent-facing rules that reference this doc, see [`AGENTS.md`](AGENTS.md).
 
-> **Status:** L1, L2, L3 (audit-only), and the CI workflow are **shipped** — see roadmap [§10](#10-implementation-roadmap) for the per-step status. L4-nested is **planned** and depends on install-pipeline gating (steps 8–12). L4-VM is documented but operates manually. The doc is kept in sync with reality as steps land.
+> **Status:** L1, L2, L3 (audit-only), the CI workflow, install-pipeline gating, and L4-nested are **shipped** — see roadmap [§10](#10-implementation-roadmap) for the per-step status. L4-nested boots a real Omedora session inside `fedora:44` via Wayland-on-Wayland nesting; the install pipeline runs end-to-end and Hyprland accepts wayland clients in the nested compositor. Follow-ups: bulk-fill the package map (step 10) and `smoke-assertions.sh`. L4-VM is documented but operates manually.
 
 ---
 
@@ -225,9 +225,9 @@ The pieces needed at run-time:
 
 The host-side launcher (`test/fedora/run-session.sh`, planned) selects mode via flags:
 
-- **`--interactive`** (default for local dev): drops you into a nested Hyprland window. You poke around, use walker, switch themes, take screenshots, exit when satisfied.
-- **`--smoke`**: runs Hyprland in background, drives it via `hyprctl`, asserts on state. Exits cleanly. Still opens a transient window on the host because we're using the wayland backend.
-- **`--headless`** (CI-friendly): wraps Hyprland in Xvfb so there's no host display dependency. Uses the `x11` backend instead of `wayland`. Same hyprctl-driven assertions.
+- **`--interactive`** (default for local dev): drops you into a nested Hyprland window. You poke around, use walker, switch themes, take screenshots, exit when satisfied. **Working** — verified.
+- **`--smoke`**: runs Hyprland in background, drives it via `hyprctl`, asserts on state. Exits cleanly. Still opens a transient window on the host because we're using the wayland backend. **Plumbing working**; `smoke-assertions.sh` is a follow-up.
+- **`--headless`** (CI-friendly): wraps Hyprland in Xvfb so there's no host display dependency. Uses the `x11` backend instead of `wayland`. Same hyprctl-driven assertions. **Not yet wired** — Hyprland 0.55.2 from lionheartp COPR doesn't expose an `AQ_BACKENDS=headless` aquamarine backend (see [§7](#7-container-test-gotchas) gotcha), so the Xvfb path is the actual CI target.
 
 ### What L4-nested asserts (via `hyprctl`)
 
@@ -280,6 +280,8 @@ Specific friction points worth knowing about before writing tests:
 | **Flatpak inside container is fiddly** — wants polkit, runtimes are huge. | Mock at L2 (record `flatpak install` args, exit 0). Exercise real flatpak at L4. |
 | **`omarchy-update-restart`** uses `pacman -Qo` for kernel detection. Pacman isn't in Fedora containers. | The Fedora-arm patch lives on the patch-stack map. Until it lands, the test that runs `omarchy-update-restart` on Fedora will fail. That's a feature: the test is the forcing function. |
 | **Network from CI runners.** GitHub Actions can reach `dl.fedoraproject.org`, `copr.fedoraproject.org`, `dl.flathub.org`. Bandwidth is fine. | If we hit rate limits on COPR, add backoff/retry to the test script. Not a current concern. |
+| **grim against the nested wayland-N socket hangs.** When Hyprland uses the `wayland` aquamarine backend, the wlr-screencopy protocol doesn't complete cleanly inside the nested compositor — `grim` from inside the container blocks indefinitely. | Drive smoke assertions via `hyprctl` only (clients, monitors, getoption). If a screenshot is genuinely needed, capture the nested *window* from the host with `grim -g <geometry>` against the host compositor. |
+| **`AQ_BACKENDS=headless` fails** on Hyprland 0.55.2 (lionheartp COPR build): `CBackend::create() failed!` — the headless aquamarine backend isn't built in. | Use the `wayland` backend (interactive/smoke modes) for local dev. For CI, wrap with Xvfb + `AQ_BACKENDS=x11` (planned). |
 
 ---
 
@@ -395,11 +397,11 @@ Steps 1-7 are **shipped** (the test-infrastructure foundation: L1, L2, L3, CI). 
 | 5 | ✅ shipped | Package map + validator | `install/packages/fedora.toml`, `bin/omarchy-dev-validate-fedora-packages`, `test/pkg-map-test.sh` | Starter set; grows incrementally per step 9. |
 | 6 | ✅ shipped | L2 + CI bring-up | `test/fedora/Dockerfile`, `test/fedora/integration.sh`, `test/fedora/lib/container.sh`, `.github/workflows/test.yml`, `test/fedora/run-integration.sh` | After this, every PR is regression-tested. |
 | 7 | ✅ shipped | L3 smoke (audit-only) | `test/fedora/smoke.sh`, `install/preflight/fedora-repos.sh`, `test/fedora/run-smoke.sh`, scheduled job in CI | Audits the package map against real dnf; does NOT yet run install.sh end-to-end. |
-| 8 | planned | **Install-pipeline gating** (preflight + orchestrator) | `install.sh` (Arch gate around `login/` and `post-install/`), `install/preflight/guard.sh` (Fedora arm), `install/preflight/pacman.sh` (1-line gate), `install/preflight/disable-mkinitcpio.sh` (1-line gate), `install/preflight/all.sh` (source `fedora-repos.sh` on Fedora) | Unblocks running `install.sh` against `fedora:44` end-to-end. |
-| 9 | planned | **Install-pipeline gating** (hardware scripts) | 1-line distro guards on `install/config/hardware/{nvidia,vulkan,intel/*,apple/*,asus/*,framework/*,lenovo/*,fix-*}.sh`; `install/config/hardware/all.sh` stage-dispatch; new `install/config/hardware/nvidia-fedora.sh` (Hyprland env vars only) | Lets install.sh complete on Fedora without trying to write `/etc/mkinitcpio.conf*`. |
-| 10 | planned | **Bulk-fill the package map** | `install/packages/fedora.toml` (add entries for the ~30 unmapped packages the L3 audit currently surfaces) | The L3 audit's "unmapped + dnf MISSES" list is the punch list. |
+| 8 | ✅ shipped | **Install-pipeline gating** (preflight + orchestrator) | `install.sh` (Arch gate around `login/` and `post-install/`), `install/preflight/guard.sh` (Fedora arm), `install/preflight/pacman.sh`, `install/preflight/disable-mkinitcpio.sh`, `install/preflight/all.sh` (source `fedora-repos.sh` on Fedora) | Unblocks running `install.sh` against `fedora:44` end-to-end. |
+| 9 | ✅ shipped | **Install-pipeline gating** (system-admin scope) | Arch-only gate on `install/config/all.sh` system-admin block (gpg, login, hardware, network, power, security, services, sudoers); per-script guards on `mimetypes.sh`, `theme.sh`, `nvim.sh`, `mise-work.sh` | System-admin concerns (sysctl, sudoers, /etc, systemd units) are the user's Fedora install's job — see [`architecture.md` §6](architecture.md#6-install-pipeline-gating). |
+| 10 | planned | **Bulk-fill the package map** | `install/packages/fedora.toml` (add entries for the ~30 unmapped packages the L3 audit currently surfaces) | The L3 audit's "unmapped + dnf MISSES" list is the punch list. Many entries currently `source = "skip"`. |
 | 11 | planned | **Wayland session entry** + Fedora-side config script | `default/wayland-sessions/omedora.desktop` (new), `install/config/wayland-session-fedora.sh` (new), wired into `install/config/all.sh` | The session entry the display manager picks up — used by L4-VM and (cosmetically) by L4-nested. |
-| 12 | planned | **L4-nested image + runner** | `test/fedora/omedora-session/Dockerfile` (FROM omedora-test:fedora44, runs install.sh), `test/fedora/omedora-session/boot-session.sh`, `test/fedora/omedora-session/smoke-assertions.sh`, `test/fedora/run-session.sh` | Depends on steps 8-11. Once landed, "Omedora-in-Docker" is real. |
+| 12 | ✅ shipped | **L4-nested image + runner** | `test/fedora/omedora-session/Dockerfile` (FROM omedora-test:fedora44, runs install.sh), `test/fedora/omedora-session/boot-session.sh`, `test/fedora/omedora-session/systemctl-shim.sh`, `test/fedora/run-session.sh` | Verified: nested Hyprland 0.55.2 boots inside `fedora:44`, accepts wayland clients (`hyprctl clients` lists `foot`). `smoke-assertions.sh` is a follow-up. |
 | 13 | deferred | VM smoke harness (optional) | `scripts/vm-smoke.sh` (new) | Deferred per user; lands if/when manual L4-VM workflow gets repetitive enough to automate. |
 
 Implementation commits should land tests **with** their corresponding code, not in batches. A package-helper patch arrives with the helper test that proves it. This is TDD-ish in spirit but pragmatic — we're not strict about tests-first vs code-first within a commit.
