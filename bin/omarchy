@@ -5,6 +5,27 @@ set -o pipefail
 OMARCHY_BIN_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 METADATA_SCAN_LIMIT=80
 
+# Brand shim (omedora). Computes BRAND_NAME / BRAND_TITLE based on, in order:
+#   1. $OMARCHY_BRAND env var (escape hatch — lets devs force a brand)
+#   2. $0 basename — invoked as `omedora` → omedora brand; `omarchy` → omarchy
+#   3. omarchy-distro output (fedora → omedora; arch → omarchy)
+#   4. Fallback: omarchy (preserves upstream behavior for any unknown case)
+# All output-rendering substitutes "omarchy" → ${BRAND_NAME} / "Omarchy" →
+# ${BRAND_TITLE} so users see consistent branding. See omedora/architecture.md §10.
+if [[ -n ${OMARCHY_BRAND:-} ]]; then
+  BRAND_NAME="$OMARCHY_BRAND"
+elif [[ "$(basename "$0")" == "omedora" ]]; then
+  BRAND_NAME="omedora"
+elif command -v omarchy-distro >/dev/null 2>&1 && \
+     [[ "$(omarchy-distro 2>/dev/null)" == "fedora" ]]; then
+  BRAND_NAME="omedora"
+else
+  BRAND_NAME="omarchy"
+fi
+
+# Title-case for headers ("Omarchy command center" → "Omedora command center").
+BRAND_TITLE="$(printf '%s' "${BRAND_NAME^}")"
+
 COMMAND_KEYS=()
 ROUTE_COLLISIONS=()
 declare -A COMMAND_ROUTE
@@ -211,7 +232,7 @@ register_command() {
   local stem="${file_binary#omarchy-}"
   local fallback_group="$stem"
   local fallback_name=""
-  local fallback_route="omarchy ${stem//-/ }"
+  local fallback_route="$BRAND_NAME ${stem//-/ }"
 
   if [[ $stem == *-* ]]; then
     fallback_group="${stem%%-*}"
@@ -224,7 +245,7 @@ register_command() {
   [[ $name_seen != "true" ]] && name="$fallback_name"
   [[ -z $summary && -n $fallback_summary ]] && summary="$fallback_summary"
   [[ -z $summary ]] && summary="Run the ${stem//-/ } command"
-  local route="omarchy $group"
+  local route="$BRAND_NAME $group"
   if [[ -n $name ]]; then
     route+=" $name"
   fi
@@ -356,7 +377,7 @@ resolve_direct_route() {
   local candidate=""
 
   for (( prefix_count = argc; prefix_count >= 1; prefix_count-- )); do
-    route="omarchy $(join_words " " "${args[@]:0:prefix_count}")"
+    route="$BRAND_NAME $(join_words " " "${args[@]:0:prefix_count}")"
 
     binary="omarchy-$(join_words "-" "${args[@]:0:prefix_count}")"
     candidate="$OMARCHY_BIN_DIR/$binary"
@@ -385,7 +406,7 @@ sorted_keys() {
 
 fallback_group_for_key() {
   local key="$1"
-  local fallback="${COMMAND_FALLBACK_ROUTE[$key]#omarchy }"
+  local fallback="${COMMAND_FALLBACK_ROUTE[$key]#$BRAND_NAME }"
 
   printf '%s' "${fallback%% *}"
 }
@@ -476,42 +497,42 @@ show_group_list() {
 }
 
 show_main_help() {
-  cat <<'EOF'
-Omarchy command center
+  cat <<EOF
+$BRAND_TITLE command center
 
 Usage:
-  omarchy <command> [args...]
-  omarchy commands [--all] [--json] [--check]
-  omarchy <group> --help
-  omarchy <group> <command> --help
+  $BRAND_NAME <command> [args...]
+  $BRAND_NAME commands [--all] [--json] [--check]
+  $BRAND_NAME <group> --help
+  $BRAND_NAME <group> <command> --help
 
 Common commands:
-  omarchy update              Update Omarchy and system packages
-  omarchy theme list          List available themes
-  omarchy theme set <name>    Apply a theme
-  omarchy font list           List available fonts
-  omarchy screenshot          Take a screenshot
-  omarchy debug               Print debugging information
+  $BRAND_NAME update              Update $BRAND_TITLE and system packages
+  $BRAND_NAME theme list          List available themes
+  $BRAND_NAME theme set <name>    Apply a theme
+  $BRAND_NAME font list           List available fonts
+  $BRAND_NAME screenshot          Take a screenshot
+  $BRAND_NAME debug               Print debugging information
 
 Groups:
 EOF
   show_group_list
-  cat <<'EOF'
+  cat <<EOF
 
 Discovery:
-  omarchy commands            List all commands
-  omarchy commands --all      Include commands explicitly marked hidden
-  omarchy commands --json     Machine-readable command list
-  omarchy commands --check    Validate command metadata and routes
+  $BRAND_NAME commands            List all commands
+  $BRAND_NAME commands --all      Include commands explicitly marked hidden
+  $BRAND_NAME commands --json     Machine-readable command list
+  $BRAND_NAME commands --check    Validate command metadata and routes
 EOF
 }
 
 show_commands_help() {
-  cat <<'EOF'
+  cat <<EOF
 Usage:
-  omarchy commands [--all] [--json] [--markdown] [--check]
+  $BRAND_NAME commands [--all] [--json] [--markdown] [--check]
 
-List commands known to the Omarchy command center.
+List commands known to the $BRAND_TITLE command center.
 
 Options:
   --all       Include commands explicitly marked hidden
@@ -551,9 +572,9 @@ show_commands() {
   local alias_rows=""
 
   if [[ $include_all == "true" ]]; then
-    echo "Omarchy commands (all):"
+    echo "$BRAND_TITLE commands (all):"
   else
-    echo "Omarchy commands:"
+    echo "$BRAND_TITLE commands:"
   fi
 
   while IFS= read -r key; do
@@ -806,7 +827,7 @@ show_prefix_help() {
 
   [[ -n $rows ]] || return 1
 
-  echo "${prefix#omarchy } commands:"
+  echo "${prefix#$BRAND_NAME } commands:"
   print_command_table "$rows"
 }
 
@@ -887,7 +908,7 @@ resolve_route() {
   local key=""
 
   for (( prefix_count = argc; prefix_count >= 1; prefix_count-- )); do
-    route="omarchy $(join_words " " "${args[@]:0:prefix_count}")"
+    route="$BRAND_NAME $(join_words " " "${args[@]:0:prefix_count}")"
     key="${ROUTE_TO_KEY[$route]}"
 
     if [[ -n $key ]]; then
@@ -906,7 +927,7 @@ suggest_command() {
   local candidate=""
 
   for candidate in "${!ROUTE_TO_KEY[@]}"; do
-    candidate="${candidate#omarchy }"
+    candidate="${candidate#$BRAND_NAME }"
     if [[ $candidate == "$first"* ]]; then
       printf '%s' "${candidate%% *}"
       return 0
@@ -1027,16 +1048,16 @@ dispatch_or_help() {
     return 0
   fi
 
-  if show_prefix_help "omarchy ${args[*]}"; then
+  if show_prefix_help "$BRAND_NAME ${args[*]}"; then
     return 0
   fi
 
-  echo "Unknown Omarchy command: omarchy ${args[*]}" >&2
+  echo "Unknown $BRAND_TITLE command: $BRAND_NAME ${args[*]}" >&2
   suggestion=$(suggest_command "${args[0]}")
   if [[ -n $suggestion ]]; then
-    echo "Did you mean: omarchy $suggestion ?" >&2
+    echo "Did you mean: $BRAND_NAME $suggestion ?" >&2
   fi
-  echo "Run 'omarchy commands --all' to discover available commands." >&2
+  echo "Run '$BRAND_NAME commands --all' to discover available commands." >&2
   return 127
 }
 

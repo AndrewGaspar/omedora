@@ -1,5 +1,25 @@
 #!/bin/bash
 
-# omarchy:summary=Print the installed Omarchy version
+# omarchy:summary=Print the installed Omarchy/Omedora version
 
-cat $OMARCHY_PATH/version
+# Brand-aware: when invoked as `omedora` or when running on Fedora, prints
+# the Omedora version followed by the upstream Omarchy version it rebases on.
+brand="omarchy"
+if [[ -n ${OMARCHY_BRAND:-} ]]; then
+  brand="$OMARCHY_BRAND"
+elif command -v omarchy-distro >/dev/null 2>&1 && \
+     [[ "$(omarchy-distro 2>/dev/null)" == "fedora" ]]; then
+  brand="omedora"
+fi
+
+upstream_version_file="${OMARCHY_PATH:-$HOME/.local/share/omarchy}/version"
+omedora_version_file="${OMARCHY_PATH:-$HOME/.local/share/omarchy}/omedora/version"
+
+if [[ $brand == "omedora" && -f $omedora_version_file ]]; then
+  printf 'Omedora %s\n' "$(cat "$omedora_version_file")"
+  if [[ -f $upstream_version_file ]]; then
+    printf '  (rebased on Omarchy %s)\n' "$(cat "$upstream_version_file")"
+  fi
+else
+  cat "$upstream_version_file"
+fi
