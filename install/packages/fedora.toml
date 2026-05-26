@@ -209,6 +209,18 @@ reason = "Proprietary; would require adding 1Password's RPM repo. Skip until we 
 source = "skip"
 reason = "Apple Studio Display brightness control; AUR-only. Hardware-specific; out of omedora's scope on Fedora."
 
+[qmk-hid]
+source = "skip"
+reason = "QMK firmware tool (Framework 16 conditional). Not in Fedora main repos. Users with Framework 16 keyboards can install via cargo / from upstream releases separately."
+
+[dell-xps-touchpad-haptics]
+source = "skip"
+reason = "Dell XPS-specific touchpad haptics package (AUR-only on Arch). Hardware-specific; out of omedora's portable scope on Fedora."
+
+[asusctl]
+source = "skip"
+reason = "ASUS ROG laptop control daemon. Available on rogdrv/asusctl COPR; not yet in our allowlist. Skip until we vet that COPR."
+
 [expac]
 source = "skip"
 reason = "Pacman database query tool; nonsensical on Fedora (dnf-query is the analog and packagers don't typically need it)."
