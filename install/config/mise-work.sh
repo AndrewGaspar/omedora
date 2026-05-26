@@ -8,6 +8,14 @@ cat >"$HOME/Work/.mise.toml" <<'EOF'
 _.path = "{{ cwd }}/bin"
 EOF
 
+# mise is required from here on. On Fedora it's currently in fedora.toml
+# as skip (no Fedora packaging yet), so the binary may be missing — degrade
+# gracefully rather than fail the whole install.
+if ! command -v mise >/dev/null 2>&1; then
+  echo "mise not installed; skipping mise trust + node install."
+  return 0 2>/dev/null || exit 0
+fi
+
 mise trust ~/Work/.mise.toml
 
 if [[ -n ${OMARCHY_CHROOT_INSTALL:-} ]]; then
