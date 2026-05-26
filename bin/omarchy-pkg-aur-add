@@ -3,6 +3,12 @@
 # omarchy:summary=Add the named packages to the system from the AUR if they're missing. Returns false if it couldn't be done.
 # omarchy:args=<packages...>
 
+# Fedora dispatch — there's no AUR, so the tier fallback in fedora.toml handles
+# what AUR would have provided on Arch. See omedora/architecture.md §3.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora) exec "$(dirname -- "${BASH_SOURCE[0]}")/fedora/pkg.py" aur-add "$@" ;;
+esac
+
 if omarchy-pkg-missing "$@"; then
   yay -S --noconfirm --needed "$@" || exit 1
 fi
