@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # Test image for omedora L2 (container integration) and L3 (smoke) tests.
 #
 # See omedora/testing.md §5 for design rationale.
@@ -5,12 +6,20 @@
 # Build:  docker build -t omedora-test:fedora44 -f test/fedora/Dockerfile test/fedora/
 # Run L2: docker run --rm -v "$PWD:/repo" omedora-test:fedora44 \
 #           bash /repo/test/fedora/integration.sh
+#
+# dnf downloads are cached in a BuildKit cache mount so iterative rebuilds
+# don't re-fetch packages from mirrors. Cache survives across `docker build`
+# invocations but is NOT baked into the image. `keepcache=True` is dropped
+# into dnf.conf before each cache-mounted dnf call so the cache actually
+# persists rpms (default is keepcache=False, which deletes after install).
 
 FROM registry.fedoraproject.org/fedora:44
 
 # Install prereqs in one layer. dnf-plugins-core gives us `dnf copr enable`;
 # everything else is what omedora's helpers + tests need.
-RUN dnf install -y --setopt=install_weak_deps=False \
+RUN --mount=type=cache,target=/var/cache/dnf,sharing=locked \
+    printf 'keepcache=True\n' >>/etc/dnf/dnf.conf && \
+    dnf install -y --setopt=install_weak_deps=False \
         dnf-plugins-core \
         git \
         gum \
@@ -22,12 +31,12 @@ RUN dnf install -y --setopt=install_weak_deps=False \
         which \
         procps-ng \
         diffutils \
-        sudo \
-    && dnf clean all
+        sudo
 
 # Warm the dnf metadata cache so the first `dnf install` inside a test isn't
 # a cold network fetch. Saves 5-30s per test run.
-RUN dnf makecache --refresh
+RUN --mount=type=cache,target=/var/cache/dnf,sharing=locked \
+    dnf makecache --refresh
 
 # Create a non-root user for L3 smoke tests that need real sudo. L2 tests
 # run as root for speed (sudo is a no-op there).
