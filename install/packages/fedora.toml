@@ -88,6 +88,143 @@ source = "flathub"
 app_id = "org.signal.Signal"
 reason = "Not in Fedora main repos; Flathub is the upstream-blessed install path."
 
+# Case-sensitive rename: ImageMagick on Fedora vs imagemagick on Arch.
+[imagemagick]
+source = "dnf"
+names = ["ImageMagick"]
+
+# polkit-gnome isn't on Fedora; polkit-kde is the agent variant in repos.
+# This is a tentative mapping — we may want to skip and let the user pick.
+[polkit-gnome]
+source = "dnf"
+names = ["polkit-kde"]
+reason = "polkit-gnome not in Fedora repos; polkit-kde provides the polkit auth agent. TODO: validate against omedora's actual polkit usage."
+
+[qemu-user-static-binfmt]
+source = "dnf"
+names = ["qemu-user-static"]
+reason = "On Fedora it's qemu-user-static (the package includes the binfmt setup)."
+
+[tesseract-data-eng]
+source = "dnf"
+names = ["tesseract-langpack-eng"]
+
+# --- Flathub apps (currently unmapped) -----------------------------------
+
+[localsend]
+source = "flathub"
+app_id = "org.localsend.localsend_app"
+
+# --- Source-installed (no Fedora repo + no Flathub) ----------------------
+
+# Currently no source installers shipped (install/packages/installers/ has
+# only README.md). Marking these as `skip` for now so the install transaction
+# completes; revisit with real source installers in a follow-up.
+
+[mise]
+source = "skip"
+reason = "TODO: source installer (mise's curl-installed binary into ~/.local/bin) — not blocking install.sh today."
+
+[claude-code]
+source = "skip"
+reason = "TODO: source installer (npm install -g claude-code, or pull binary) — not blocking install.sh today."
+
+[omarchy-nvim]
+source = "skip"
+reason = "TODO: source installer (clone omarchy's nvim config into ~/.config/nvim) — not blocking install.sh today."
+
+[omarchy-walker]
+source = "skip"
+reason = "TODO: source installer for Walker (download upstream release binary) — Fedora has no walker package. Not blocking install.sh today."
+
+[starship]
+source = "skip"
+reason = "TODO: source installer (curl -sS https://starship.rs/install.sh | sh) — not blocking install.sh today."
+
+[lazygit]
+source = "skip"
+reason = "TODO: source installer (GitHub releases) or vetted COPR. Not in Fedora main repos."
+
+[lazydocker]
+source = "skip"
+reason = "TODO: source installer (GitHub releases). Not in Fedora main repos."
+
+[swayosd]
+source = "skip"
+reason = "TODO: source installer or vetted COPR (swayosd-git on AUR; needs Fedora packaging). Not in Fedora main repos."
+
+[satty]
+source = "skip"
+reason = "TODO: source installer (cargo install satty) or COPR. Not in Fedora main repos."
+
+[bluetui]
+source = "skip"
+reason = "TODO: source installer (cargo install bluetui). Not in Fedora main repos."
+
+[hyprland-preview-share-picker]
+source = "skip"
+reason = "TODO: source installer (small wrapper; ships with Hyprland on Arch). Not on lionheartp/Hyprland COPR."
+
+[ttf-ia-writer]
+source = "skip"
+reason = "TODO: source installer (proprietary iA Writer font; vendored from upstream). Not in Fedora main repos."
+
+[python-terminaltexteffects]
+source = "skip"
+reason = "TODO: pip install for the omedora user. Not in Fedora main repos."
+
+[tzupdate]
+source = "skip"
+reason = "TODO: pip install. Fedora has timedatectl set-timezone for the same purpose."
+
+[usage]
+source = "skip"
+reason = "TODO: source installer for the `usage` CLI (mise's spec-driven CLI tool). Not in Fedora main repos."
+
+# --- 37signals / Basecamp internal tools (skip on Fedora) ----------------
+
+[aether]
+source = "skip"
+reason = "37signals internal tool; not on Fedora (and likely Arch-AUR-only upstream). Out of omedora's portable scope."
+
+[tobi-try]
+source = "skip"
+reason = "37signals internal tool; not on Fedora. Out of omedora's portable scope."
+
+[impala]
+source = "skip"
+reason = "37signals internal tool / TUI; not on Fedora."
+
+[cliamp]
+source = "skip"
+reason = "TUI audio mixer (AUR-only on Arch). Not on Fedora; revisit if user demand surfaces."
+
+# --- Arch-specific tools without a Fedora analog -------------------------
+
+[1password-cli]
+source = "skip"
+reason = "Proprietary; would require adding 1Password's RPM repo. Skip until we decide to take on that third-party repo dependency."
+
+[asdcontrol]
+source = "skip"
+reason = "Apple Studio Display brightness control; AUR-only. Hardware-specific; out of omedora's scope on Fedora."
+
+[expac]
+source = "skip"
+reason = "Pacman database query tool; nonsensical on Fedora (dnf-query is the analog and packagers don't typically need it)."
+
+[gnome-themes-extra]
+source = "skip"
+reason = "Fedora's GNOME theming differs; adw-gtk3-theme is the modern equivalent for Adwaita-like styling. Skip until omedora has a GTK theming story on Fedora."
+
+[inetutils]
+source = "skip"
+reason = "Provides telnet/ftp/whois on Arch; Fedora splits into separate packages (telnet, ftp, whois) that users install à la carte. Skip — no single mapping."
+
+[yay]
+source = "skip"
+reason = "AUR helper; AUR doesn't exist on Fedora. omedora-pkg-aur-add on Fedora handles tier fallback via the package map."
+
 # --- COPR-required (Hyprland ecosystem) ----------------------------------
 
 [hyprland]
@@ -143,9 +280,8 @@ app_id = "io.typora.Typora"
 reason = "Proprietary; Flathub is the canonical install path on Fedora."
 
 [1password-beta]
-source = "flathub"
-app_id = "com.bitwarden.desktop"
-reason = "Placeholder — 1Password's own RPM repo would be preferred; revisit before shipping."
+source = "skip"
+reason = "Proprietary. Adding 1Password's own RPM repo is the right answer; skip until we take on that third-party repo dependency."
 
 # --- Explicitly skipped (out of omedora scope on Fedora) -----------------
 
