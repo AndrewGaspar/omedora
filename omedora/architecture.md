@@ -501,25 +501,43 @@ Each row is classified by patch type:
 | `omedora/AGENTS.md` | New | Supplemental agent rules |
 | `omedora/testing.md` | New | Test strategy (the pyramid + container design + CI shape) |
 
-### Testing (planned — see [`testing.md`](testing.md))
+### Testing (see [`testing.md`](testing.md))
 
-The test infrastructure is documented in [`testing.md`](testing.md) but most of these files do not yet exist. They land in subsequent commits per the roadmap in `testing.md` §9.
+Per-file status as of the current tip of `dev`. The roadmap in `testing.md` §10 has commit-grouping notes.
 
-| File | Type | Notes |
-| --- | --- | --- |
-| `test/helpers.sh` | New (planned) | Shared TAP helpers (`pass`/`fail`/`assert_output_contains`) extracted from `omarchy-cli-test.sh` |
-| `test/omarchy-cli-test.sh` | Edit (planned) | Source `helpers.sh`; add brand-shim assertions for the CLI rebrand |
-| `test/distro-test.sh` | New (planned) | L1 unit test for `bin/omarchy-distro` |
-| `test/pkg-helper-test.sh` | New (planned) | L1 unit test for package-helper dispatch (mocks `dnf`/`rpm`/`pacman`) |
-| `test/pkg-map-test.sh` | New (planned) | L1 unit test wrapping `omarchy-dev-validate-fedora-packages` |
-| `test/mocks/{dnf,rpm,pacman,flatpak}` | New (planned) | Shell mocks for L1 — record invocations to `$MOCK_LOG`, exit 0 |
-| `test/fedora/Dockerfile` | New (planned) | L2/L3 container base image (`fedora:44` + prereqs) |
-| `test/fedora/integration.sh` | New (planned) | L2 orchestrator |
-| `test/fedora/smoke.sh` | New (planned) | L3 full-install orchestrator (scheduled / label-gated) |
-| `test/fedora/lib/*.sh` | New (planned) | Container test helpers |
-| `test/fedora/fixtures/*` | New (planned) | Fixture TOML maps, migrations, `os-release` files |
-| `bin/omarchy-dev-validate-fedora-packages` | New (planned) | Package-map validator; mirrors `bin/omarchy-dev-bin-metadata` shape |
-| `.github/workflows/test.yml` | New (planned) | CI workflow — four parallel jobs (shell-unit, arch-regression, fedora-integration, fedora-smoke) |
+| File | Type | Status | Notes |
+| --- | --- | --- | --- |
+| `test/helpers.sh` | New | ✅ shipped | Shared TAP helpers (`pass`/`fail`/`assert_output_contains`/`assert_equals`/`assert_file_exists`/`assert_exit_code`/`assert_output_lacks`) |
+| `test/omarchy-cli-test.sh` | Edit | ✅ shipped | Sources `helpers.sh`; brand-shim assertions added |
+| `test/distro-test.sh` | New | ✅ shipped | L1 unit test for `bin/omarchy-distro` |
+| `test/pkg-helper-test.sh` | New | ✅ shipped | L1 unit test for package-helper dispatch (mocks `dnf`/`rpm`/`pacman`/`flatpak`/`sudo`) |
+| `test/pkg-map-test.sh` | New | ✅ shipped | L1 unit test wrapping `omarchy-dev-validate-fedora-packages` |
+| `test/mocks/{dnf,rpm,pacman,flatpak,sudo}` | New | ✅ shipped | Shell mocks — record invocations to `$MOCK_LOG`, exit 0 by default |
+| `test/fedora/Dockerfile` | New | ✅ shipped | L2/L3 container base image (`fedora:44` + prereqs) |
+| `test/fedora/integration.sh` | New | ✅ shipped | L2 orchestrator |
+| `test/fedora/lib/container.sh` | New | ✅ shipped | Container test helpers (`assert_dnf_installed`, `assert_copr_enabled`) |
+| `test/fedora/smoke.sh` | New | ✅ shipped | L3 audit-only smoke (scheduled / label-gated) |
+| `test/fedora/run-integration.sh`, `run-smoke.sh` | New | ✅ shipped | Host-side runners for L2 / L3 |
+| `bin/fedora/pkg.py` | New | ✅ shipped | Python implementation of pkg-add/missing/present/drop/aur-add on Fedora; map resolution + dnf/rpm/flatpak/source dispatch |
+| `bin/omarchy-dev-validate-fedora-packages` | New | ✅ shipped | Package-map validator; mirrors `bin/omarchy-dev-bin-metadata` shape |
+| `install/packages/fedora.toml` | New | ✅ shipped | Package map (44 entries; bulks out per testing.md step 10) |
+| `install/packages/installers/` | New | ✅ shipped | Per-package source installers (currently empty; populated as needed) |
+| `install/preflight/fedora-repos.sh` | New | ✅ shipped | RPM Fusion + lionheartp/Hyprland COPR + Flathub remote enable |
+| `.github/workflows/test.yml` | New | ✅ shipped | CI workflow — four parallel jobs (shell-unit, arch-regression, fedora-integration, fedora-smoke) |
+| `install.sh` | Edit | planned (step 8) | Gate `login/all.sh` + `post-install/all.sh` behind Arch check; let preflight + packaging + config run on Fedora |
+| `install/preflight/all.sh` | Edit | planned (step 8) | Source `fedora-repos.sh` on Fedora; skip `pacman.sh` + `disable-mkinitcpio.sh` on Fedora |
+| `install/preflight/guard.sh` | Edit | planned (step 8) | Fedora arm: prepend early-return guard that checks distro + arch + non-root; existing Arch guards unchanged below |
+| `install/preflight/pacman.sh` | Edit | planned (step 8) | 1-line `[[ $(omarchy-distro) == arch ]] \|\| return 0` guard at top |
+| `install/preflight/disable-mkinitcpio.sh` | Edit | planned (step 8) | Same 1-line guard |
+| `install/config/hardware/all.sh` | Edit | planned (step 9) | Stage dispatch — source `-fedora.sh` siblings if present; gate Arch-only entries on Fedora |
+| `install/config/hardware/{nvidia,vulkan,intel/*,apple/*,asus/*,framework/*,lenovo/*,fix-*}.sh` | Edit | planned (step 9) | 1-line distro guards |
+| `install/config/hardware/nvidia-fedora.sh` | New | planned (step 9) | Hyprland NVIDIA env vars only (no dracut writes — Fedora's akmod-nvidia handles drivers) |
+| `default/wayland-sessions/omedora.desktop` | New | planned (step 11) | The session entry GDM/SDDM displays as "Omedora" |
+| `install/config/wayland-session-fedora.sh` | New | planned (step 11) | Installs `omedora.desktop` to `/usr/share/wayland-sessions/` (or user fallback) |
+| `test/fedora/omedora-session/Dockerfile` | New | planned (step 12) | `FROM omedora-test:fedora44`, runs `install.sh` end-to-end as the `omedora` user |
+| `test/fedora/omedora-session/boot-session.sh` | New | planned (step 12) | Container-side launcher — supports `interactive` / `smoke` / `headless` (Xvfb) modes |
+| `test/fedora/omedora-session/smoke-assertions.sh` | New | planned (step 12) | hyprctl-driven assertions for the running session |
+| `test/fedora/run-session.sh` | New | planned (step 12) | Host-side L4-nested runner; mounts Wayland socket, `/dev/dri`, render/video GIDs |
 
 ### Files explicitly NOT touched
 
