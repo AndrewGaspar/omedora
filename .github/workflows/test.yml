@@ -1,0 +1,99 @@
+name: Test
+
+on:
+  push:
+    branches: [dev, master]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel in-progress runs when a new commit lands on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shell-unit:
+    name: L1 shell unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install prereqs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq python3 shellcheck
+
+      - name: Verify Python 3.11+ (needs tomllib)
+        run: python3 -c 'import sys, tomllib; assert sys.version_info >= (3, 11)'
+
+      - name: Run dispatcher test
+        run: bash test/omarchy-cli-test.sh
+
+      - name: Run distro detection test
+        run: bash test/distro-test.sh
+
+      - name: Run pkg helper test
+        run: bash test/pkg-helper-test.sh
+
+      - name: Run pkg map test
+        run: bash test/pkg-map-test.sh
+
+      - name: Validate the real fedora.toml
+        run: bin/omarchy-dev-validate-fedora-packages
+
+  arch-regression:
+    name: L2 Arch regression (dual-distro contract)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run upstream dispatcher test in Arch container
+        run: |
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/repo" \
+            -w /repo \
+            archlinux:latest bash -c '
+              pacman -Sy --noconfirm --needed jq python git gum >/dev/null
+              # Brand shim defaults to omarchy on Arch — verify upstream
+              # behavior is preserved byte-for-byte.
+              bash test/omarchy-cli-test.sh
+              bash test/distro-test.sh
+              bash test/pkg-helper-test.sh
+              # Sanity: omarchy --help should say Omarchy (no OMARCHY_BRAND).
+              env -u OMARCHY_BRAND bin/omarchy --help | grep -q "Omarchy command center"
+              # And the brand-on-Arch dispatcher routes start with "omarchy ".
+              env -u OMARCHY_BRAND bin/omarchy commands --json |
+                jq -e ".commands | all(.route | startswith(\"omarchy \"))" >/dev/null
+            '
+
+  fedora-integration:
+    name: L2 Fedora container integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up dnf cache directory
+        run: mkdir -p /tmp/dnf-cache
+
+      - name: Restore dnf cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/dnf-cache
+          key: dnf-cache-${{ hashFiles('test/fedora/Dockerfile') }}-${{ github.sha }}
+          restore-keys: |
+            dnf-cache-${{ hashFiles('test/fedora/Dockerfile') }}-
+            dnf-cache-
+
+      - name: Build Fedora test image
+        run: docker build -t omedora-test:fedora44 -f test/fedora/Dockerfile test/fedora/
+
+      - name: Run L2 integration tests
+        run: |
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/repo" \
+            -v /tmp/dnf-cache:/var/cache/dnf \
+            omedora-test:fedora44 \
+            bash /repo/test/fedora/integration.sh

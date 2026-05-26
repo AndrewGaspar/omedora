@@ -16,9 +16,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Default (no brand override): dispatcher renders as Omarchy.
-# Explicitly unset OMARCHY_BRAND so the test is hermetic across CI environments.
-unset OMARCHY_BRAND
+# Most assertions below exercise upstream Omarchy behavior, so they pin
+# OMARCHY_BRAND=omarchy regardless of host distro. (On Fedora the default
+# brand is omedora — the dual-distro contract — which makes the unpinned
+# upstream test brittle. The brand-shim assertions later in this file flip
+# brand intentionally.)
+export OMARCHY_BRAND=omarchy
 
 output=$("$CLI" --help)
 assert_output_contains "main help renders" "$output" "Omarchy command center"
@@ -250,27 +253,31 @@ assert_output_contains "body metadata command dispatches by filename" "$output" 
 
 # ============================================================================
 # Brand-shim assertions (omedora) — see omedora/architecture.md §10.
+# Each invocation here sets OMARCHY_BRAND explicitly (or unsets it via env -u)
+# so the assertions are hermetic across distros — on Fedora the default brand
+# is omedora, which would flip otherwise-Arch-centric assertions.
 # ============================================================================
 
-# Default invocation as `omarchy` retains upstream branding (regression check).
-output=$("$CLI" --help)
-assert_output_contains "default brand renders Omarchy header" "$output" "Omarchy command center"
-assert_output_lacks "default brand does NOT mention Omedora" "$output" "Omedora command center"
-assert_output_contains "default brand example uses 'omarchy theme'" "$output" "omarchy theme list"
-assert_output_lacks "default brand example does NOT use 'omedora theme'" "$output" "omedora theme list"
+# Pinned OMARCHY_BRAND=omarchy invocation retains upstream branding everywhere.
+output=$(OMARCHY_BRAND=omarchy "$CLI" --help)
+assert_output_contains "OMARCHY_BRAND=omarchy renders Omarchy header" "$output" "Omarchy command center"
+assert_output_lacks "OMARCHY_BRAND=omarchy does NOT mention Omedora" "$output" "Omedora command center"
+assert_output_contains "OMARCHY_BRAND=omarchy example uses 'omarchy theme'" "$output" "omarchy theme list"
+assert_output_lacks "OMARCHY_BRAND=omarchy example does NOT use 'omedora theme'" "$output" "omedora theme list"
 
-# OMARCHY_BRAND env override → Omedora branding everywhere.
+# OMARCHY_BRAND=omedora env override → Omedora branding everywhere.
 output=$(OMARCHY_BRAND=omedora "$CLI" --help)
 assert_output_contains "OMARCHY_BRAND=omedora renders Omedora header" "$output" "Omedora command center"
 assert_output_contains "OMARCHY_BRAND=omedora example uses 'omedora theme'" "$output" "omedora theme list"
 assert_output_lacks "OMARCHY_BRAND=omedora example does NOT use 'omarchy theme'" "$output" "omarchy theme list"
 
 # bin/omedora symlink → invoked as `omedora` → Omedora branding via basename.
+# Unset OMARCHY_BRAND for this so the basename-derived brand kicks in.
 if [[ -L "$ROOT/bin/omedora" ]]; then
   link_target=$(readlink "$ROOT/bin/omedora")
   assert_equals "bin/omedora is a symlink to omarchy" "$link_target" "omarchy"
 
-  output=$("$ROOT/bin/omedora" --help)
+  output=$(env -u OMARCHY_BRAND "$ROOT/bin/omedora" --help)
   assert_output_contains "invoked as omedora → Omedora header (via basename)" "$output" "Omedora command center"
 fi
 
@@ -286,8 +293,9 @@ pass "OMARCHY_BRAND=omedora JSON routes start with 'omedora '"
 
 # Routing works via either name regardless of brand: `omedora theme list` and
 # `omarchy theme list` both resolve to the same binary. (Smoke check; the safe
-# `theme list` dispatch is exercised above.)
-omedora_output=$("$ROOT/bin/omedora" theme list)
-omarchy_output=$("$CLI" theme list)
-assert_equals "omedora theme list output == omarchy theme list output" \
+# `theme list` dispatch is exercised above.) Pin both to the same brand so the
+# safe-dispatch comparison is meaningful.
+omedora_output=$(OMARCHY_BRAND=omarchy "$ROOT/bin/omedora" theme list)
+omarchy_output=$(OMARCHY_BRAND=omarchy "$CLI" theme list)
+assert_equals "omedora theme list output == omarchy theme list output (same brand)" \
   "$omedora_output" "$omarchy_output"
