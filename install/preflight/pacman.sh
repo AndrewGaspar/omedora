@@ -1,3 +1,8 @@
+# Arch-only — Fedora gets RPM Fusion + COPRs from preflight/fedora-repos.sh
+if [[ $(omarchy-distro 2>/dev/null || echo arch) != "arch" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
+
 if [[ -n ${OMARCHY_ONLINE_INSTALL:-} ]]; then
   # Install build tools
   omarchy-pkg-add base-devel

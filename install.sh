@@ -14,5 +14,10 @@ source "$OMARCHY_INSTALL/helpers/all.sh"
 source "$OMARCHY_INSTALL/preflight/all.sh"
 source "$OMARCHY_INSTALL/packaging/all.sh"
 source "$OMARCHY_INSTALL/config/all.sh"
-source "$OMARCHY_INSTALL/login/all.sh"
-source "$OMARCHY_INSTALL/post-install/all.sh"
+# login/ and post-install/ are Arch-only — they own the boot stack
+# (Plymouth, SDDM, Limine+Snapper, final pacman config). Omedora doesn't
+# own the boot stack on Fedora; see omedora/architecture.md §6 and §14.
+if [[ $(omarchy-distro 2>/dev/null || echo arch) == "arch" ]]; then
+  source "$OMARCHY_INSTALL/login/all.sh"
+  source "$OMARCHY_INSTALL/post-install/all.sh"
+fi

@@ -236,5 +236,67 @@ assert_output_contains "version output mentions Omedora on Fedora" \
 assert_output_contains "version output mentions Omarchy upstream" \
   "$version_output" "rebased on Omarchy"
 
+
+# ============================================================================
+echo "=== Install-pipeline gating: preflight scripts behave on Fedora ==="
+# ============================================================================
+
+export OMARCHY_INSTALL="$REPO/install"
+
+# guard.sh refuses to run as root on Fedora (matches production policy), so
+# we exercise it as the non-root `omedora` user provisioned in the base image.
+run_as_omedora() {
+  # Pass PATH explicitly so omarchy-distro is reachable from the bin/ dir.
+  sudo -u omedora env PATH="$REPO/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin" \
+    OMARCHY_INSTALL="$REPO/install" \
+    OMARCHY_PATH="$REPO" \
+    bash "$@"
+}
+
+# guard.sh — Fedora arm should early-return without aborting (no gum prompt).
+if run_as_omedora "$REPO/install/preflight/guard.sh" >/tmp/guard.out 2>&1; then
+  output=$(cat /tmp/guard.out)
+  assert_output_contains "preflight/guard.sh prints Fedora-arm OK message" \
+    "$output" "Fedora guards: OK"
+else
+  cat /tmp/guard.out >&2
+  fail "preflight/guard.sh aborted on Fedora"
+fi
+
+# Refuses root — the production policy check that catches misuse.
+if bash "$REPO/install/preflight/guard.sh" >/tmp/guard-root.out 2>&1; then
+  cat /tmp/guard-root.out >&2
+  fail "guard.sh should have refused to run as root on Fedora"
+else
+  output=$(cat /tmp/guard-root.out)
+  assert_output_contains "guard.sh refuses root on Fedora" \
+    "$output" "must run as a regular user"
+fi
+
+# pacman.sh — Arch-only; 1-line guard should early-return on Fedora.
+if bash "$REPO/install/preflight/pacman.sh" >/tmp/pacman-preflight.out 2>&1; then
+  pass "preflight/pacman.sh early-returns on Fedora (no errors)"
+else
+  cat /tmp/pacman-preflight.out >&2
+  fail "preflight/pacman.sh failed on Fedora"
+fi
+
+# disable-mkinitcpio.sh — Arch-only; 1-line guard should early-return.
+if bash "$REPO/install/preflight/disable-mkinitcpio.sh" >/tmp/mkinit.out 2>&1; then
+  pass "preflight/disable-mkinitcpio.sh early-returns on Fedora"
+else
+  cat /tmp/mkinit.out >&2
+  fail "preflight/disable-mkinitcpio.sh failed on Fedora"
+fi
+
+# install.sh sourcing should not even attempt login/post-install on Fedora.
+# (We don't run install.sh itself yet — that's L3 / L4-nested scope. But we
+# can confirm the gate by grepping the orchestrator.)
+if grep -qE 'omarchy-distro.*==.*"arch"' "$REPO/install.sh"; then
+  pass "install.sh has the Arch-only gate around login/ + post-install/"
+else
+  fail "install.sh missing the Arch-only gate; login/ would attempt to run on Fedora"
+fi
+
 echo ""
 echo "=== All L2 integration tests passed ==="
