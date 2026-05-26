@@ -34,12 +34,16 @@ LOG="${OMEDORA_SESSION_BUILD_LOG:-/tmp/omedora-session-build.log}"
 rebuild=false
 build_only=false
 shell=false
+mode="interactive"
 
 for arg in "$@"; do
   case "$arg" in
-    --rebuild)    rebuild=true ;;
-    --build-only) build_only=true ;;
-    --shell)      shell=true ;;
+    --rebuild)     rebuild=true ;;
+    --build-only)  build_only=true ;;
+    --shell)       shell=true ;;
+    --smoke)       mode="smoke" ;;
+    --headless)    mode="headless" ;;
+    --interactive) mode="interactive" ;;
     --help|-h)
       grep '^# ' "$0" | sed 's/^# //'
       exit 0
@@ -79,9 +83,42 @@ fi
 
 $build_only && exit 0
 
-if $shell; then
-  exec docker run --rm -it "$SESSION_IMAGE" bash
+# --- Compose docker-run args for nested Omedora ---
+
+run_args=(--rm -e "OMEDORA_SESSION_MODE=$mode")
+
+# GPU access (always — even headless wants Mesa's software OpenGL bits).
+if [[ -e /dev/dri ]]; then
+  run_args+=(--device /dev/dri)
+  render_gid=$(getent group render | cut -d: -f3)
+  video_gid=$(getent group video  | cut -d: -f3)
+  [[ -n $render_gid ]] && run_args+=(--group-add "$render_gid")
+  [[ -n $video_gid  ]] && run_args+=(--group-add "$video_gid")
 fi
 
-# Default: drop into bash inside the built session image.
-exec docker run --rm -it "$SESSION_IMAGE"
+# Wayland-on-Wayland socket bind (interactive + smoke modes).
+if [[ $mode != "headless" ]]; then
+  : "${WAYLAND_DISPLAY:?need WAYLAND_DISPLAY (run from a Wayland desktop or use --headless)}"
+  : "${XDG_RUNTIME_DIR:?need XDG_RUNTIME_DIR}"
+  host_sock="$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY"
+  if [[ ! -S $host_sock ]]; then
+    echo "ERROR: host Wayland socket not found at $host_sock" >&2
+    exit 3
+  fi
+  run_args+=(
+    -e "XDG_RUNTIME_DIR=/tmp"
+    -e "WAYLAND_DISPLAY=host-wayland"
+    -v "$host_sock:/tmp/host-wayland"
+  )
+fi
+
+if $shell; then
+  exec docker run -it "${run_args[@]}" "$SESSION_IMAGE" bash
+fi
+
+# Interactive mode opens a window; smoke/headless are non-interactive.
+if [[ $mode == "interactive" ]]; then
+  exec docker run -it "${run_args[@]}" "$SESSION_IMAGE"
+else
+  exec docker run "${run_args[@]}" "$SESSION_IMAGE"
+fi
