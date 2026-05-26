@@ -8,28 +8,8 @@ TMPDIR=""
 
 export PATH="$ROOT/bin:$PATH"
 
-pass() {
-  printf 'ok - %s\n' "$1"
-}
-
-fail() {
-  printf 'not ok - %s\n' "$1" >&2
-  exit 1
-}
-
-assert_output_contains() {
-  local description="$1"
-  local output="$2"
-  local expected="$3"
-
-  if [[ $output != *"$expected"* ]]; then
-    printf 'Expected output to contain: %s\n' "$expected" >&2
-    printf 'Actual output:\n%s\n' "$output" >&2
-    fail "$description"
-  fi
-
-  pass "$description"
-}
+# Shared TAP helpers (pass, fail, assert_output_contains, etc.)
+. "$ROOT/test/helpers.sh"
 
 cleanup() {
   [[ -n $TMPDIR && -d $TMPDIR ]] && rm -rf "$TMPDIR"
