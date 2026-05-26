@@ -22,7 +22,71 @@ names = ["cascadia-code-fonts"]
 
 [woff2-font-awesome]
 source = "dnf"
-names = ["fontawesome-fonts"]
+names = ["fontawesome-fonts-all"]
+reason = "On Fedora 44 the FontAwesome metapackage is 'fontawesome-fonts-all' (pulls all variants). 'fontawesome-fonts' is unavailable."
+
+[noto-fonts]
+source = "dnf"
+names = ["google-noto-fonts-common", "google-noto-sans-fonts"]
+
+[noto-fonts-cjk]
+source = "dnf"
+names = ["google-noto-sans-cjk-fonts", "google-noto-serif-cjk-fonts"]
+
+[noto-fonts-emoji]
+source = "dnf"
+names = ["google-noto-emoji-fonts"]
+
+[nvim]
+source = "dnf"
+names = ["neovim"]
+
+[github-cli]
+source = "dnf"
+names = ["gh"]
+
+[qt5-wayland]
+source = "dnf"
+names = ["qt5-qtwayland"]
+
+[python-gobject]
+source = "dnf"
+names = ["python3-gobject"]
+
+[python-poetry-core]
+source = "dnf"
+names = ["python3-poetry-core"]
+
+[fd]
+source = "dnf"
+names = ["fd-find"]
+
+[dust]
+source = "dnf"
+names = ["du-dust"]
+
+[mariadb-libs]
+source = "dnf"
+names = ["mariadb-connector-c"]
+
+[postgresql-libs]
+source = "dnf"
+names = ["libpq"]
+
+[docker]
+source = "dnf"
+names = ["moby-engine", "docker-cli"]
+reason = "Fedora ships moby-engine + docker-cli in main repos as the libre Docker stack. Docker CE from Docker's own repo is also an option but adds a third-party repo we don't need."
+
+[libreoffice-fresh]
+source = "dnf"
+names = ["libreoffice"]
+reason = "Fedora ships LibreOffice (no -fresh/-still split); 'libreoffice' resolves to the current stable."
+
+[signal-desktop]
+source = "flathub"
+app_id = "org.signal.Signal"
+reason = "Not in Fedora main repos; Flathub is the upstream-blessed install path."
 
 # --- COPR-required (Hyprland ecosystem) ----------------------------------
 

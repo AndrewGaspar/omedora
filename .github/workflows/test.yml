@@ -4,6 +4,8 @@ on:
   push:
     branches: [dev, master]
   pull_request:
+  schedule:
+    - cron: '0 6 * * *'   # nightly at 06:00 UTC — exercises L3 smoke
   workflow_dispatch:
 
 # Cancel in-progress runs when a new commit lands on the same ref.
@@ -97,3 +99,42 @@ jobs:
             -v /tmp/dnf-cache:/var/cache/dnf \
             omedora-test:fedora44 \
             bash /repo/test/fedora/integration.sh
+
+  fedora-smoke:
+    name: L3 Fedora smoke (full repo enable + package-map audit)
+    # Slow (real RPM Fusion install + COPR enable + dnf list checks for
+    # every package in omarchy-base.packages). Runs on:
+    #   - schedule (nightly)
+    #   - PR with 'smoke' label
+    #   - manual workflow_dispatch
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.pull_request.labels.*.name, 'smoke')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up dnf cache directory
+        run: mkdir -p /tmp/dnf-cache
+
+      - name: Restore dnf cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/dnf-cache
+          key: dnf-cache-smoke-${{ hashFiles('test/fedora/Dockerfile') }}-${{ github.sha }}
+          restore-keys: |
+            dnf-cache-smoke-${{ hashFiles('test/fedora/Dockerfile') }}-
+            dnf-cache-
+
+      - name: Build Fedora test image
+        run: docker build -t omedora-test:fedora44 -f test/fedora/Dockerfile test/fedora/
+
+      - name: Run L3 smoke
+        run: |
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/repo" \
+            -v /tmp/dnf-cache:/var/cache/dnf \
+            omedora-test:fedora44 \
+            bash /repo/test/fedora/smoke.sh
