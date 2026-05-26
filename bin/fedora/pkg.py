@@ -204,10 +204,26 @@ def cmd_add(entries: list[Entry], args: argparse.Namespace) -> int:
         run(["sudo", "dnf", "install", "-y", "--setopt=install_weak_deps=False",
              *dnf_names], args.dry_run)
 
-    # Install Flatpaks (per app).
-    for app_id in flathub_ids:
-        info(f"Installing via flatpak: {app_id}")
-        run(["flatpak", "install", "--user", "-y", "flathub", app_id], args.dry_run)
+    # Install Flatpaks (per app). Tolerate failure when there's no DBus
+    # session bus (e.g., container builds): a `flatpak install --user` call
+    # without DBus produces "Could not connect: No such file or directory"
+    # and exits non-zero. Skipping with a warning lets the rest of the
+    # install proceed; production users (with a real session) re-run
+    # `omedora update` later to pick the flatpaks up.
+    if flathub_ids and not (os.environ.get("DBUS_SESSION_BUS_ADDRESS")
+                            or os.path.exists(f"/run/user/{os.getuid()}/bus")):
+        warn(
+            f"no DBus session bus detected; skipping {len(flathub_ids)} "
+            "Flatpak install(s). Re-run from a desktop session to pick them "
+            "up, or set DBUS_SESSION_BUS_ADDRESS in a build env."
+        )
+    else:
+        for app_id in flathub_ids:
+            info(f"Installing via flatpak: {app_id}")
+            # check=False so a single Flatpak failure doesn't abort the
+            # whole install — the user can retry the failing one later.
+            run(["flatpak", "install", "--user", "-y", "flathub", app_id],
+                args.dry_run, check=False)
 
     # Run source installers (each is a separate script).
     installers_dir = Path(os.environ.get("OMARCHY_FEDORA_INSTALLERS", DEFAULT_INSTALLERS))
