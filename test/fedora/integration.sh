@@ -298,5 +298,12 @@ else
   fail "install.sh missing the Arch-only gate; login/ would attempt to run on Fedora"
 fi
 
+# config/all.sh hardware block should be gated on Arch.
+if grep -qE 'omarchy-distro.*==.*"arch"' "$REPO/install/config/all.sh"; then
+  pass "config/all.sh hardware block is gated Arch-only"
+else
+  fail "config/all.sh hardware block is not gated; would run on Fedora and likely fail"
+fi
+
 echo ""
 echo "=== All L2 integration tests passed ==="

@@ -31,6 +31,9 @@ run_logged $OMARCHY_INSTALL/config/powerprofilesctl-rules.sh
 run_logged $OMARCHY_INSTALL/config/wifi-powersave-rules.sh
 run_logged $OMARCHY_INSTALL/config/plocate-ac-only.sh
 
+# Hardware enablement is Arch-only on omedora. Body intentionally un-indented
+# to keep the rebase diff minimal — see omedora/architecture.md §8.
+if [[ $(omarchy-distro 2>/dev/null || echo arch) == "arch" ]]; then
 run_logged $OMARCHY_INSTALL/config/hardware/network.sh
 run_logged $OMARCHY_INSTALL/config/hardware/set-wireless-regdom.sh
 run_logged $OMARCHY_INSTALL/config/hardware/fix-fkeys.sh
@@ -71,3 +74,4 @@ run_logged $OMARCHY_INSTALL/config/hardware/fix-surface-keyboard.sh
 run_logged $OMARCHY_INSTALL/config/hardware/fix-yt6801-ethernet-adapter.sh
 run_logged $OMARCHY_INSTALL/config/hardware/fix-synaptic-touchpad.sh
 run_logged $OMARCHY_INSTALL/config/hardware/fix-tuxedo-backlight.sh
+fi
