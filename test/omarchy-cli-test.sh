@@ -16,6 +16,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Default (no brand override): dispatcher renders as Omarchy.
+# Explicitly unset OMARCHY_BRAND so the test is hermetic across CI environments.
+unset OMARCHY_BRAND
+
 output=$("$CLI" --help)
 assert_output_contains "main help renders" "$output" "Omarchy command center"
 assert_output_contains "main help includes hardware group" "$output" "hw"
@@ -243,3 +247,47 @@ assert_output_contains "partial metadata command dispatches" "$output" "partial-
 
 output=$("$TMPDIR/omarchy" body metadata test)
 assert_output_contains "body metadata command dispatches by filename" "$output" "body-metadata-ok"
+
+# ============================================================================
+# Brand-shim assertions (omedora) — see omedora/architecture.md §10.
+# ============================================================================
+
+# Default invocation as `omarchy` retains upstream branding (regression check).
+output=$("$CLI" --help)
+assert_output_contains "default brand renders Omarchy header" "$output" "Omarchy command center"
+assert_output_lacks "default brand does NOT mention Omedora" "$output" "Omedora command center"
+assert_output_contains "default brand example uses 'omarchy theme'" "$output" "omarchy theme list"
+assert_output_lacks "default brand example does NOT use 'omedora theme'" "$output" "omedora theme list"
+
+# OMARCHY_BRAND env override → Omedora branding everywhere.
+output=$(OMARCHY_BRAND=omedora "$CLI" --help)
+assert_output_contains "OMARCHY_BRAND=omedora renders Omedora header" "$output" "Omedora command center"
+assert_output_contains "OMARCHY_BRAND=omedora example uses 'omedora theme'" "$output" "omedora theme list"
+assert_output_lacks "OMARCHY_BRAND=omedora example does NOT use 'omarchy theme'" "$output" "omarchy theme list"
+
+# bin/omedora symlink → invoked as `omedora` → Omedora branding via basename.
+if [[ -L "$ROOT/bin/omedora" ]]; then
+  link_target=$(readlink "$ROOT/bin/omedora")
+  assert_equals "bin/omedora is a symlink to omarchy" "$link_target" "omarchy"
+
+  output=$("$ROOT/bin/omedora" --help)
+  assert_output_contains "invoked as omedora → Omedora header (via basename)" "$output" "Omedora command center"
+fi
+
+# Unknown command on omedora brand uses omedora in the error message.
+unknown_output=$(OMARCHY_BRAND=omedora "$CLI" nonexistent-command 2>&1 || true)
+assert_output_contains "unknown command error uses Omedora brand" "$unknown_output" "Unknown Omedora command"
+assert_output_lacks "unknown command error does NOT mention Omarchy" "$unknown_output" "Unknown Omarchy command"
+
+# JSON output includes brand-substituted routes for omedora.
+json_output=$(OMARCHY_BRAND=omedora "$CLI" commands --json)
+echo "$json_output" | jq -e '.commands[] | select(.binary == "omarchy-theme-set" and (.route | startswith("omedora ")))' >/dev/null
+pass "OMARCHY_BRAND=omedora JSON routes start with 'omedora '"
+
+# Routing works via either name regardless of brand: `omedora theme list` and
+# `omarchy theme list` both resolve to the same binary. (Smoke check; the safe
+# `theme list` dispatch is exercised above.)
+omedora_output=$("$ROOT/bin/omedora" theme list)
+omarchy_output=$("$CLI" theme list)
+assert_equals "omedora theme list output == omarchy theme list output" \
+  "$omedora_output" "$omarchy_output"
