@@ -74,15 +74,16 @@ restore_outputs() {
 
 # Error handler
 catch_errors() {
+  # Capture the failed command's exit code as the very first statement —
+  # any subsequent command (including the [[ ]] in the if below) clobbers $?.
+  local exit_code=$?
+
   # Prevent recursive error handling
   if [[ $ERROR_HANDLING == "true" ]]; then
     return
   else
     ERROR_HANDLING=true
   fi
-
-  # Store exit code immediately before it gets overwritten
-  local exit_code=$?
 
   stop_log_output
   restore_outputs
@@ -99,6 +100,14 @@ catch_errors() {
   gum style "$QR_CODE"
   echo
   gum style "Get help from the community via QR code or at https://discord.gg/tXFUdasqhY"
+
+  # Non-interactive bypass: in containers / CI / scripted runs there's no
+  # human to answer the gum prompt. Exit immediately so the caller (docker
+  # build, test harness, etc.) sees the failure instead of hanging forever.
+  if [[ -n ${OMARCHY_NONINTERACTIVE:-} ]] || [[ ! -t 0 ]] || [[ ! -t 1 ]]; then
+    gum style --foreground 1 "OMARCHY_NONINTERACTIVE / no TTY: aborting without prompt."
+    exit "$exit_code"
+  fi
 
   # Offer options menu
   while true; do
