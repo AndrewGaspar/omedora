@@ -124,6 +124,15 @@ RUN install_exit=$(cat /tmp/install.exit); \
     fi; \
     echo "install.sh succeeded"
 
+# Set a known password so hyprlock / sudo prompts inside the nested session
+# have something to accept. The base image creates omedora with a locked
+# password (`!` in /etc/shadow); without this, any PAM-mediated prompt
+# rejects every attempt. Placed AFTER the install RUNs so this layer
+# doesn't bust the slow install cache when the password line changes.
+USER root
+RUN echo 'omedora:omedora' | chpasswd
+USER omedora
+
 # Default CMD: boot a nested Omedora session.
 #
 # Nesting trick (per omedora/testing.md §6): Hyprland's wayland backend

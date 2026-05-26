@@ -87,6 +87,11 @@ $build_only && exit 0
 
 run_args=(--rm -e "OMEDORA_SESSION_MODE=$mode")
 
+# Bind-mount the updated boot-session.sh from the working tree so we can
+# iterate on it without rebuilding the (~4 GB) image. The Dockerfile baked
+# in a copy too; this just overlays it.
+run_args+=(-v "$REPO/test/fedora/omedora-session/boot-session.sh:/home/omedora/.local/share/omarchy/test/fedora/omedora-session/boot-session.sh:ro")
+
 # GPU access (always — even headless wants Mesa's software OpenGL bits).
 if [[ -e /dev/dri ]]; then
   run_args+=(--device /dev/dri)
