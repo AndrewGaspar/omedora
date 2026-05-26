@@ -95,8 +95,14 @@ RUN --mount=type=cache,target=/var/cache/dnf,sharing=locked \
     echo $? > /tmp/install.exit; \
     exit 0
 
-# Inspect the install result. If install failed, show recognizable error
-# markers + the last 1.5MB of the install log (fits in BuildKit's ~2MB cap).
+# Inspect the install result. Two log files exist:
+#   /tmp/install.log              — full PTY capture (dominated by gum's
+#                                    live-redraw spam; mostly useless)
+#   /var/log/omarchy-install.log  — clean per-script stdout/stderr that
+#                                    run_logged appends to (the GOOD log)
+# We inspect the clean log: print all lifecycle events, then ~400 lines of
+# context around the LAST per-script log section to surface the actual
+# command output that triggered the failure.
 RUN install_exit=$(cat /tmp/install.exit); \
     if (( install_exit != 0 )); then \
       echo ""; \
@@ -104,11 +110,16 @@ RUN install_exit=$(cat /tmp/install.exit); \
       echo "=== install.sh failed (exit $install_exit)"; \
       echo "================================================================"; \
       echo ""; \
-      echo "--- Failed-script / error markers in log ---"; \
-      grep -E "Failed script:|^Error:|^error:|^FAIL|^fail" /tmp/install.log | tail -40 || true; \
+      clean=/var/log/omarchy-install.log; \
+      if [[ ! -s "$clean" ]]; then \
+        echo "(no $clean — falling back to /tmp/install.log)"; \
+        clean=/tmp/install.log; \
+      fi; \
+      echo "--- Last 60 lifecycle events (Starting/Completed/Failed) ---"; \
+      grep -aE '^\[20[0-9]{2}-[0-9]{2}-[0-9]{2} [0-9:]+\] (Starting|Completed|Failed):' "$clean" | tail -60 || true; \
       echo ""; \
-      echo "--- last ~1.5MB of /tmp/install.log ---"; \
-      tail -c 1500000 /tmp/install.log; \
+      echo "--- Last 400 lines of clean per-script log ---"; \
+      tail -400 "$clean" | sed -E 's/\x1b\[[0-9;?]*[mGKsuHJh]//g; s/\x1b\][^\x07]*(\x07|\x1b\\)//g; s/\r/\n/g'; \
       exit "$install_exit"; \
     fi; \
     echo "install.sh succeeded"
