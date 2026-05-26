@@ -1,3 +1,11 @@
+# xdg-mime / xdg-settings ship with xdg-utils. On Fedora it isn't always
+# pulled in by the base set; guard so a missing xdg-utils degrades to "no
+# MIME defaults configured" rather than aborting the install.
+if ! command -v xdg-mime >/dev/null 2>&1; then
+  echo "xdg-mime not installed; skipping MIME default setup."
+  return 0 2>/dev/null || exit 0
+fi
+
 omarchy-refresh-applications
 update-desktop-database ~/.local/share/applications
 
