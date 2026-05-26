@@ -4,6 +4,29 @@ abort() {
   gum confirm "Proceed anyway on your own accord and without assistance?" || exit 1
 }
 
+# Fedora arm — Omedora has different guard concerns than Omarchy because we
+# don't own the boot stack (no Limine/btrfs requirement, no Plymouth conflict,
+# etc.). Early-return after a minimal sanity check; the Arch guards below are
+# byte-for-byte upstream. See omedora/architecture.md §7.
+if [[ $(omarchy-distro 2>/dev/null) == "fedora" ]]; then
+  if (( EUID == 0 )); then
+    echo -e "\e[31mOmedora install must run as a regular user (not root)\e[0m" >&2
+    exit 1
+  fi
+  if [[ $(uname -m) != "x86_64" ]]; then
+    echo -e "\e[31mOmedora install requires x86_64 (got $(uname -m))\e[0m" >&2
+    exit 1
+  fi
+  if [[ ! -r /etc/os-release ]] || ! grep -q '^ID=fedora' /etc/os-release; then
+    echo -e "\e[31mOmedora install requires Fedora (no /etc/os-release ID=fedora)\e[0m" >&2
+    exit 1
+  fi
+  echo "Fedora guards: OK"
+  # Return if sourced (the normal install.sh path); exit if executed directly
+  # (test runs via `bash guard.sh`).
+  return 0 2>/dev/null || exit 0
+fi
+
 # Must be an Arch distro
 if [[ ! -f /etc/arch-release ]]; then
   abort "Vanilla Arch"

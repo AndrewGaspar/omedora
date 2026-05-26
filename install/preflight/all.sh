@@ -1,6 +1,14 @@
 source $OMARCHY_INSTALL/preflight/guard.sh
 source $OMARCHY_INSTALL/preflight/begin.sh
 run_logged $OMARCHY_INSTALL/preflight/show-env.sh
+
+# Fedora-only repo enablement (RPM Fusion + Hyprland COPR + Flathub).
+# Inserted between show-env and the Arch-only pacman setup so it runs early
+# enough that subsequent packaging stages can pull from the new repos.
+if [[ $(omarchy-distro 2>/dev/null || echo arch) == "fedora" ]]; then
+  run_logged $OMARCHY_INSTALL/preflight/fedora-repos.sh
+fi
+
 run_logged $OMARCHY_INSTALL/preflight/pacman.sh
 run_logged $OMARCHY_INSTALL/preflight/migrations.sh
 run_logged $OMARCHY_INSTALL/preflight/first-run-mode.sh
