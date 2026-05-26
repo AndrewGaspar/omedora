@@ -6,6 +6,9 @@ EOF
 
   sudo systemctl enable power-profiles-daemon
 
-  sudo udevadm control --reload 2>/dev/null
-  sudo udevadm trigger --subsystem-match=power_supply 2>/dev/null
+  # udevadm fails when systemd-udevd isn't running (e.g., unprivileged
+  # containers). The .rules file is what matters; on-disk rules apply at
+  # next udev start. Tolerate the failure so set -e doesn't abort install.
+  sudo udevadm control --reload 2>/dev/null || true
+  sudo udevadm trigger --subsystem-match=power_supply 2>/dev/null || true
 fi
