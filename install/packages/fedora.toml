@@ -1,0 +1,146 @@
+# Package map: Arch package name -> Fedora install source.
+#
+# Absence from this file means the Arch name resolves identically on Fedora's
+# main repos. Add an entry only when:
+#   - The Fedora package name differs from the Arch name, OR
+#   - The package isn't in Fedora main repos (needs RPM Fusion, COPR, Flathub,
+#     or source), OR
+#   - The package should be deliberately skipped on Fedora (with a reason).
+#
+# Schema and tier rules are documented in omedora/packages.md.
+# Validate this file with `omarchy dev validate-fedora-packages`.
+
+# --- Renamed packages (different name, in Fedora main) -------------------
+
+[ttf-jetbrains-mono-nerd]
+source = "dnf"
+names = ["jetbrains-mono-fonts-all"]
+
+[ttf-cascadia-mono-nerd]
+source = "dnf"
+names = ["cascadia-code-fonts"]
+
+[woff2-font-awesome]
+source = "dnf"
+names = ["fontawesome-fonts"]
+
+# --- COPR-required (Hyprland ecosystem) ----------------------------------
+
+[hyprland]
+source = "copr"
+copr = "lionheartp/Hyprland"
+names = ["hyprland"]
+reason = "Hyprland not in Fedora 44 main repos; lionheartp/Hyprland tracks upstream and has current F44 builds. Revisit each Fedora release."
+
+[hypridle]
+source = "copr"
+copr = "lionheartp/Hyprland"
+names = ["hypridle"]
+
+[hyprlock]
+source = "copr"
+copr = "lionheartp/Hyprland"
+names = ["hyprlock"]
+
+[hyprpaper]
+source = "copr"
+copr = "lionheartp/Hyprland"
+names = ["hyprpaper"]
+
+[hyprpicker]
+source = "copr"
+copr = "lionheartp/Hyprland"
+names = ["hyprpicker"]
+
+[hyprsunset]
+source = "copr"
+copr = "lionheartp/Hyprland"
+names = ["hyprsunset"]
+
+[xdg-desktop-portal-hyprland]
+source = "copr"
+copr = "lionheartp/Hyprland"
+names = ["xdg-desktop-portal-hyprland"]
+
+# --- Flathub (proprietary or unpackaged GUI apps) ------------------------
+
+[obsidian]
+source = "flathub"
+app_id = "md.obsidian.Obsidian"
+
+[spotify]
+source = "flathub"
+app_id = "com.spotify.Client"
+reason = "Proprietary; Flathub is the canonical install path on Fedora."
+
+[typora]
+source = "flathub"
+app_id = "io.typora.Typora"
+reason = "Proprietary; Flathub is the canonical install path on Fedora."
+
+[1password-beta]
+source = "flathub"
+app_id = "com.bitwarden.desktop"
+reason = "Placeholder — 1Password's own RPM repo would be preferred; revisit before shipping."
+
+# --- Explicitly skipped (out of omedora scope on Fedora) -----------------
+
+[ufw]
+source = "skip"
+reason = "Fedora ships firewalld; omedora does not replace the firewall."
+
+[ufw-docker]
+source = "skip"
+reason = "Companion to ufw; not needed under firewalld."
+
+[limine]
+source = "skip"
+reason = "Bootloader; omedora does not own the boot stack on Fedora."
+
+[limine-mkinitcpio-hook]
+source = "skip"
+reason = "Limine + mkinitcpio integration; out of scope on Fedora (uses dracut + GRUB)."
+
+[limine-snapper-sync]
+source = "skip"
+reason = "Limine + Snapper snapshot integration; bootloader territory, out of scope."
+
+[snapper]
+source = "skip"
+reason = "Snapshot integration relies on Limine on Arch; out of scope on Fedora."
+
+[plymouth]
+source = "skip"
+reason = "Fedora ships its own Plymouth; omedora does not replace it."
+
+[mkinitcpio]
+source = "skip"
+reason = "Arch initramfs tool; Fedora uses dracut. Out of scope."
+
+[archlinux-keyring]
+source = "skip"
+reason = "Arch package signing keyring; not applicable on Fedora."
+
+[base]
+source = "skip"
+reason = "Arch base metapackage; not applicable on Fedora."
+
+[base-devel]
+source = "skip"
+reason = "Arch build group; Fedora uses 'dnf group install development-tools' which the user can opt into separately."
+
+[linux-firmware-marvell]
+source = "skip"
+reason = "Surface-specific Marvell firmware; users on Surface devices install via Fedora's own channels."
+
+[intel-ipu7-camera]
+source = "skip"
+reason = "Intel IPU7 camera kernel module; users opt into akmod-ipu7 separately. Out of omedora scope."
+
+[intel-lpmd]
+source = "skip"
+reason = "Intel Low Power Mode Daemon; not packaged on Fedora; users with Intel hardware can build separately."
+
+[kernel-modules-hook]
+source = "skip"
+reason = "Pacman hook for kernel module cleanup; Fedora's dnf has equivalent behavior built-in."
