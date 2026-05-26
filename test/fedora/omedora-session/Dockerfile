@@ -124,6 +124,14 @@ RUN install_exit=$(cat /tmp/install.exit); \
     fi; \
     echo "install.sh succeeded"
 
-# Default CMD (post-install): boot a nested Hyprland session.
-# Filled in later — for now the image is "an installed omedora ready to boot."
-CMD ["bash"]
+# Default CMD: boot a nested Omedora session.
+#
+# Nesting trick (per omedora/testing.md §6): Hyprland's wayland backend
+# (AQ_BACKENDS=wayland) makes Hyprland a Wayland *client* of the host's
+# compositor instead of talking to DRM/KMS directly. The host's Wayland
+# socket is bind-mounted in by run-session.sh; the script below points
+# Hyprland at it.
+#
+# Run via test/fedora/run-session.sh from the host (handles the socket
+# bind, /dev/dri share, and render/video group propagation).
+CMD ["bash", "/home/omedora/.local/share/omarchy/test/fedora/omedora-session/boot-session.sh"]
