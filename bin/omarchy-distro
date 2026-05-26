@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# omarchy:summary=Print the detected host distribution token (arch|fedora)
+# omarchy:examples=omarchy distro
+# omarchy:hidden=true
+
+# Detect the host distribution and emit exactly one of: arch, fedora.
+# Used by every helper that needs distro-aware dispatch.
+#
+# Resolution order:
+#   1. $OMARCHY_DISTRO (escape hatch — lets devs force a code path)
+#   2. /etc/os-release ID field (arch | fedora)
+#   3. /etc/os-release ID_LIKE field (matches "arch" or "fedora" tokens)
+#   4. Exit 1 with an error if nothing matches
+#
+# For tests: set $OMARCHY_OS_RELEASE_PATH to point at a fixture file
+# instead of /etc/os-release.
+
+set -eu
+
+if [[ -n ${OMARCHY_DISTRO:-} ]]; then
+  printf '%s\n' "$OMARCHY_DISTRO"
+  exit 0
+fi
+
+os_release="${OMARCHY_OS_RELEASE_PATH:-/etc/os-release}"
+
+if [[ ! -r $os_release ]]; then
+  echo "omarchy-distro: cannot read $os_release" >&2
+  exit 1
+fi
+
+# Source it in a subshell-safe way; os-release files are POSIX-style
+# KEY=VALUE pairs that bash can source directly.
+id=""
+id_like=""
+while IFS='=' read -r key value; do
+  # Strip surrounding quotes from value, if any.
+  value="${value%\"}"
+  value="${value#\"}"
+  case "$key" in
+    ID)      id="$value" ;;
+    ID_LIKE) id_like="$value" ;;
+  esac
+done <"$os_release"
+
+case "$id" in
+  arch)   echo arch;   exit 0 ;;
+  fedora) echo fedora; exit 0 ;;
+esac
+
+# Fall back to ID_LIKE — covers derivatives like AlmaLinux/Rocky (fedora-like)
+# or Manjaro (arch-like). We deliberately do NOT match Arch derivatives
+# upstream's guard.sh rejects (CachyOS, EndeavourOS, Garuda, Manjaro) — but
+# at the distro-detection layer we treat ID_LIKE=arch as Arch so the user
+# can at least invoke the CLI. Guard rules live in install/preflight/guard.sh,
+# not here.
+for token in $id_like; do
+  case "$token" in
+    fedora) echo fedora; exit 0 ;;
+    arch)   echo arch;   exit 0 ;;
+  esac
+done
+
+echo "omarchy-distro: unsupported distribution (ID=$id ID_LIKE=$id_like)" >&2
+exit 1
