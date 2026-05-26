@@ -31,10 +31,12 @@ set -uo pipefail
 MODE="${OMEDORA_SESSION_MODE:-interactive}"
 REPO="${OMARCHY_PATH:-/home/omedora/.local/share/omarchy}"
 
-# XDG_RUNTIME_DIR must exist and be 0700.
+# XDG_RUNTIME_DIR must exist and be 0700. When it's /tmp (the shared sticky
+# dir we bind-mount the host Wayland socket into) we can't chmod it — that's
+# fine, Wayland clients only need the *socket* to be reachable.
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
-mkdir -p "$XDG_RUNTIME_DIR"
-chmod 0700 "$XDG_RUNTIME_DIR"
+mkdir -p "$XDG_RUNTIME_DIR" 2>/dev/null || true
+chmod 0700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
 
 # Aquamarine / wlroots-style backend selection.
 case "$MODE" in
@@ -59,13 +61,16 @@ case "$MODE" in
     ;;
 esac
 
-# UWSM is the upstream way to launch the Hyprland session — it sets up the
-# user systemd environment and runs the right exec lines from
-# hyprland.desktop. omedora's install pipeline configures it.
-if command -v uwsm >/dev/null 2>&1 && [[ $MODE == "interactive" ]]; then
-  echo "Launching Omedora via UWSM (nested $AQ_BACKENDS)..."
+# UWSM is the upstream way to launch on real Arch — it wires user systemd
+# into the session. We don't have PID-1 systemd in the container, so uwsm
+# fails on its graphical.target check. Launch Hyprland directly instead;
+# the autostart entries in hyprland.conf (waybar, mako, swaybg, etc.) still
+# fire because they're exec-once lines that Hyprland reads on startup
+# regardless of how it was invoked.
+if [[ $MODE == "interactive" ]]; then
+  echo "Launching Omedora (nested $AQ_BACKENDS, no-systemd)..."
   echo "  Exit the host window to stop the session."
-  exec uwsm start -- hyprland.desktop
+  exec Hyprland
 fi
 
 # Smoke / headless: run Hyprland directly so we can drive it via hyprctl.
