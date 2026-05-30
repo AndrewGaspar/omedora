@@ -18,6 +18,14 @@ spec="${1:?usage: build-local.sh <name.spec>}"
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
 COPR_DIR="$REPO/omedora/packaging/copr"
 IMAGE="${OMEDORA_RPMBUILD_IMAGE:-registry.fedoraproject.org/fedora:44}"
+# Persist dnf's package + metadata cache across builds. fedora:44 ships dnf5,
+# whose cache lives under /var/cache/libdnf5 (NOT the dnf4 path /var/cache/dnf).
+# With `--rm` each spec builds in a throwaway container, so without this volume
+# EVERY build re-downloads the rpm-build/rpmdevtools/builddep tooling AND each
+# spec's BuildRequires from scratch (most painful in build-repo.sh's 14-spec
+# loop, where the common tooling is fetched 14 times). The named volume is
+# auto-created on first use; keepcache=1 makes the downloaded RPMs stick.
+CACHE_VOL="${OMEDORA_RPMBUILD_DNF_CACHE:-omedora-rpmbuild-dnf-cache}"
 
 [[ -f "$COPR_DIR/$spec" ]] || { echo "spec not found: $COPR_DIR/$spec" >&2; exit 1; }
 
@@ -26,10 +34,13 @@ mkdir -p "$COPR_DIR/output"
 echo "Building $spec in $IMAGE ..."
 podman run --rm \
   -v "$COPR_DIR:/copr:z" \
+  -v "$CACHE_VOL:/var/cache/libdnf5" \
   "$IMAGE" bash -euo pipefail -c '
     # rpm-build gives rpmbuild; rpmdevtools gives rpmdev-setuptree + spectool;
-    # the builddep plugin installs a spec'\''s BuildRequires.
-    dnf install -y --setopt=install_weak_deps=False \
+    # the builddep plugin installs a spec'\''s BuildRequires. keepcache=1 keeps
+    # the downloaded RPMs in the mounted /var/cache/libdnf5 volume so the next
+    # spec (next throwaway container) reuses them instead of re-downloading.
+    dnf install -y --setopt=keepcache=1 --setopt=install_weak_deps=False \
       rpm-build rpmdevtools "dnf-command(builddep)" >/dev/null
 
     # Standard ~/rpmbuild/{SPECS,SOURCES,RPMS,SRPMS,BUILD} tree.
@@ -38,7 +49,7 @@ podman run --rm \
 
     # Install the spec'\''s BuildRequires (e.g. systemd-rpm-macros for
     # %%{_userunitdir}). A COPR does this step for you.
-    dnf builddep -y ~/rpmbuild/SPECS/'"$spec"' >/dev/null
+    dnf builddep -y --setopt=keepcache=1 ~/rpmbuild/SPECS/'"$spec"' >/dev/null
 
     # Download every Source0/SourceN URL declared in the spec into SOURCES/.
     spectool -g -R ~/rpmbuild/SPECS/'"$spec"'
