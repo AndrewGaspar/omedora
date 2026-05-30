@@ -3,64 +3,75 @@
 # Launch the Omedora graphical session inside the systemd container.
 #
 # Runs AS the omedora user INSIDE a real logind session (entered via
-# `machinectl shell` by run-session.sh). Because it's a real session,
-# XDG_RUNTIME_DIR, DBUS_SESSION_BUS_ADDRESS, and the `systemd --user` manager
-# are already set up by pam_systemd — exactly like a bare-metal TTY/DM login.
+# `machinectl shell` by run-session.sh), and launches the session through
+# `uwsm start` — exactly as the omarchy.desktop session entry does on bare
+# metal. uwsm sets up the user environment, activates graphical-session.target,
+# and runs the autostart chain in proper `systemd --user` scopes. That makes
+# the container session behave like a real one: PATH is propagated, env reaches
+# systemd/dbus, and `uwsm-app`-launched apps (waybar, walker's gapplication
+# service, ...) render correctly. Launching Hyprland directly instead led to a
+# cascade of breakage (no PATH, unpropagated env, broken uwsm-app scopes).
 #
-# The only thing this adds over a bare-metal launch is the Wayland-on-Wayland
-# nesting: Hyprland's `wayland` backend makes it a Wayland *client* of the
-# host compositor (whose socket the runner bind-mounted at /tmp/host-wayland)
-# instead of driving DRM/KMS directly.
+# Two things make `uwsm start` work in a container:
 #
-# Why not `uwsm start`? Upstream's omarchy.desktop launches via
-# `uwsm start -g -1 -e -D Hyprland hyprland.desktop`, but uwsm's environment
-# preloader is seat/VT-aware: it calls loginctl to find the session attached to
-# the foreground VT and aborts ("Could not determine session on foreground VT")
-# when there isn't one. A container has no seat0 and no VTs, so `uwsm start`
-# can't run there — it's the wrong tool for a nested session.
+#  1. The seat/VT gate. uwsm's env preloader normally calls logind to find the
+#     graphical session on the foreground VT and aborts ("Could not determine
+#     session on foreground VT") when there isn't one — a container has no
+#     seat0/VTs. But its prepare_env() only does that lookup when XDG_SEAT or
+#     XDG_SESSION_ID are empty; if both are set it skips it. `uwsm start` saves
+#     the whole launching environment, so exporting a (fake but non-empty)
+#     XDG_SEAT plus the real XDG_SESSION_ID below bypasses the gate. The value
+#     of XDG_SEAT is never validated against hardware once the gate is passed.
 #
-# Launching Hyprland directly under this real logind + `systemd --user` session
-# is faithful in every way that matters for L4: the autostart chain in
-# default/hypr/autostart.lua wraps each app in `uwsm-app -- <cmd>`, and the real
-# `uwsm-app` hands those off to the running user systemd manager — so waybar,
-# mako, swaybg, hypridle, fcitx5 et al. start exactly as on bare metal. (Proven:
-# 0/13 autostart entries fired under the old no-systemd image; all fire here.)
+#  2. The nesting env. uwsm deliberately strips WAYLAND_DISPLAY from the user
+#     manager env (a compositor is expected to *create* its socket, not inherit
+#     one). For Wayland-on-Wayland nesting we instead feed it — plus the
+#     aquamarine/wlroots backend selection — to the compositor unit via a
+#     drop-in. (Container-test-only: it hardcodes the bind-mounted host socket.)
 
 set -uo pipefail
 
-# Host compositor socket (bind-mounted by the runner). An absolute WAYLAND_DISPLAY
-# is used verbatim by libwayland, so the nesting backend connects to the host.
-export WAYLAND_DISPLAY=/tmp/host-wayland
-if [[ ! -S $WAYLAND_DISPLAY ]]; then
-  echo "ERROR: host Wayland socket not present at $WAYLAND_DISPLAY" >&2
+# Host compositor socket (bind-mounted by the runner at /tmp/host-wayland).
+if [[ ! -S /tmp/host-wayland ]]; then
+  echo "ERROR: host Wayland socket not present at /tmp/host-wayland" >&2
   echo "       Run via test/fedora/run-session.sh from a Wayland desktop." >&2
   exit 2
 fi
 
-# omarchy's session environment — PATH (so omarchy-* bins resolve), TERMINAL,
-# BROWSER, EDITOR, mise — lives in ~/.config/uwsm/env, normally sourced by
-# `uwsm start`. We launch Hyprland directly, so source it ourselves. Without
-# this the omarchy bin dir isn't on PATH, and every keybind that calls
-# omarchy-menu / omarchy-launch-walker (Super+Space, the menus, theme switch,
-# screenshots, ...) silently fails with "command not found".
+# (2) Feed the nesting env to the compositor service (uwsm strips WAYLAND_DISPLAY
+# from the user-manager env, so a drop-in is the way to get it to the unit).
+mkdir -p "$HOME/.config/systemd/user/wayland-wm@.service.d"
+cat >"$HOME/.config/systemd/user/wayland-wm@.service.d/10-nest.conf" <<'EOF'
+[Service]
+Environment=WAYLAND_DISPLAY=/tmp/host-wayland
+Environment=AQ_BACKENDS=wayland
+Environment=WLR_BACKENDS=wayland
+EOF
+systemctl --user daemon-reload 2>/dev/null || true
+
+# omarchy's session environment (PATH with the omarchy bin dir, TERMINAL,
+# BROWSER, EDITOR, mise). `uwsm start` saves the launching env and propagates
+# it, so sourcing this here is what gets omarchy-* onto the user manager's PATH.
 [[ -f "$HOME/.config/uwsm/env" ]] && source "$HOME/.config/uwsm/env"
 
-# Nest under the host compositor instead of DRM/KMS.
-export AQ_BACKENDS=wayland
-export WLR_BACKENDS=wayland
-export XDG_CURRENT_DESKTOP=Hyprland
-export XDG_SESSION_TYPE=wayland
+# The container has no GPU (software rendering), so force GTK4 apps to the cairo
+# renderer — the default GL/Vulkan renderer fails to paint here. Set it in the
+# session env so it propagates (via uwsm) to ALL user scopes, including the
+# walker autostart service. (omarchy-launch-walker sets cairo for its own
+# walker, but the autostart unit doesn't, which left it unable to render the
+# menu.) Test-only: real hardware wants the GL renderer.
+export GSK_RENDERER=cairo
 
-echo "Starting Omedora (nested wayland; session=${XDG_SESSION_ID:-?}, runtime=$XDG_RUNTIME_DIR)"
+# (1) Satisfy uwsm's seat/VT gate so the env preloader skips the foreground-VT
+# lookup that fails in a container.
+export XDG_CURRENT_DESKTOP=Hyprland
+export XDG_SEAT="${XDG_SEAT:-seat0}"
+export XDG_SESSION_ID="${XDG_SESSION_ID:-$(loginctl --no-legend list-sessions 2>/dev/null | awk 'NR==1{print $1}')}"
+
+echo "Starting Omedora via uwsm (nested wayland; session=${XDG_SESSION_ID:-?}, seat=$XDG_SEAT)"
 echo "  Close the host window to end the session."
 
-# Several user services are WantedBy graphical-session.target, which our direct
-# Hyprland launch (no uwsm) doesn't activate. Start them explicitly:
-#   - elephant: walker's data-provider backend (else Super+Space has no results)
-#   - pipewire / pipewire-pulse / wireplumber: the audio stack waybar's volume
-#     module talks to (else the audio icon is blank until first interaction)
-# All harmless if absent.
-systemctl --user start elephant.service 2>/dev/null || true
-systemctl --user start pipewire.service pipewire-pulse.service wireplumber.service 2>/dev/null || true
-
-exec Hyprland
+# uwsm activates graphical-session.target, which brings up the WantedBy= user
+# services (elephant, pipewire, wireplumber, ...) and runs autostart in proper
+# scopes — no manual `systemctl --user start` workarounds needed anymore.
+exec uwsm start -- hyprland.desktop
