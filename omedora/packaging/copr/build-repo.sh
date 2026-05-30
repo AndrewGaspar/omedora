@@ -67,10 +67,35 @@ for s in "${candidates[@]}"; do
   fi
 done
 
+# Seed the local repo with everything already built, so the FIRST spec in a
+# partial/incremental run can still resolve siblings from a previous full run.
+# build-local.sh enables /copr/repo inside its build container; we keep it
+# populated + indexed here so each spec sees the ones before it (intra-stack
+# BuildRequires across the Hyprland stack).
+seed_and_index_repo() {
+  podman run --rm -v "$COPR_DIR:/copr:z" "$IMAGE" bash -euo pipefail -c '
+    dnf install -y --setopt=install_weak_deps=False createrepo_c >/dev/null
+    mkdir -p /copr/repo
+    # Binary RPMs only (skip the .src.rpm — not needed to install from).
+    cp -u /copr/output/*.x86_64.rpm /copr/output/*.noarch.rpm /copr/repo/ 2>/dev/null || true
+    createrepo_c --quiet --update /copr/repo
+  '
+}
+
 if (( ${#to_build[@]} )); then
   echo "==> Building ${#to_build[@]} spec(s): ${to_build[*]}"
+  # Make sure any pre-existing output is indexed before the first build, so a
+  # partial run resolves siblings built in an earlier invocation.
+  if compgen -G "$COPR_DIR/output/"*.rpm >/dev/null 2>&1; then
+    echo "==> Indexing pre-existing RPMs into local repo"
+    seed_and_index_repo
+  fi
   for s in "${to_build[@]}"; do
     "$BUILDER" "$s"
+    # Incrementally fold this spec's just-built RPMs into the local repo and
+    # re-index, so the NEXT spec's `dnf builddep` can resolve it.
+    echo "==> Folding $s into local repo (createrepo_c --update)"
+    seed_and_index_repo
     touch "$STAMP_DIR/$s"   # stamp only after a successful build (set -e aborts on failure)
   done
 else
@@ -78,7 +103,9 @@ else
 fi
 
 echo ""
-echo "==> Assembling local repo (createrepo_c)"
+echo "==> Assembling/refreshing local repo (createrepo_c)"
+# Final pass: rebuild the repo cleanly from output/ so it contains EXACTLY the
+# current artifacts (drops anything stale if output/ was pruned), then index.
 podman run --rm -v "$COPR_DIR:/copr:z" "$IMAGE" bash -euo pipefail -c '
   dnf install -y --setopt=install_weak_deps=False createrepo_c >/dev/null
   rm -rf /copr/repo

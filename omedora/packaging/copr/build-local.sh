@@ -41,14 +41,35 @@ podman run --rm \
     # the downloaded RPMs in the mounted /var/cache/libdnf5 volume so the next
     # spec (next throwaway container) reuses them instead of re-downloading.
     dnf install -y --setopt=keepcache=1 --setopt=install_weak_deps=False \
-      rpm-build rpmdevtools "dnf-command(builddep)" >/dev/null
+      rpm-build rpmdevtools "dnf-command(builddep)" createrepo_c >/dev/null
+
+    # Expose ALREADY-BUILT sibling RPMs to this build as a local dnf repo. The
+    # Hyprland stack has deep intra-stack BuildRequires (e.g. hyprland BR
+    # hyprutils-devel, aquamarine-devel, ...). build-repo.sh copies each freshly
+    # built RPM into /copr/repo before invoking the next spec, so dnf builddep
+    # below resolves just-built siblings. We (re)generate repodata here so the
+    # repo is always valid even if an external caller only dropped RPMs in.
+    # The repo is mounted read-write via /copr; createrepo_c needs the metadata
+    # to exist for dnf to consume it.
+    if compgen -G "/copr/repo/*.rpm" >/dev/null 2>&1; then
+      [[ -d /copr/repo/repodata ]] || createrepo_c --quiet /copr/repo
+      cat > /etc/yum.repos.d/omedora-local.repo <<EOF
+[omedora-local]
+name=omedora local build repo
+baseurl=file:///copr/repo
+enabled=1
+gpgcheck=0
+priority=1
+EOF
+    fi
 
     # Standard ~/rpmbuild/{SPECS,SOURCES,RPMS,SRPMS,BUILD} tree.
     rpmdev-setuptree
     cp "/copr/'"$spec"'" ~/rpmbuild/SPECS/
 
     # Install the spec'\''s BuildRequires (e.g. systemd-rpm-macros for
-    # %%{_userunitdir}). A COPR does this step for you.
+    # %%{_userunitdir}, or just-built sibling -devel packages). A COPR does this
+    # step for you.
     dnf builddep -y --setopt=keepcache=1 ~/rpmbuild/SPECS/'"$spec"' >/dev/null
 
     # Download every Source0/SourceN URL declared in the spec into SOURCES/.
