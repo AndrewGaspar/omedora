@@ -16,6 +16,13 @@ run_logged $OMARCHY_INSTALL/config/omarchy-ai-skill.sh
 run_logged $OMARCHY_INSTALL/config/pi.sh
 run_logged $OMARCHY_INSTALL/config/omarchy-toggles.sh
 
+# --- Fedora-only (user-level) ---
+# On Arch the default terminal arrives via the omarchy-base metapackage; on
+# Fedora nothing pulls it in, so install + set it explicitly here.
+if [[ $(omarchy-distro 2>/dev/null || echo arch) == "fedora" ]]; then
+run_logged $OMARCHY_INSTALL/config/default-terminal-fedora.sh
+fi
+
 # --- System-admin (Arch-only on omedora) ---
 # These scripts write to /etc/, /usr/, modify system services, usermod, or
 # otherwise change machine-wide state. On omedora-for-Fedora those changes

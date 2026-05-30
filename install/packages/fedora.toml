@@ -13,12 +13,14 @@
 # --- Renamed packages (different name, in Fedora main) -------------------
 
 [ttf-jetbrains-mono-nerd]
-source = "dnf"
-names = ["jetbrains-mono-fonts-all"]
+source = "source"
+installer = "nerd-fonts.sh"
+reason = "Fedora's jetbrains-mono-fonts-all is the PLAIN font — no Nerd Font icon glyphs, so waybar/terminal icons render as tofu. The installer fetches the patched Nerd Font from ryanoasis/nerd-fonts. Covers both this and ttf-cascadia-mono-nerd."
 
 [ttf-cascadia-mono-nerd]
-source = "dnf"
-names = ["cascadia-code-fonts"]
+source = "source"
+installer = "nerd-fonts.sh"
+reason = "See ttf-jetbrains-mono-nerd — the same installer fetches CascadiaCode (CaskaydiaMono) Nerd Font. Fedora's cascadia-code-fonts is the un-patched variant."
 
 [woff2-font-awesome]
 source = "dnf"
