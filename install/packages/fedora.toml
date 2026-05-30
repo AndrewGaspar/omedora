@@ -138,7 +138,7 @@ reason = "TODO: source installer (clone omarchy's nvim config into ~/.config/nvi
 [omarchy-walker]
 source = "dnf"
 names = ["walker", "elephant"]
-reason = "AUR meta pulling walker + elephant; neither is in Fedora repos. Both are packaged as RPMs in omedora/packaging/copr/ (walker pulls gtk4-layer-shell, elephant pulls libqalculate + ships its providers and user service) and served from the omedora repo (local now, COPR later)."
+reason = "AUR meta pulling walker + elephant; neither is in Fedora repos. Both are packaged as RPMs in omedora/packaging/copr/ (walker pulls gtk4-layer-shell, elephant pulls qalculate for the calc provider's qalc CLI + ships its providers and user service) and served from the omedora repo (local now, COPR later)."
 
 [starship]
 source = "skip"
