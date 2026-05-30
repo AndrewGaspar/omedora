@@ -12,7 +12,7 @@
 
 Name:           elephant
 Version:        2.21.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Data provider and executor backend for the Walker launcher
 
 # TODO: confirm upstream license string before publishing to a COPR.
@@ -38,10 +38,14 @@ ExclusiveArch:  x86_64
 # Provides the %%{_userunitdir} macro (path for systemd *user* units).
 BuildRequires:  systemd-rpm-macros
 
-# calc provider dlopen's libqalculate at runtime; without it the `=` calc prefix
-# silently disables itself. RPM auto-detects the core/plugin .so library needs,
-# but libqalculate is a runtime (not link-time) dep, so name it explicitly.
-Requires:       libqalculate
+# calc provider shells out to the `qalc` CLI at runtime (exec.LookPath("qalc")
+# in internal/providers/calc/setup.go — it does NOT dlopen libqalculate). On
+# Fedora the `qalc` binary ships in the `qalculate` package, NOT in
+# `libqalculate` (which is the shared library only). Requiring `libqalculate`
+# alone left `qalc` absent, so the provider's Available() check failed and the
+# `=` calc prefix silently disabled itself. Require `qalculate` (which pulls in
+# libqalculate transitively) so the binary is present.
+Requires:       qalculate
 
 # Prebuilt binaries: no debuginfo, and DO NOT strip — Go plugins carry build
 # metadata that plugin.Open() verifies; stripping can make them fail to load.
@@ -71,11 +75,17 @@ done
 install -D -m 0755 elephant-linux-amd64 %{buildroot}%{_bindir}/elephant
 
 # Provider plugins → /usr/lib/elephant/providers/<name>.so (a built-in libDir).
-# Strip the "-linux-amd64" suffix so the filenames read as plain provider names.
+# Strip the "-linux-amd64" suffix so the filenames read as plain provider names
+# (e.g. calc-linux-amd64.so -> calc.so). elephant's loader looks for "<name>.so".
+# NOTE: the "%%" below is mandatory. In the shell suffix-strip ${so%-linux-amd64.so}
+# the bare "%" is a macro sigil to rpm's spec parser, which silently ate
+# "%-linux-amd64.so" at parse time — so the strip never ran and files installed as
+# calc-linux-amd64.so.so, which elephant could not find (calc/`=` prefix dead).
+# Doubling it (%%) emits a literal "%" to the shell so the strip works.
 provdir=%{buildroot}%{_prefix}/lib/elephant/providers
 install -d "$provdir"
 for so in *-linux-amd64.so; do
-  install -m 0644 "$so" "$provdir/${so%-linux-amd64.so}.so"
+  install -m 0644 "$so" "$provdir/${so%%-linux-amd64.so}.so"
 done
 
 # systemd *user* service. elephant runs per-user alongside the graphical
@@ -105,6 +115,16 @@ EOF
 %{_userunitdir}/elephant.service
 
 %changelog
+* Sat May 30 2026 omedora <noreply@omedora> - 2.21.0-2
+- Fix calc (`=`) provider, two bugs:
+  1. Require `qalculate` instead of `libqalculate`: the provider execs the
+     `qalc` CLI, which Fedora ships in `qalculate`, not in the `libqalculate`
+     shared-library package. `qalculate` pulls libqalculate in transitively.
+  2. Escape the `%` in the provider-rename suffix-strip (`%%` not `%`). rpm's
+     spec parser was eating `%-linux-amd64.so` as a macro, so plugins installed
+     as `calc-linux-amd64.so.so` instead of `calc.so` and elephant could not
+     load any of them.
+
 * Fri May 29 2026 omedora <noreply@omedora> - 2.21.0-1
 - Initial binary-repackage of elephant core + the providers omedora uses.
 - Providers install to /usr/lib/elephant/providers (a built-in elephant libDir).
