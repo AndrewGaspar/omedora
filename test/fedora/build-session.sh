@@ -32,11 +32,22 @@ BUILD_CTR="${OMEDORA_BUILD_CTR:-omedora-session-build}"
 DNF_CACHE_VOL="${OMEDORA_DNF_CACHE_VOL:-omedora-dnf-cache}"
 HOST_LOG="${OMEDORA_SYSTEMD_BUILD_LOG:-/tmp/omedora-session-build.log}"
 DOCKERFILE="$REPO/test/fedora/omedora-session/Dockerfile.base"
+COPR_DIR="$REPO/packaging/copr"
 
 rebuild=false
 [[ "${1:-}" == "--rebuild" ]] && rebuild=true
 
 log() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
+
+# --- 0. Build the local omedora RPM repo (COPR stand-in) ---------------------
+# walker/elephant/fonts aren't in Fedora repos; we serve them as RPMs from a
+# local repo injected into the build container (§ step 2.5 below). install.sh's
+# dnf calls then resolve them + their deps. Skip if the repo already exists and
+# we're not rebuilding.
+if $rebuild || [[ ! -f "$COPR_DIR/repo/repodata/repomd.xml" ]]; then
+  log "Building local omedora RPM repo"
+  "$COPR_DIR/build-repo.sh"
+fi
 
 # --- 1. Build the base image -------------------------------------------------
 if $rebuild || ! podman image exists "$BASE_IMAGE"; then
@@ -73,6 +84,17 @@ for i in $(seq 1 30); do
   sleep 1
 done
 echo "  user@1000.service: active"
+
+# --- 2.5 Inject the local omedora RPM repo ----------------------------------
+# Copy the createrepo'd RPMs into the container and drop a .repo pointing at
+# them, so install.sh's `dnf install walker/elephant/omedora-nerd-fonts`
+# resolves from here (with dependencies). This is exactly what enabling a COPR
+# would do; swapping to a published COPR later means deleting this block and
+# flipping the fedora.toml entries to source = "copr".
+log "Injecting local omedora RPM repo"
+podman cp "$COPR_DIR/repo" "$BUILD_CTR:/opt/omedora-repo"
+podman exec "$BUILD_CTR" bash -c \
+  'printf "[omedora-local]\nname=Omedora local packages\nbaseurl=file:///opt/omedora-repo\nenabled=1\ngpgcheck=0\n" >/etc/yum.repos.d/omedora-local.repo'
 
 # --- 3. Run install.sh inside the live logind session -----------------------
 # machinectl shell gives omedora a real PAM/logind session: XDG_RUNTIME_DIR,
