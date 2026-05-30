@@ -32,7 +32,7 @@ BUILD_CTR="${OMEDORA_BUILD_CTR:-omedora-session-build}"
 DNF_CACHE_VOL="${OMEDORA_DNF_CACHE_VOL:-omedora-dnf-cache}"
 HOST_LOG="${OMEDORA_SYSTEMD_BUILD_LOG:-/tmp/omedora-session-build.log}"
 DOCKERFILE="$REPO/test/fedora/omedora-session/Dockerfile.base"
-COPR_DIR="$REPO/packaging/copr"
+COPR_DIR="$REPO/omedora/packaging/copr"
 
 rebuild=false
 [[ "${1:-}" == "--rebuild" ]] && rebuild=true

@@ -15,8 +15,8 @@
 set -euo pipefail
 
 spec="${1:?usage: build-local.sh <name.spec>}"
-REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-COPR_DIR="$REPO/packaging/copr"
+REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
+COPR_DIR="$REPO/omedora/packaging/copr"
 IMAGE="${OMEDORA_RPMBUILD_IMAGE:-registry.fedoraproject.org/fedora:44}"
 
 [[ -f "$COPR_DIR/$spec" ]] || { echo "spec not found: $COPR_DIR/$spec" >&2; exit 1; }

@@ -15,7 +15,7 @@
 [ttf-jetbrains-mono-nerd]
 source = "dnf"
 names = ["omedora-nerd-fonts"]
-reason = "Fedora's plain jetbrains-mono-fonts-all lacks the Nerd Font icon glyphs (waybar/terminal tofu). The omedora-nerd-fonts RPM (packaging/copr/) bundles the patched CascadiaCode + JetBrainsMono families; served from the omedora repo (local now, COPR later). Covers ttf-cascadia-mono-nerd too."
+reason = "Fedora's plain jetbrains-mono-fonts-all lacks the Nerd Font icon glyphs (waybar/terminal tofu). The omedora-nerd-fonts RPM (omedora/packaging/copr/) bundles the patched CascadiaCode + JetBrainsMono families; served from the omedora repo (local now, COPR later). Covers ttf-cascadia-mono-nerd too."
 
 [ttf-cascadia-mono-nerd]
 source = "dnf"
@@ -138,7 +138,7 @@ reason = "TODO: source installer (clone omarchy's nvim config into ~/.config/nvi
 [omarchy-walker]
 source = "dnf"
 names = ["walker", "elephant"]
-reason = "AUR meta pulling walker + elephant; neither is in Fedora repos. Both are packaged as RPMs in packaging/copr/ (walker pulls gtk4-layer-shell, elephant pulls libqalculate + ships its providers and user service) and served from the omedora repo (local now, COPR later)."
+reason = "AUR meta pulling walker + elephant; neither is in Fedora repos. Both are packaged as RPMs in omedora/packaging/copr/ (walker pulls gtk4-layer-shell, elephant pulls libqalculate + ships its providers and user service) and served from the omedora repo (local now, COPR later)."
 
 [starship]
 source = "skip"
@@ -155,7 +155,7 @@ reason = "TODO: source installer (GitHub releases). Not in Fedora main repos."
 [swayosd]
 source = "dnf"
 names = ["swayosd"]
-reason = "Not in Fedora main repos and ships no prebuilt binaries, so the omedora swayosd RPM (packaging/copr/swayosd.spec) builds it from source via meson+cargo. Served from the omedora repo (local now, COPR later). Provides swayosd-server/-client (omedora drives them via its own user unit + ~/.config/swayosd theme) plus the libinput backend glue; fixes the swayosd-server.service 203/EXEC crash-loop."
+reason = "Not in Fedora main repos and ships no prebuilt binaries, so the omedora swayosd RPM (omedora/packaging/copr/swayosd.spec) builds it from source via meson+cargo. Served from the omedora repo (local now, COPR later). Provides swayosd-server/-client (omedora drives them via its own user unit + ~/.config/swayosd theme) plus the libinput backend glue; fixes the swayosd-server.service 203/EXEC crash-loop."
 
 [satty]
 source = "skip"
@@ -176,7 +176,7 @@ reason = "TODO: source installer (proprietary iA Writer font; vendored from upst
 [python-terminaltexteffects]
 source = "dnf"
 names = ["python3-terminaltexteffects"]
-reason = "The `tte` terminal-effects CLI; not in Fedora main repos. Packaged from-source as an RPM in packaging/copr/ (pure Python, no runtime deps; ships /usr/bin/tte) and served from the omedora repo (local now, COPR later)."
+reason = "The `tte` terminal-effects CLI; not in Fedora main repos. Packaged from-source as an RPM in omedora/packaging/copr/ (pure Python, no runtime deps; ships /usr/bin/tte) and served from the omedora repo (local now, COPR later)."
 
 [tzupdate]
 source = "skip"

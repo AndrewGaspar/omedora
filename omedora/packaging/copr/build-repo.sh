@@ -13,8 +13,8 @@
 
 set -euo pipefail
 
-REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-COPR_DIR="$REPO/packaging/copr"
+REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
+COPR_DIR="$REPO/omedora/packaging/copr"
 IMAGE="${OMEDORA_RPMBUILD_IMAGE:-registry.fedoraproject.org/fedora:44}"
 
 SPECS=(walker.spec elephant.spec omedora-nerd-fonts.spec swayosd.spec terminaltexteffects.spec)
