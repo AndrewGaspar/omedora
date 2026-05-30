@@ -508,8 +508,8 @@ Packages with no Fedora / RPM Fusion / vetted-COPR / Flathub home are built as *
 
 | File | Type | Notes |
 | --- | --- | --- |
-| `default/wayland-sessions/omedora.desktop` | New | Installed to `/usr/share/wayland-sessions/` (or `~/.local/share/wayland-sessions/`) |
-| `install/config/wayland-session-fedora.sh` (or similar) | New | The install step that copies the session entry |
+| `default/wayland-sessions/omedora.desktop` | New | ✅ shipped. `Exec=uwsm start -g -1 -e -D Hyprland hyprland.desktop` — launching via uwsm is what sources `~/.config/uwsm/env` and puts `omarchy/bin` on PATH. |
+| `install/config/wayland-session-fedora.sh` | New | ✅ shipped. Fedora-gated; copies the entry to `/usr/share/wayland-sessions/` (the one sanctioned /usr write, AGENTS.md §6). Without it the only session is the COPR's bare `hyprland.desktop` (no uwsm → broken PATH). |
 
 ### Documentation (this folder)
 

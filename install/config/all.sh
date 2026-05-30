@@ -25,6 +25,11 @@ run_logged $OMARCHY_INSTALL/config/default-browser-fedora.sh
 # PowerProfiles D-Bus API but no powerprofilesctl CLI. Install the shim before
 # anything exercises the power-profile features (menu, udev rules, boot init).
 run_logged $OMARCHY_INSTALL/config/powerprofilesctl-shim-fedora.sh
+# Install the Omedora wayland-session entry (launches Hyprland via uwsm, which
+# sources ~/.config/uwsm/env -> PATH incl. omarchy/bin). Without this the only
+# session option is the COPR's plain "Hyprland" (Exec=Hyprland, no uwsm), which
+# breaks omarchy-* commands and walker launches.
+run_logged $OMARCHY_INSTALL/config/wayland-session-fedora.sh
 fi
 
 # --- System-admin (Arch-only on omedora) ---
