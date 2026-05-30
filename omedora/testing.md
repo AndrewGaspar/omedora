@@ -207,11 +207,43 @@ The L4-nested image runs a full Omedora session inside a Fedora container **boot
 A `podman build` RUN has no PID-1 systemd, so the install can't run at build time without re-introducing the shims. Instead the build is two pieces:
 
 1. **`Dockerfile.base`** — `FROM fedora:44`, installs systemd + `systemd-container` (for `machinectl`) + `systemd-pam` + dbus-broker + polkit + the install toolchain, creates the `omedora` user (wheel, NOPASSWD, password `omedora`, lingering enabled), copies the omedora tree to `~/.local/share/omarchy`, `CMD ["/sbin/init"]`. Build product: `omedora-test:fedora44-session-base`.
-2. **`build-session.sh`** — boots the base under `--systemd=always`, waits for systemd + the `omedora` user manager, then runs `install.sh` **as omedora through `machinectl shell`** (a real PAM/logind session: `XDG_RUNTIME_DIR`, user D-Bus, a PTY — no `script` hack), and `podman commit`s the finished container to `omedora-test:fedora44-session`.
+2. **`build-session.sh`** — boots the base under `--systemd=always`, waits for systemd + the `omedora` user manager, then runs the install **as omedora through `machinectl shell`** (a real PAM/logind session: `XDG_RUNTIME_DIR`, user D-Bus, a PTY — no `script` hack), and `podman commit`s the finished container to `omedora-test:fedora44-session`.
 
 This is the most faithful path — literally "boot Fedora, log in, run the installer." Concrete wins over the old build-time install: **Flatpaks actually install** (real session bus; Typora/Obsidian/Signal/localsend + the freedesktop runtimes) instead of being skipped, the install runs under a real PTY, and there's no `OMARCHY_CHROOT_INSTALL`, no systemctl shim, no uwsm-app shim.
 
 Two non-obvious bring-up fixes live in `Dockerfile.base`: install `systemd-pam` (the minimal Fedora image omits `pam_systemd.so`, without which `machinectl shell` gets no session or `XDG_RUNTIME_DIR`), and a `user@.service` drop-in pinning `XDG_RUNTIME_DIR=/run/user/%i` (so the lingering user manager starts at boot instead of dying with exit 49).
+
+#### Two-stage build (incremental-rebuild speedup)
+
+Profiling a warm build showed the install wall-time is dominated by **one stage**: `install/packaging/base.sh` (`dnf install` of the whole package set) is **~93%** of it (~3 min, even with the dnf cache warm), while the config stages you actually iterate on are **~10 s combined**. Re-running the whole install to test a one-line config change therefore paid the full ~3 min package cost for nothing.
+
+`build-session.sh` now splits the install into **two committed layers**, sourcing the *same* real install `all.sh` files in the *same* order as `install.sh` (via `omedora-session/staged-install.sh` — `install.sh` itself is untouched, so zero added rebase surface):
+
+| Image | Built from | Stages |
+| --- | --- | --- |
+| `omedora-test:fedora44-session-base` | `Dockerfile.base` | Fedora + systemd + the omedora tree |
+| `omedora-test:fedora44-session-pkgs` | base | `preflight/all.sh` + `packaging/all.sh` (the slow `dnf install`) |
+| `omedora-test:fedora44-session` | **pkgs** | `config/all.sh` (the fast, idempotent config) |
+
+Build modes:
+
+| Command | What it does | Wall time (this dev box) |
+| --- | --- | --- |
+| `build-session.sh` | base (if missing) → **pkgs (if missing)** → config → session | full first time; **~9 s** (config-only) if the pkgs image already exists |
+| `build-session.sh --rebuild` | clean: base + pkgs + config (force-repackage); rebuilds the RPM repo **only if a spec changed** | packages phase + config |
+| `build-session.sh --rebuild-repo` | as `--rebuild`'s default path but also force-rebuilds the local RPM repo | + ~3–4 min repo build |
+| `build-session.sh --fast` (alias `--config-only`) | boot the **existing** pkgs image, re-run **only** the config stages, recommit session | **~9 s** (boot ~3 s + config ~3 s + commit ~3 s) |
+| `build-session.sh --packages-only` | build/refresh just the pkgs image, no session | packages phase only |
+
+So the common loop — *edit one config script, rebuild* — is `build-session.sh --fast` (or just `build-session.sh`, which now skips straight to the config phase whenever the pkgs image is present): **~9 s** measured, versus the **~14 min** a full single-stage install paid before. It re-applies config against the already-installed packages instead of re-installing them. `--rebuild` is unchanged in fidelity: a clean, full repackage. The fast path is **opt-in for fidelity-critical cases** — if you changed a *package* (added/removed a dnf package, edited a spec), use a plain rebuild or `--rebuild` so the pkgs image is regenerated; `--fast` deliberately does not touch packages.
+
+The config stages are safe to re-run on top of an already-packaged filesystem because they're idempotent (`mkdir -p`, symlink, copy). `staged-install.sh`'s `config` phase re-seeds the install-log start marker (the packaging phase that normally prints it ran in a previous container) so `run_logged`/the error handler still behave.
+
+**dnf cache actually persists now (dnf5 path fix).** Fedora 44 ships **dnf5**, whose package cache lives under `/var/cache/libdnf5` — *not* the dnf4 path `/var/cache/dnf`. The build previously mounted the persistent cache volume (and the `Dockerfile.base` BuildKit cache) at `/var/cache/dnf`, so despite `keepcache=True` the volume stayed **empty** (measured: 0 RPMs after a full install, while `/var/cache/libdnf5` held **1.9 GB / 1153 RPMs** that were discarded with the container). Every cold/`--rebuild` packages phase therefore re-downloaded the entire package set (~14 min). Mounting the volume + BuildKit cache at `/var/cache/libdnf5` makes the cache stick, so repeat package builds reuse the downloaded RPMs.
+
+**The RPM repo rebuilds only when a spec changed.** The local omedora RPM repo (walker/elephant/fonts/swayosd/tte) is built by 5 throwaway Fedora containers (~3–4 min total). It used to rebuild on *every* `--rebuild` and never otherwise — so `--rebuild` paid the cost even with unchanged specs, while a default build that edited a spec wrongly kept the stale repo. It now rebuilds iff a `*.spec` / `build-repo.sh` / `build-local.sh` is newer than the built `repodata/repomd.xml` (or the repo is missing); `--rebuild-repo` forces it.
+
+> **Override knobs:** `OMEDORA_SYSTEMD_PKGS_IMAGE` overrides the intermediate image name (defaults to the session image name with a `-pkgs` tag suffix). The existing `OMEDORA_SYSTEMD_BASE_IMAGE`, `OMEDORA_SYSTEMD_SESSION_IMAGE`, `OMEDORA_BUILD_CTR`, and `OMEDORA_DNF_CACHE_VOL` still apply (the cache volume is mounted at the dnf5 path `/var/cache/libdnf5`).
 
 ### Booting the session: Wayland-on-Wayland nesting
 
