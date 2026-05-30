@@ -330,6 +330,10 @@ reason = "Snapshot integration relies on Limine on Arch; out of scope on Fedora.
 source = "skip"
 reason = "Fedora ships its own Plymouth; omedora does not replace it."
 
+[power-profiles-daemon]
+source = "skip"
+reason = "Fedora Workstation ships tuned-ppd as its ppd-service provider; the two mutually Conflict (both Provide ppd-service), so installing power-profiles-daemon aborts the dnf transaction. Keep Fedora's default. Omarchy's only hard dependency is the powerprofilesctl CLI (shipped by p-p-d, NOT by tuned-ppd), so omedora installs a Fedora-gated shim (install/config/powerprofilesctl-shim-fedora.sh) that drives the same PowerProfiles D-Bus API tuned-ppd implements."
+
 [mkinitcpio]
 source = "skip"
 reason = "Arch initramfs tool; Fedora uses dracut. Out of scope."
