@@ -106,15 +106,20 @@ When it finishes you should see a `repo contents:` listing with the five `.rpm` 
 
 The installer resolves `walker`, `elephant`, `omedora-nerd-fonts`, `swayosd`, and `python3-terminaltexteffects` by name from `dnf`. For those names to resolve, `dnf` needs to know about the local repo you just built.
 
-Drop a `.repo` file pointing at it:
+Drop a `.repo` file pointing at it. Resolve the path **as your own user first** — inside `sudo bash -c`, `~` would expand to `/root`, not your home:
 
 ```bash
-sudo bash -c 'printf "[omedora-local]\nname=Omedora local packages\nbaseurl=file://%s\nenabled=1\ngpgcheck=0\n" \
-  "$(realpath ~/.local/share/omarchy/omedora/packaging/copr/repo)" \
-  >/etc/yum.repos.d/omedora-local.repo'
+REPO_DIR="$(realpath ~/.local/share/omarchy/omedora/packaging/copr/repo)"
+sudo tee /etc/yum.repos.d/omedora-local.repo >/dev/null <<EOF
+[omedora-local]
+name=Omedora local packages
+baseurl=file://$REPO_DIR
+enabled=1
+gpgcheck=0
+EOF
 ```
 
-> This is exactly what `omedora/test/fedora/build-session.sh` does (step 2.5), translated from `podman cp` + `exec` into direct host commands. The `file://` URL must point at the directory containing `repodata/` — `realpath` expands the `~` for the `sudo` context.
+> This is exactly what `omedora/test/fedora/build-session.sh` does (step 2.5), translated from `podman cp` + `exec` into direct host commands. The `file://` URL must point at the directory containing `repodata/`. Note `$REPO_DIR` is expanded by *your* shell before `sudo` runs, so the path resolves against your home — don't move the `realpath` inside the `sudo` command (there `~` becomes `/root`).
 
 Verify `dnf` can see the repo:
 
