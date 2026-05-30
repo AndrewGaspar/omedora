@@ -238,9 +238,50 @@ Hyprland normally drives KMS/DRM directly — impossible in a container (needs s
 
 A scripted `--smoke` mode driving `hyprctl` (theme switch, walker open, screenshot) is a follow-up — see `smoke-assertions.sh` in [§10](#10-implementation-roadmap) step 13.
 
-### Why this isn't in CI (today)
+### Headless mode (`--headless`): self-contained, parallelizable, CI-able
 
-GitHub Actions Linux runners are headless — no Wayland compositor for the `wayland` backend to nest under. A headless path needs Xvfb + the `x11` backend (Hyprland 0.55.2 from the lionheartp COPR has no `AQ_BACKENDS=headless`; see [§7](#7-container-test-gotchas)), plus the systemd image build is at the upper edge of practical CI runtime. **L4-nested is local-only**; CI keeps L1/L2/L3.
+The default run mode nests Hyprland into the **developer's own desktop compositor** (the host Wayland socket bind-mounted at `/tmp/host-wayland`). That has three structural problems: it needs a logged-in Wayland desktop (useless on CI / headless servers), there's only **one** host socket (parallel runs collide — container-name clashes, fights over the socket, chmod races), and the host desktop's locking interferes with screenshots.
+
+**`run-session.sh --headless` fixes all three.** Each container stands up its **own** headless Wayland compositor (`labwc`) internally and nests Omedora's Hyprland into *that*. No host desktop, no socket bind-mount, no shared state — so many containers run in parallel without conflict, and it works on a headless box. The in-container launcher is `session-launch-headless.sh` (run via `machinectl shell` as omedora, same as the default path).
+
+```
+run-session.sh --headless
+   └─ podman run --systemd=always (NO host-socket mount)
+        └─ machinectl shell omedora@.host → session-launch-headless.sh
+             ├─ systemd-run --user labwc   (WLR_BACKENDS=headless)  → wayland-0
+             └─ systemd-run --user Hyprland (nests into wayland-0)   → wayland-1 + IPC
+```
+
+**Why labwc (and not weston / sway / cage / Hyprland's own headless backend)?** Hyprland 0.55.2 uses **Aquamarine 0.12**, whose nested (`wayland`) backend hard-requires the host compositor to advertise **both**:
+
+| Requirement | weston 15 headless | sway 1.11 | **labwc 0.9.6** |
+| --- | --- | --- | --- |
+| `xdg_wm_base` **version 6** | ✗ (v5 → *"invalid version for global xdg_wm_base"*) | ✗ (v5) | ✓ |
+| `zwp_linux_dmabuf_v1` | ✗ (headless backend never exports it, any renderer → *"Missing protocols"*) | ✓ | ✓ |
+
+labwc (wlroots 0.19) is the lightest Fedora 44 compositor that satisfies both: it runs its GLES2 renderer over a DRM render node and exports linux-dmabuf + xdg-shell v6. (Hyprland's *own* headless backend `AQ_BACKENDS=headless` is absent from the lionheartp build — `CBackend::create() failed!` — so a separate nesting host is required regardless.)
+
+**The recipe** (all proven empirically):
+
+1. **labwc**, transient user unit: `WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1 WLR_RENDERER_ALLOW_SOFTWARE=1 labwc` → creates `wayland-0`.
+2. **Hyprland**, transient user unit, `WAYLAND_DISPLAY=wayland-0` → aquamarine's wayland backend connects, binds dmabuf, creates the nested output, and IPC comes up.
+3. **`hyprctl output create headless`** — the nested aquamarine output doesn't always auto-promote to a Hyprland monitor under this build, so create an explicit 1920×1080 headless output. (`hyprctl keyword monitor …` is rejected by the Lua-config parser; `output create` works.)
+4. Drive via `hyprctl` and screenshot with `grim -o <MON>` against `WAYLAND_DISPLAY=<Hyprland's wl_socket>`.
+
+The full autostart chain (waybar, mako, swaybg, hypridle, fcitx5) comes up exactly as in the host-nested path, and `grim` captures a non-blank PNG of the live Omedora desktop. Two `--headless` containers run side-by-side with independent state (verified).
+
+**GPU vs software rendering.** Aquamarine's GBM allocator needs a DRM **render node** (`/dev/dri/renderD*`) — it has *no* shm/pixman fallback for nesting, so a pure-software (`--renderer=pixman`, no render node) path does **not** work.
+
+- **Local dev (has a GPU):** the runner passes `--device /dev/dri`; labwc/wlroots picks a node automatically. On **multi-GPU** hosts one node's GBM allocator can fail (observed: NVIDIA `renderD128` → *"Couldn't allocate a gbm buffer … format XR24"*, while AMD `renderD129` works). Pin the good one with `OMEDORA_RENDER_NODE=/dev/dri/renderD129` — it's forwarded to both labwc (`WLR_RENDER_DRM_DEVICE`) and aquamarine (`AQ_DRM_DEVICES`).
+- **GPU-less CI:** load the host kernel **`vkms`** module (Virtual KMS — a software DRM device that llvmpipe renders into; shipped by stock Fedora/Ubuntu CI kernels) and pass that render node via `OMEDORA_RENDER_NODE`. This is the no-GPU path. (The dev box used here runs an Arch kernel built **without** `CONFIG_DRM_VKMS`, so the pure-no-GPU path couldn't be demonstrated locally — but the chain is identical: any working render node, real or vkms, satisfies aquamarine.)
+
+**Knobs:** `OMEDORA_RENDER_NODE` (pin a render node), `OMEDORA_HEADLESS_RES` (default `1920x1080`), `OMEDORA_HEADLESS_KEEP` (return after the session is up instead of blocking — for scripted/CI driving).
+
+**Limitations:** software rendering (llvmpipe / vkms) is slow — fine for smoke assertions and screenshots, not for perf testing. The lionheartp Hyprland build's `hyprctl monitors` intermittently returns `unknown request` before the explicit output is created (the launcher works around it). `hyprctl dispatch exec …` needs the Lua quoting form `hl.dispatch("exec","<cmd>")`; launching clients directly with `WAYLAND_DISPLAY` set to Hyprland's socket is simpler for scripted driving.
+
+### Why this *can now* be in CI
+
+The original blocker was "GitHub Actions runners are headless — no compositor to nest under." `--headless` removes that: the container brings its own compositor. The remaining requirement is a **DRM render node**, satisfied on GPU-less runners by loading **`vkms`** (`sudo modprobe vkms` in a CI step, then `OMEDORA_RENDER_NODE=/dev/dri/renderD128`). The systemd image build (~15–30 min) is still at the upper edge of practical CI runtime, so the pragmatic plan is a **scheduled / on-demand** CI job (not every push) that builds once, caches the image, and runs the `--headless` smoke. The earlier Xvfb + `x11`-backend idea is unnecessary.
 
 ### File layout
 
@@ -250,8 +291,9 @@ test/fedora/
 ├── integration.sh          # L2
 ├── smoke.sh                # L3 (audit)
 ├── omedora-session/        # L4-nested (podman, systemd)
-│   ├── Dockerfile.base     # FROM fedora:44; systemd + deps + omedora tree; CMD /sbin/init
-│   └── session-launch.sh   # in-container: nests Hyprland under the host compositor
+│   ├── Dockerfile.base               # FROM fedora:44; systemd + deps + omedora tree (+ labwc for --headless); CMD /sbin/init
+│   ├── session-launch.sh             # in-container: nests Hyprland under the HOST compositor
+│   └── session-launch-headless.sh    # in-container: starts labwc + nests Hyprland into it (no host desktop)
 ├── build-session.sh        # boot base under systemd, install via machinectl shell, commit
 ├── run-integration.sh      # L2 host-side runner
 ├── run-smoke.sh            # L3 host-side runner
