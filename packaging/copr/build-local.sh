@@ -27,12 +27,18 @@ echo "Building $spec in $IMAGE ..."
 podman run --rm \
   -v "$COPR_DIR:/copr:z" \
   "$IMAGE" bash -euo pipefail -c '
-    # rpm-build gives rpmbuild; rpmdevtools gives rpmdev-setuptree + spectool.
-    dnf install -y --setopt=install_weak_deps=False rpm-build rpmdevtools >/dev/null
+    # rpm-build gives rpmbuild; rpmdevtools gives rpmdev-setuptree + spectool;
+    # the builddep plugin installs a spec'\''s BuildRequires.
+    dnf install -y --setopt=install_weak_deps=False \
+      rpm-build rpmdevtools "dnf-command(builddep)" >/dev/null
 
     # Standard ~/rpmbuild/{SPECS,SOURCES,RPMS,SRPMS,BUILD} tree.
     rpmdev-setuptree
     cp "/copr/'"$spec"'" ~/rpmbuild/SPECS/
+
+    # Install the spec'\''s BuildRequires (e.g. systemd-rpm-macros for
+    # %%{_userunitdir}). A COPR does this step for you.
+    dnf builddep -y ~/rpmbuild/SPECS/'"$spec"' >/dev/null
 
     # Download every Source0/SourceN URL declared in the spec into SOURCES/.
     spectool -g -R ~/rpmbuild/SPECS/'"$spec"'
