@@ -89,7 +89,14 @@ RUN install -d -m 0755 /var/lib/systemd/linger && \
 # --- the omedora tree --------------------------------------------------------
 # install.sh expects the tree at ~/.local/share/omarchy and finds itself via
 # OMARCHY_PATH. Bake it in so the build-via-commit step is reproducible.
-RUN install -d -o omedora -g omedora /home/omedora/.local/share
+#
+# Create the XDG dirs omedora-owned. NOTE: `install -d -o omedora` only chowns
+# the leaf it's told to create, NOT intermediate parents — so a bare
+# `install -d .../​.local/share` leaves `.local` root-owned, and the install's
+# preflight/migrations.sh then can't `mkdir ~/.local/state` (Permission
+# denied). Chown `.local` explicitly so the whole XDG tree is writable.
+RUN install -d -o omedora -g omedora /home/omedora/.local/share && \
+    chown omedora:omedora /home/omedora/.local
 COPY --chown=omedora:omedora . /home/omedora/.local/share/omarchy
 
 # install.sh's logger appends to /var/log/omarchy-install.log. Pre-create it
