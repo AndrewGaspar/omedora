@@ -444,6 +444,8 @@ Packages with no Fedora / RPM Fusion / vetted-COPR / Flathub home are built as *
 | `install/preflight/pacman.sh` | 1-line gate | Arch-only |
 | `install/preflight/disable-mkinitcpio.sh` | 1-line gate | Arch-only |
 | `install/config/all.sh` | Stage dispatch only if needed | Most config scripts work as-is via dispatched helpers |
+| `install/config/fix-powerprofilesctl-shebang.sh` | 1-line gate | Early-return when `/usr/bin/powerprofilesctl` is absent (Fedora keeps tuned-ppd + a bash shim, so there's no python shebang to patch) |
+| `install/config/powerprofilesctl-shim-fedora.sh` | New | Fedora-gated `powerprofilesctl` shim driving the PowerProfiles D-Bus API that tuned-ppd implements (omedora keeps tuned-ppd instead of swapping in power-profiles-daemon) |
 | `install/config/hardware/all.sh` | Stage dispatch | Source `-fedora.sh` siblings if present; skip Arch-only entries on Fedora |
 | `install/config/hardware/{nvidia,vulkan,intel/*,apple/*,asus/*,framework/*,lenovo/*,fix-*}.sh` | 1-line gate | Most are Arch-only; gate at top with `return 0` on Fedora |
 | `install/config/hardware/nvidia-fedora.sh` | New | Hyprland env vars only (no dracut/mkinitcpio writes) |
