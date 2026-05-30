@@ -130,7 +130,7 @@ reason = "Not in Fedora repos or RPM Fusion. Upstream ships a prebuilt linux-x64
 
 [claude-code]
 source = "skip"
-reason = "TODO: source installer (npm install -g claude-code, or pull binary) — not blocking install.sh today."
+reason = "Anthropic's CLI is a proprietary self-contained Bun binary (downloads.claude.ai), not an npm/distro package. Users install via Anthropic's official installer; enterprises via their own deployment. An omedora RPM exists (omedora/packaging/copr/claude-code.spec, mirrors omarchy) but is deliberately parked — excluded from build-repo.sh — pending a redistribution-licensing decision before any public COPR."
 
 [omarchy-nvim]
 source = "dnf"
