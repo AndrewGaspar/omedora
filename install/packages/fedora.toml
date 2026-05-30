@@ -153,8 +153,9 @@ source = "skip"
 reason = "TODO: source installer (GitHub releases). Not in Fedora main repos."
 
 [swayosd]
-source = "skip"
-reason = "TODO: source installer or vetted COPR (swayosd-git on AUR; needs Fedora packaging). Not in Fedora main repos."
+source = "dnf"
+names = ["swayosd"]
+reason = "Not in Fedora main repos and ships no prebuilt binaries, so the omedora swayosd RPM (packaging/copr/swayosd.spec) builds it from source via meson+cargo. Served from the omedora repo (local now, COPR later). Provides swayosd-server/-client (omedora drives them via its own user unit + ~/.config/swayosd theme) plus the libinput backend glue; fixes the swayosd-server.service 203/EXEC crash-loop."
 
 [satty]
 source = "skip"
