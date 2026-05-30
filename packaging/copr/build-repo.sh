@@ -17,7 +17,7 @@ REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 COPR_DIR="$REPO/packaging/copr"
 IMAGE="${OMEDORA_RPMBUILD_IMAGE:-registry.fedoraproject.org/fedora:44}"
 
-SPECS=(walker.spec elephant.spec omedora-nerd-fonts.spec swayosd.spec)
+SPECS=(walker.spec elephant.spec omedora-nerd-fonts.spec swayosd.spec terminaltexteffects.spec)
 
 echo "==> Building RPMs"
 for s in "${SPECS[@]}"; do
