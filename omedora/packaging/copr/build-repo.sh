@@ -26,10 +26,56 @@ SPECS=(
   # redistribution-licensing decision before any public COPR (proprietary binary).
 )
 
-echo "==> Building RPMs"
-for s in "${SPECS[@]}"; do
-  "$COPR_DIR/build-local.sh" "$s"
+# --- Incremental build selection -------------------------------------------
+# By default, only (re)build "dirty" specs: ones with no prior build stamp, a
+# spec file newer than its stamp, or built by an older build-local.sh. Pass
+# --force to rebuild everything, or name specs to build just those.
+#   build-repo.sh                 # build dirty specs, then assemble the repo
+#   build-repo.sh --force         # rebuild all specs
+#   build-repo.sh walker.spec     # build just walker.spec if dirty (--force to force)
+# Stamps live in output/.stamps/ (gitignored with the rest of output/). The
+# first run after adopting this rebuilds everything once to establish stamps.
+force=false
+requested=()
+for arg in "$@"; do
+  case "$arg" in
+    -f|--force) force=true ;;
+    -h|--help)  echo "usage: build-repo.sh [--force] [<name>.spec ...]  (default: build only dirty specs)"; exit 0 ;;
+    *.spec)     requested+=("$arg") ;;
+    *) echo "unknown argument: $arg (expected --force or a <name>.spec)" >&2; exit 2 ;;
+  esac
 done
+
+STAMP_DIR="$COPR_DIR/output/.stamps"
+BUILDER="$COPR_DIR/build-local.sh"
+mkdir -p "$STAMP_DIR"
+
+if (( ${#requested[@]} )); then
+  candidates=("${requested[@]}")
+else
+  candidates=("${SPECS[@]}")
+fi
+
+to_build=()
+for s in "${candidates[@]}"; do
+  [[ -f "$COPR_DIR/$s" ]] || { echo "spec not found: $COPR_DIR/$s" >&2; exit 1; }
+  stamp="$STAMP_DIR/$s"
+  if $force || [[ ! -e $stamp || "$COPR_DIR/$s" -nt $stamp || "$BUILDER" -nt $stamp ]]; then
+    to_build+=("$s")
+  else
+    echo "  up-to-date, skipping: $s"
+  fi
+done
+
+if (( ${#to_build[@]} )); then
+  echo "==> Building ${#to_build[@]} spec(s): ${to_build[*]}"
+  for s in "${to_build[@]}"; do
+    "$BUILDER" "$s"
+    touch "$STAMP_DIR/$s"   # stamp only after a successful build (set -e aborts on failure)
+  done
+else
+  echo "==> All specs up-to-date (use --force to rebuild all)"
+fi
 
 echo ""
 echo "==> Assembling local repo (createrepo_c)"
