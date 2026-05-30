@@ -13,14 +13,14 @@
 # --- Renamed packages (different name, in Fedora main) -------------------
 
 [ttf-jetbrains-mono-nerd]
-source = "source"
-installer = "nerd-fonts.sh"
-reason = "Fedora's jetbrains-mono-fonts-all is the PLAIN font — no Nerd Font icon glyphs, so waybar/terminal icons render as tofu. The installer fetches the patched Nerd Font from ryanoasis/nerd-fonts. Covers both this and ttf-cascadia-mono-nerd."
+source = "dnf"
+names = ["omedora-nerd-fonts"]
+reason = "Fedora's plain jetbrains-mono-fonts-all lacks the Nerd Font icon glyphs (waybar/terminal tofu). The omedora-nerd-fonts RPM (packaging/copr/) bundles the patched CascadiaCode + JetBrainsMono families; served from the omedora repo (local now, COPR later). Covers ttf-cascadia-mono-nerd too."
 
 [ttf-cascadia-mono-nerd]
-source = "source"
-installer = "nerd-fonts.sh"
-reason = "See ttf-jetbrains-mono-nerd — the same installer fetches CascadiaCode (CaskaydiaMono) Nerd Font. Fedora's cascadia-code-fonts is the un-patched variant."
+source = "dnf"
+names = ["omedora-nerd-fonts"]
+reason = "Same omedora-nerd-fonts RPM as ttf-jetbrains-mono-nerd (it bundles both families)."
 
 [woff2-font-awesome]
 source = "dnf"
@@ -136,8 +136,9 @@ source = "skip"
 reason = "TODO: source installer (clone omarchy's nvim config into ~/.config/nvim) — not blocking install.sh today."
 
 [omarchy-walker]
-source = "skip"
-reason = "TODO: source installer for Walker (download upstream release binary) — Fedora has no walker package. Not blocking install.sh today."
+source = "dnf"
+names = ["walker", "elephant"]
+reason = "AUR meta pulling walker + elephant; neither is in Fedora repos. Both are packaged as RPMs in packaging/copr/ (walker pulls gtk4-layer-shell, elephant pulls libqalculate + ships its providers and user service) and served from the omedora repo (local now, COPR later)."
 
 [starship]
 source = "skip"
