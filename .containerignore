@@ -1,4 +1,4 @@
 # Build artifacts — kept out of the image's omarchy tree. The L4 session build
 # (test/fedora/build-session.sh) injects the local RPM repo separately.
-packaging/copr/output
-packaging/copr/repo
+omedora/packaging/copr/output
+omedora/packaging/copr/repo
