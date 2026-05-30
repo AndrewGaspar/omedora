@@ -19,6 +19,8 @@ Every change you make falls into one of these categories. If you can't categoriz
 
 The map is the contract. If you find yourself wanting to silently extend it, you're about to make the rebase harder for future-you (or future-Claude).
 
+**Where new files go.** Standalone omedora additions — tooling with no upstream caller, like `omedora/packaging/copr/` (the RPM specs + build scripts) — live under **`omedora/`**, not at the repo top level and not scattered through Omarchy's tree. Only place an omedora file *inside* the Omarchy hierarchy (`bin/`, `install/`, `default/`, `test/`) when integration genuinely forces it: it must be on `$PATH` (`bin/omarchy-distro`, `bin/fedora/pkg.py`), sourced by an upstream `all.sh` (the Fedora-gated `install/*/…-fedora.sh` scripts), read by a tool at a fixed path (`install/packages/fedora.toml`), or required there by convention (`.github/workflows/`). Smaller Omarchy footprint ⇒ cleaner rebases. When unsure, default to `omedora/`.
+
 ---
 
 ## 2. Additive-only edits
