@@ -54,10 +54,13 @@ export XDG_SESSION_TYPE=wayland
 echo "Starting Omedora (nested wayland; session=${XDG_SESSION_ID:-?}, runtime=$XDG_RUNTIME_DIR)"
 echo "  Close the host window to end the session."
 
-# elephant (walker's backend) is a `systemd --user` unit WantedBy
-# graphical-session.target. Launching Hyprland directly (not via uwsm) doesn't
-# activate that target, so start elephant explicitly — otherwise Super+Space /
-# walker have no provider backend. Harmless if the unit is absent.
+# Several user services are WantedBy graphical-session.target, which our direct
+# Hyprland launch (no uwsm) doesn't activate. Start them explicitly:
+#   - elephant: walker's data-provider backend (else Super+Space has no results)
+#   - pipewire / pipewire-pulse / wireplumber: the audio stack waybar's volume
+#     module talks to (else the audio icon is blank until first interaction)
+# All harmless if absent.
 systemctl --user start elephant.service 2>/dev/null || true
+systemctl --user start pipewire.service pipewire-pulse.service wireplumber.service 2>/dev/null || true
 
 exec Hyprland

@@ -21,6 +21,7 @@ run_logged $OMARCHY_INSTALL/config/omarchy-toggles.sh
 # Fedora nothing pulls it in, so install + set it explicitly here.
 if [[ $(omarchy-distro 2>/dev/null || echo arch) == "fedora" ]]; then
 run_logged $OMARCHY_INSTALL/config/default-terminal-fedora.sh
+run_logged $OMARCHY_INSTALL/config/default-browser-fedora.sh
 fi
 
 # --- System-admin (Arch-only on omedora) ---
