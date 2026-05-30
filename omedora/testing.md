@@ -4,7 +4,7 @@ This doc is the canonical strategy for testing omedora. It defines a four-layer 
 
 For the higher-level architecture this strategy serves, see [`architecture.md`](architecture.md). For agent-facing rules that reference this doc, see [`AGENTS.md`](AGENTS.md).
 
-> **Status:** L1, L2, L3 (audit-only), the CI workflow, install-pipeline gating, and L4-nested are **shipped** — see roadmap [§10](#10-implementation-roadmap) for the per-step status. L4-nested boots a real Omedora session inside `fedora:44` via Wayland-on-Wayland nesting; the install pipeline runs end-to-end and Hyprland accepts wayland clients in the nested compositor. Follow-ups: bulk-fill the package map (step 10) and `smoke-assertions.sh`. L4-VM is documented but operates manually.
+> **Status:** L1, L2, L3 (audit-only), the CI workflow, install-pipeline gating, and L4-nested are **shipped** — see roadmap [§10](#10-implementation-roadmap) for the per-step status. L4-nested boots a real Omedora session inside `fedora:44` under **real PID-1 systemd** (`podman --systemd=always`): the install runs end-to-end in a logind session (Flatpaks and all), and launching Hyprland brings up the full autostart chain (waybar, mako, swaybg, hypridle, fcitx5) nested under the host compositor. Follow-ups: bulk-fill the package map (step 10) and a scripted `smoke-assertions.sh`. L4-VM is documented but operates manually.
 
 ---
 
@@ -196,72 +196,66 @@ By default, Fedora containers don't run systemd as PID 1. Anything that needs `s
 
 ## 6. L4-nested container design
 
-The L4-nested image runs a full Omedora session inside a Fedora container. It depends on the install-pipeline gating (see [§10](#10-implementation-roadmap) and [`architecture.md` §6](architecture.md#6-install-pipeline-gating)) because it executes `install.sh` end-to-end against `fedora:44` — so until that lands, this layer can't be built.
+The L4-nested image runs a full Omedora session inside a Fedora container **booting real PID-1 systemd**, so the container has a real system D-Bus, `systemd-logind`, and a per-user `systemd --user` manager. That's the environment Omarchy/Omedora actually assumes — and the reason this layer earns "L4." It runs `install.sh` end-to-end against `fedora:44` and then boots Hyprland the way a bare-metal user would.
 
-### Image layout
+**Why systemd, not shims.** An earlier iteration used a plain `fedora:44` rootfs with no init and papered over the gap with shims: a no-op `systemctl`, a `uwsm-app` passthrough, and `dbus-run-session`. They drifted from reality and broke the session: **0 of 13 autostart entries fired** (the `uwsm-app -- <cmd>` wrappers had no user systemd to hand off to) and **waybar segfaulted** (no system bus). Booting real systemd fixes all of it at the root instead of one symptom at a time. The shims are gone.
 
-Two-stage build, on top of the L2/L3 base:
+**Runtime: podman, not docker.** L1/L2/L3 stay on docker, but L4 uses `podman run --systemd=always` — podman is built for systemd-in-container (cgroup + tmpfs scaffolding, `SIGRTMIN+3` stop signal, rootless) with no `--privileged`. Docker would need `--privileged` (or hand-tuned caps + cgroup mounts).
 
-1. **Stage 1 — install Omedora.** `FROM omedora-test:fedora44`, `git clone` (or bind-mount) the omedora repo, run `bash install.sh` as the non-root `omedora` user with sudoers preconfigured. The install pipeline must complete (preflight + packaging + config; login/post-install gated off). At the end of stage 1, the image looks like a freshly-installed omedora system: `~/.config/` populated, all Hyprland-ecosystem packages installed, the Wayland session entry at `/usr/share/wayland-sessions/omedora.desktop`.
-2. **Stage 2 — boot the session.** The default CMD launches Hyprland via the same `AQ_BACKENDS=wayland` nesting trick documented in the sibling research. UWSM is used as the session manager exactly as a real user would experience.
+### Build: boot-then-install-then-commit
 
-Build product: `omedora-test:fedora44-session` (planned).
+A `podman build` RUN has no PID-1 systemd, so the install can't run at build time without re-introducing the shims. Instead the build is two pieces:
 
-### The Wayland-on-Wayland nesting trick
+1. **`Dockerfile.base`** — `FROM fedora:44`, installs systemd + `systemd-container` (for `machinectl`) + `systemd-pam` + dbus-broker + polkit + the install toolchain, creates the `omedora` user (wheel, NOPASSWD, password `omedora`, lingering enabled), copies the omedora tree to `~/.local/share/omarchy`, `CMD ["/sbin/init"]`. Build product: `omedora-test:fedora44-session-base`.
+2. **`build-session.sh`** — boots the base under `--systemd=always`, waits for systemd + the `omedora` user manager, then runs `install.sh` **as omedora through `machinectl shell`** (a real PAM/logind session: `XDG_RUNTIME_DIR`, user D-Bus, a PTY — no `script` hack), and `podman commit`s the finished container to `omedora-test:fedora44-session`.
 
-Hyprland normally talks to KMS/DRM directly via the `drm` backend. That doesn't work inside a container — DRM requires real hardware access + seat permissions + getty-style setup. The `wayland` backend instead makes Hyprland a *Wayland client* of an existing compositor: it opens a window on the host's compositor and renders inside it.
+This is the most faithful path — literally "boot Fedora, log in, run the installer." Concrete wins over the old build-time install: **Flatpaks actually install** (real session bus; Typora/Obsidian/Signal/localsend + the freedesktop runtimes) instead of being skipped, the install runs under a real PTY, and there's no `OMARCHY_CHROOT_INSTALL`, no systemctl shim, no uwsm-app shim.
 
-The pieces needed at run-time:
+Two non-obvious bring-up fixes live in `Dockerfile.base`: install `systemd-pam` (the minimal Fedora image omits `pam_systemd.so`, without which `machinectl shell` gets no session or `XDG_RUNTIME_DIR`), and a `user@.service` drop-in pinning `XDG_RUNTIME_DIR=/run/user/%i` (so the lingering user manager starts at boot instead of dying with exit 49).
+
+### Booting the session: Wayland-on-Wayland nesting
+
+Hyprland normally drives KMS/DRM directly — impossible in a container (needs seat + DRM master). The `wayland` backend (`AQ_BACKENDS=wayland`) instead makes Hyprland a *Wayland client* of the host compositor: it opens a window on the host and renders into it. `run-session.sh` handles the host side; `session-launch.sh` (inside the container, run via `machinectl shell` as omedora) sets the nesting env and launches the compositor.
 
 | Need | How |
 | --- | --- |
-| Host Wayland socket reachable inside container | Bind-mount `$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY` to a known path in the container; set the container-side `WAYLAND_DISPLAY` to point at it |
-| `XDG_RUNTIME_DIR` set + writable | Container creates `/tmp` with mode 0700 and exports `XDG_RUNTIME_DIR=/tmp` |
-| Hardware-accelerated rendering | `--device /dev/dri` + `--group-add $(getent group render | cut -d: -f3)` + same for video |
-| Environment hints | `AQ_BACKENDS=wayland`, `WLR_BACKENDS=wayland`, `XDG_SESSION_TYPE=wayland` |
-| Hyprland refuses to run as root | The omedora user (uid 1000) provisioned by the base image is used; never the container's root |
+| Host Wayland socket reachable as omedora | Bind-mount `$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY` → `/tmp/host-wayland`; `session-launch.sh` sets `WAYLAND_DISPLAY=/tmp/host-wayland` (an absolute value libwayland uses verbatim) |
+| omedora (a subuid under rootless podman) can connect to that socket | The runner — which owns the socket — widens it to `0777` for the session and restores the original mode on exit. The render node is world-rw, so GPU needs no group juggling |
+| `XDG_RUNTIME_DIR` + user D-Bus + `systemd --user` | Provided by the real logind session `machinectl shell` enters — not faked |
+| Hardware-accelerated rendering | `--device /dev/dri` (render node is `crw-rw-rw-`); `--device /dev/rfkill` keeps waybar's rfkill module quiet |
+| Hyprland refuses to run as root | Runs as omedora (uid 1000) inside the logind session, never container root |
+
+**Why not `uwsm start`?** Upstream's `omarchy.desktop` launches via `uwsm start … Hyprland hyprland.desktop`, but uwsm's environment preloader is seat/VT-aware: it asks `loginctl` for the session on the foreground VT and aborts ("Could not determine session on foreground VT") when there isn't one — and a container has no seat0 and no VTs. So `session-launch.sh` launches `Hyprland` directly. This is still faithful where it counts: the autostart chain in `default/hypr/autostart.lua` wraps each app in `uwsm-app -- <cmd>`, and the real `uwsm-app` hands those off to the running `systemd --user` exactly as on bare metal. Verified: the full autostart chain — waybar, mako, swaybg, hypridle, fcitx5 — comes up and waybar is stable.
 
 ### Run modes
 
-The host-side launcher (`test/fedora/run-session.sh`, planned) selects mode via flags:
+`test/fedora/run-session.sh` (default: interactive):
 
-- **`--interactive`** (default for local dev): drops you into a nested Hyprland window. You poke around, use walker, switch themes, take screenshots, exit when satisfied. **Working** — verified.
-- **`--smoke`**: runs Hyprland in background, drives it via `hyprctl`, asserts on state. Exits cleanly. Still opens a transient window on the host because we're using the wayland backend. **Plumbing working**; `smoke-assertions.sh` is a follow-up.
-- **`--headless`** (CI-friendly): wraps Hyprland in Xvfb so there's no host display dependency. Uses the `x11` backend instead of `wayland`. Same hyprctl-driven assertions. **Not yet wired** — Hyprland 0.55.2 from lionheartp COPR doesn't expose an `AQ_BACKENDS=headless` aquamarine backend (see [§7](#7-container-test-gotchas) gotcha), so the Xvfb path is the actual CI target.
+- **(default)** boots the session image under systemd and `machinectl shell`s into `session-launch.sh`, opening a nested Hyprland window on your desktop with the full Omedora session. Close the window to exit; the runner removes the container and restores the host socket mode. **Working — verified.**
+- **`--shell`** — boots systemd and drops you into a `machinectl shell` as omedora (no compositor) for poking around a real logind session.
+- **`--rebuild`** — rebuilds the session image (re-runs `build-session.sh`) first.
+- **`--keep`** — leaves the container running on exit for inspection.
 
-### What L4-nested asserts (via `hyprctl`)
-
-Sample assertions a smoke run would check:
-
-- Hyprland reaches IPC ready within N seconds (`HYPRLAND_INSTANCE_SIGNATURE` socket appears)
-- `hyprctl version` returns expected version
-- `hyprctl monitors` shows at least one monitor (the nested fake screen)
-- waybar process is running and produces output on its IPC socket
-- mako process is running; `notify-send "test"` produces a notification
-- `omarchy theme set tokyo-night` exits 0 and the waybar / terminal CSS files under `~/.config/omarchy/current/` reflect the theme name
-- `omarchy theme set everforest` reverts; assertions repeat
-- `hyprctl dispatch exec foot` produces a new client in `hyprctl clients`
-- `omarchy capture screenshot fullscreen save` writes a PNG file
-- `hyprctl getoption …` confirms key config values are loaded from omedora's real `config/hypr/`
+A scripted `--smoke` mode driving `hyprctl` (theme switch, walker open, screenshot) is a follow-up — see `smoke-assertions.sh` in [§10](#10-implementation-roadmap) step 13.
 
 ### Why this isn't in CI (today)
 
-GitHub Actions Linux runners are headless — they don't run a Wayland compositor. The `wayland` backend therefore won't work unmodified. The `--headless` (Xvfb + x11) mode IS CI-runnable, but Xvfb adds complexity and the test-image build time (~15–30min cold) is at the upper edge of practical CI runtime. Initial scope: **L4-nested is local-only**; CI keeps L1/L2/L3. If we hit a point where compositor-level regressions are bypassing pre-merge review, we revisit.
+GitHub Actions Linux runners are headless — no Wayland compositor for the `wayland` backend to nest under. A headless path needs Xvfb + the `x11` backend (Hyprland 0.55.2 from the lionheartp COPR has no `AQ_BACKENDS=headless`; see [§7](#7-container-test-gotchas)), plus the systemd image build is at the upper edge of practical CI runtime. **L4-nested is local-only**; CI keeps L1/L2/L3.
 
 ### File layout
 
 ```
 test/fedora/
-├── Dockerfile              # L2/L3 base
+├── Dockerfile              # L2/L3 base (docker)
 ├── integration.sh          # L2
 ├── smoke.sh                # L3 (audit)
-├── omedora-session/        # NEW (L4-nested) — planned
-│   ├── Dockerfile          # FROM omedora-test:fedora44, runs install.sh
-│   ├── boot-session.sh     # container-side: launches Hyprland (interactive|smoke|headless)
-│   └── smoke-assertions.sh # hyprctl-driven assertions
+├── omedora-session/        # L4-nested (podman, systemd)
+│   ├── Dockerfile.base     # FROM fedora:44; systemd + deps + omedora tree; CMD /sbin/init
+│   └── session-launch.sh   # in-container: nests Hyprland under the host compositor
+├── build-session.sh        # boot base under systemd, install via machinectl shell, commit
 ├── run-integration.sh      # L2 host-side runner
 ├── run-smoke.sh            # L3 host-side runner
-└── run-session.sh          # NEW — L4-nested host-side runner; --interactive|--smoke|--headless|--rebuild|--shell
+└── run-session.sh          # L4-nested runner: --shell | --rebuild | --keep
 ```
 
 ---
@@ -273,21 +267,23 @@ Specific friction points worth knowing about before writing tests:
 | Gotcha | Mitigation |
 | --- | --- |
 | **SELinux context differs.** Container is `container_t`, real install is `user_t`. Most omedora ops are identical in both; some (writing outside `/etc/yum.repos.d/`) may differ. | Catch user_t-specific issues at L4. Don't write L2 tests that depend on user_t policy. |
-| **No systemd PID 1.** `systemctl status foo.service` returns nothing meaningful. | Use `podman --systemd=true` for the rare test that needs it. Otherwise defer to L4. |
-| **Default user is root.** Sudo is a no-op. Hides bugs in the sudo path. | L3 smoke runs as non-root with sudoers preconfigured. L2 tolerates the simplification. |
-| **dnf metadata is slow first time** (~10-30s cold). | Cache `/var/cache/dnf` aggressively. |
+| **No systemd PID 1 at L2/L3.** The docker L2/L3 base has no init, so `systemctl status foo.service` returns nothing meaningful. | Defer anything needing a real session to **L4-nested**, which boots real PID-1 systemd under `podman --systemd=always` ([§6](#6-l4-nested-container-design)). Don't write L2/L3 tests that assume running units. |
+| **Default user is root (L2).** Sudo is a no-op. Hides bugs in the sudo path. | L3 smoke and L4-nested both run as non-root `omedora` with sudoers preconfigured. L2 tolerates the simplification. |
+| **dnf metadata is slow first time** (~10-30s cold). | Cache `/var/cache/dnf` aggressively (docker BuildKit cache mount at L2/L3; a named podman volume for the L4 build). |
 | **COPR metadata** lives in dnf cache once enabled. Re-enabling doesn't re-fetch — just appends. | Pre-enable in the image. Skip the enable step in tests that don't specifically test enablement. |
-| **Flatpak inside container is fiddly** — wants polkit, runtimes are huge. | Mock at L2 (record `flatpak install` args, exit 0). Exercise real flatpak at L4. |
+| **Flatpak needs a session bus.** It wants the user D-Bus + polkit; runtimes are huge. | Mock at L2 (record `flatpak install` args, exit 0). At **L4-nested** real `flatpak install --user` works because the install runs in a logind session with a live user bus — verified installing Typora/Obsidian/Signal/localsend. |
 | **`omarchy-update-restart`** uses `pacman -Qo` for kernel detection. Pacman isn't in Fedora containers. | The Fedora-arm patch lives on the patch-stack map. Until it lands, the test that runs `omarchy-update-restart` on Fedora will fail. That's a feature: the test is the forcing function. |
 | **Network from CI runners.** GitHub Actions can reach `dl.fedoraproject.org`, `copr.fedoraproject.org`, `dl.flathub.org`. Bandwidth is fine. | If we hit rate limits on COPR, add backoff/retry to the test script. Not a current concern. |
 | **grim against the nested wayland-N socket hangs.** When Hyprland uses the `wayland` aquamarine backend, the wlr-screencopy protocol doesn't complete cleanly inside the nested compositor — `grim` from inside the container blocks indefinitely. | Drive smoke assertions via `hyprctl` only (clients, monitors, getoption). If a screenshot is genuinely needed, capture the nested *window* from the host with `grim -g <geometry>` against the host compositor. |
-| **`AQ_BACKENDS=headless` fails** on Hyprland 0.55.2 (lionheartp COPR build): `CBackend::create() failed!` — the headless aquamarine backend isn't built in. | Use the `wayland` backend (interactive/smoke modes) for local dev. For CI, wrap with Xvfb + `AQ_BACKENDS=x11` (planned). |
+| **`AQ_BACKENDS=headless` fails** on Hyprland 0.55.2 (lionheartp COPR build): `CBackend::create() failed!` — the headless aquamarine backend isn't built in. | Use the `wayland` backend (nest under the host compositor) for local dev. A CI-runnable headless path needs Xvfb + `AQ_BACKENDS=x11` (planned). |
+| **`uwsm start` aborts in a container** — its env preloader asks `loginctl` for the session on the foreground VT and fails ("Could not determine session on foreground VT"); a container has no seat0/VTs. | L4-nested launches `Hyprland` directly under the logind session. The autostart's per-app `uwsm-app -- <cmd>` still works via the real `systemd --user` ([§6](#6-l4-nested-container-design)). |
+| **Rootless podman maps omedora to a subuid**, so it can't connect to the host's `0755` Wayland socket. | `run-session.sh` (which owns the socket) widens it to `0777` for the session and restores the mode on exit. GPU needs no juggling — the render node is world-rw. |
 
 ---
 
 ## 8. CI workflow shape
 
-`.github/workflows/test.yml` defines four parallel jobs on push and pull_request. **L4-nested is not in CI** (no host Wayland on GitHub runners; Xvfb-wrapped headless mode is technically possible but the image build cost makes it impractical for every PR).
+`.github/workflows/test.yml` defines four parallel jobs on push and pull_request. **L4-nested is not in CI** (no host Wayland on GitHub runners for the nested compositor to render into; an Xvfb-wrapped headless path is technically possible but the systemd image build cost makes it impractical for every PR).
 
 ### `shell-unit` (fast, every PR)
 
@@ -401,8 +397,9 @@ Steps 1-7 are **shipped** (the test-infrastructure foundation: L1, L2, L3, CI). 
 | 9 | ✅ shipped | **Install-pipeline gating** (system-admin scope) | Arch-only gate on `install/config/all.sh` system-admin block (gpg, login, hardware, network, power, security, services, sudoers); per-script guards on `mimetypes.sh`, `theme.sh`, `nvim.sh`, `mise-work.sh` | System-admin concerns (sysctl, sudoers, /etc, systemd units) are the user's Fedora install's job — see [`architecture.md` §6](architecture.md#6-install-pipeline-gating). |
 | 10 | planned | **Bulk-fill the package map** | `install/packages/fedora.toml` (add entries for the ~30 unmapped packages the L3 audit currently surfaces) | The L3 audit's "unmapped + dnf MISSES" list is the punch list. Many entries currently `source = "skip"`. |
 | 11 | planned | **Wayland session entry** + Fedora-side config script | `default/wayland-sessions/omedora.desktop` (new), `install/config/wayland-session-fedora.sh` (new), wired into `install/config/all.sh` | The session entry the display manager picks up — used by L4-VM and (cosmetically) by L4-nested. |
-| 12 | ✅ shipped | **L4-nested image + runner** | `test/fedora/omedora-session/Dockerfile` (FROM omedora-test:fedora44, runs install.sh), `test/fedora/omedora-session/boot-session.sh`, `test/fedora/omedora-session/systemctl-shim.sh`, `test/fedora/run-session.sh` | Verified: nested Hyprland 0.55.2 boots inside `fedora:44`, accepts wayland clients (`hyprctl clients` lists `foot`). `smoke-assertions.sh` is a follow-up. |
-| 13 | deferred | VM smoke harness (optional) | `scripts/vm-smoke.sh` (new) | Deferred per user; lands if/when manual L4-VM workflow gets repetitive enough to automate. |
+| 12 | ✅ shipped | **L4-nested image + runner (systemd)** | `test/fedora/omedora-session/Dockerfile.base` (FROM fedora:44, systemd + tree), `test/fedora/build-session.sh` (boot+install+commit), `test/fedora/omedora-session/session-launch.sh`, `test/fedora/run-session.sh` (podman `--systemd=always`) | Verified: real PID-1 systemd boots, install runs in a logind session (Flatpaks install), nested Hyprland brings up the full autostart chain. Supersedes the earlier shimmed image (no-init + systemctl/uwsm-app shims) — those are deleted. |
+| 13 | planned | **`smoke-assertions.sh`** | `test/fedora/omedora-session/smoke-assertions.sh` | hyprctl-driven assertions (theme switch, walker open, screenshot) for a scripted `--smoke` run. |
+| 14 | deferred | VM smoke harness (optional) | `scripts/vm-smoke.sh` (new) | Deferred per user; lands if/when manual L4-VM workflow gets repetitive enough to automate. |
 
 Implementation commits should land tests **with** their corresponding code, not in batches. A package-helper patch arrives with the helper test that proves it. This is TDD-ish in spirit but pragmatic — we're not strict about tests-first vs code-first within a commit.
 

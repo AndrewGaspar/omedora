@@ -9,12 +9,12 @@
 #
 # This Dockerfile builds only the BASE (Fedora + systemd + deps + the omedora
 # tree). The install does NOT run here — a Dockerfile RUN has no PID-1 systemd.
-# Instead test/fedora/build-session-systemd.sh boots this image, runs install.sh
+# Instead test/fedora/build-session.sh boots this image, runs install.sh
 # inside the live logind session, and commits the result. See omedora/testing.md
 # §6 and the migration plan.
 #
 # Built and run entirely under podman (--systemd=always); independent of the
-# docker-based L1/L2/L3 images. Build product: omedora-test:fedora44-systemd-base.
+# docker-based L1/L2/L3 images. Build product: omedora-test:fedora44-session-base.
 
 FROM registry.fedoraproject.org/fedora:44
 
