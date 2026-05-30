@@ -77,6 +77,9 @@ run_args=(
   --device /dev/dri
 )
 [[ -e /dev/rfkill ]] && run_args+=(--device /dev/rfkill)
+# xdg-document-portal needs /dev/fuse (it FUSE-mounts the document store);
+# without it the portal service crash-loops with "device /dev/fuse not found".
+[[ -e /dev/fuse ]] && run_args+=(--device /dev/fuse)
 
 # Iterate on session-launch.sh without rebuilding the image.
 run_args+=(-v "$REPO/test/fedora/omedora-session/session-launch.sh:$LAUNCH_IN_IMAGE:ro")
