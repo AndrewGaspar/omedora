@@ -124,16 +124,18 @@ app_id = "org.localsend.localsend_app"
 # completes; revisit with real source installers in a follow-up.
 
 [mise]
-source = "skip"
-reason = "TODO: source installer (mise's curl-installed binary into ~/.local/bin) — not blocking install.sh today."
+source = "dnf"
+names = ["mise"]
+reason = "Not in Fedora repos or RPM Fusion. Upstream ships a prebuilt linux-x64 tarball; binary-repackaged by omedora/packaging/copr/mise.spec (binary + man page + fish activation snippet)."
 
 [claude-code]
 source = "skip"
 reason = "TODO: source installer (npm install -g claude-code, or pull binary) — not blocking install.sh today."
 
 [omarchy-nvim]
-source = "skip"
-reason = "TODO: source installer (clone omarchy's nvim config into ~/.config/nvim) — not blocking install.sh today."
+source = "dnf"
+names = ["omarchy-nvim"]
+reason = "omarchy's prebuilt LazyVim distribution (config + baked plugin cache + omarchy-nvim-setup), NOT a plain config clone. Built from source by omedora/packaging/copr/omarchy-nvim.spec (reproduces the omacom-io/omarchy-pkgs PKGBUILD; headless Lazy sync). install/packaging/nvim.sh already invokes omarchy-nvim-setup."
 
 [omarchy-walker]
 source = "dnf"
@@ -141,16 +143,19 @@ names = ["walker", "elephant"]
 reason = "AUR meta pulling walker + elephant; neither is in Fedora repos. Both are packaged as RPMs in omedora/packaging/copr/ (walker pulls gtk4-layer-shell, elephant pulls qalculate for the calc provider's qalc CLI + ships its providers and user service) and served from the omedora repo (local now, COPR later)."
 
 [starship]
-source = "skip"
-reason = "TODO: source installer (curl -sS https://starship.rs/install.sh | sh) — not blocking install.sh today."
+source = "dnf"
+names = ["starship"]
+reason = "Not in Fedora repos or RPM Fusion. Upstream ships a prebuilt x86_64 binary; binary-repackaged by omedora/packaging/copr/starship.spec."
 
 [lazygit]
-source = "skip"
-reason = "TODO: source installer (GitHub releases) or vetted COPR. Not in Fedora main repos."
+source = "dnf"
+names = ["lazygit"]
+reason = "Not in Fedora main or RPM Fusion; atim/lazygit COPR not on the allowlist. Binary-repackaged from upstream's prebuilt release tarball (omedora/packaging/copr/lazygit.spec); resolves to the omedora-repo RPM."
 
 [lazydocker]
-source = "skip"
-reason = "TODO: source installer (GitHub releases). Not in Fedora main repos."
+source = "dnf"
+names = ["lazydocker"]
+reason = "Not in Fedora main or RPM Fusion; atim/lazydocker COPR not on the allowlist. Binary-repackaged from upstream's prebuilt release tarball (omedora/packaging/copr/lazydocker.spec)."
 
 [swayosd]
 source = "dnf"
@@ -158,16 +163,19 @@ names = ["swayosd"]
 reason = "Not in Fedora main repos and ships no prebuilt binaries, so the omedora swayosd RPM (omedora/packaging/copr/swayosd.spec) builds it from source via meson+cargo. Served from the omedora repo (local now, COPR later). Provides swayosd-server/-client (omedora drives them via its own user unit + ~/.config/swayosd theme) plus the libinput backend glue; fixes the swayosd-server.service 203/EXEC crash-loop."
 
 [satty]
-source = "skip"
-reason = "TODO: source installer (cargo install satty) or COPR. Not in Fedora main repos."
+source = "dnf"
+names = ["satty"]
+reason = "Wayland screenshot annotation (Rust/GTK4). Not in Fedora repos/RPM Fusion, and — despite being a GUI — NOT on Flathub (verified against Flathub appstream+search). Built from source by omedora/packaging/copr/satty.spec."
 
 [bluetui]
-source = "skip"
-reason = "TODO: source installer (cargo install bluetui). Not in Fedora main repos."
+source = "dnf"
+names = ["bluetui"]
+reason = "Bluetooth TUI (Rust). Not in Fedora repos/RPM Fusion; a TUI is not a Flathub fit. Built from source by omedora/packaging/copr/bluetui.spec (Requires bluez)."
 
 [hyprland-preview-share-picker]
-source = "skip"
-reason = "TODO: source installer (small wrapper; ships with Hyprland on Arch). Not on lionheartp/Hyprland COPR."
+source = "dnf"
+names = ["hyprland-preview-share-picker"]
+reason = "Rust (edition 2024) GTK4 xdph share picker. Not in Fedora main/RPM Fusion or the allowlisted lionheartp/Hyprland COPR. Built from source by omedora/packaging/copr/hyprland-preview-share-picker.spec (hyprland-protocols submodule fetched at a pinned commit). Runtime dep xdg-desktop-portal-hyprland comes from lionheartp/Hyprland."
 
 [ttf-ia-writer]
 source = "skip"
@@ -183,8 +191,9 @@ source = "skip"
 reason = "TODO: pip install. Fedora has timedatectl set-timezone for the same purpose."
 
 [usage]
-source = "skip"
-reason = "TODO: source installer for the `usage` CLI (mise's spec-driven CLI tool). Not in Fedora main repos."
+source = "dnf"
+names = ["usage"]
+reason = "Not in Fedora repos or RPM Fusion. jdx/usage (mise companion) ships a prebuilt x86_64 binary; binary-repackaged by omedora/packaging/copr/usage.spec (binary + man page)."
 
 # --- 37signals / Basecamp internal tools (skip on Fedora) ----------------
 

@@ -220,7 +220,7 @@ sudo dnf install -y walker elephant omedora-nerd-fonts swayosd python3-terminalt
 This is normal if you try to launch Hyprland from inside another Wayland compositor (e.g., GNOME) directly from a terminal. Log out of GNOME and select the "Omedora" session at GDM instead. Hyprland must be started as the first compositor on a VT seat — uwsm handles this when launched from the display manager.
 
 **Packages marked `skip` in `install/packages/fedora.toml`**
-Several packages are deliberately skipped on Fedora because they have no current Fedora/COPR/Flathub equivalent: `mise`, `claude-code`, `lazygit`, `lazydocker`, `starship`, `satty`, `1password-cli`. These are logged during install and can be installed manually afterward.
+Most former skips (`mise`, `starship`, `usage`, `lazygit`, `lazydocker`, `satty`, `bluetui`, `hyprland-preview-share-picker`, `omarchy-nvim`) are now packaged as omedora RPMs and resolve from the local repo you built in step 3. A few remain deliberately skipped because they're proprietary, vendor-installed, or out of omedora's scope: `claude-code` (proprietary; install via Anthropic's official installer), `1password-cli`, and the 37signals-internal tools. These are logged during install and can be installed manually afterward.
 
 **Build fails: `podman` pull errors**
 If `build-repo.sh` fails pulling `registry.fedoraproject.org/fedora:44`, try:

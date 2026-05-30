@@ -17,7 +17,14 @@ REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
 COPR_DIR="$REPO/omedora/packaging/copr"
 IMAGE="${OMEDORA_RPMBUILD_IMAGE:-registry.fedoraproject.org/fedora:44}"
 
-SPECS=(walker.spec elephant.spec omedora-nerd-fonts.spec swayosd.spec terminaltexteffects.spec)
+SPECS=(
+  walker.spec elephant.spec omedora-nerd-fonts.spec swayosd.spec terminaltexteffects.spec
+  # task #59 back-fill (all build-tested):
+  lazygit.spec lazydocker.spec mise.spec starship.spec usage.spec
+  satty.spec bluetui.spec hyprland-preview-share-picker.spec omarchy-nvim.spec
+  # claude-code.spec is intentionally NOT built here — parked pending a
+  # redistribution-licensing decision before any public COPR (proprietary binary).
+)
 
 echo "==> Building RPMs"
 for s in "${SPECS[@]}"; do
