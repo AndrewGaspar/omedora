@@ -4,8 +4,8 @@
 # Fedora 44 / RPM Fusion, so omedora vendors it. Adapted from solopasha's
 # Fedora spec set (github.com/solopasha/hyprlandRPM) — the maintained spec set
 # the dropped lionheartp/Hyprland COPR forked. Converted to omedora conventions:
-# pinned Version (no rpmautospec %autorelease/%autochangelog), explicit
-# Release + %changelog.
+# pinned Version (no rpmautospec auto-release/auto-changelog), explicit
+# Release + changelog.
 #
 # Header-only: only a -devel (noarch) subpackage with the headers + cmake glue.
 

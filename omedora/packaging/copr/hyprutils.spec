@@ -5,7 +5,7 @@
 # 0.13.1 (newer EVR ⇒ dnf upgrades the stale copy automatically, so the rest of
 # our stack — which needs the new ABI — is installable). Adapted from
 # solopasha/hyprlandRPM. omedora conventions: pinned Version, explicit Release +
-# %changelog, soname owned via glob (self-adjusting across releases).
+# changelog, soname owned via glob (self-adjusting across releases).
 
 Name:           hyprutils
 Version:        0.13.1
