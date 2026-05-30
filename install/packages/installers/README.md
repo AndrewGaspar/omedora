@@ -1,18 +1,18 @@
-# Source installers
+# Source installers — RETIRED
 
-Bash scripts that fetch and install packages with no Fedora repo, RPM Fusion,
-COPR, or Flathub presence. Each installer:
+This directory once held per-package shell "source installers" for packages with
+no Fedora repo, RPM Fusion, COPR, or Flathub presence. **That approach is
+retired.** No source installers ship here, and new ones should not be added.
 
-1. Has no shebang (sourced/invoked via `bash <file>`).
-2. Starts with a one-line `echo` describing what it does.
-3. Is idempotent: re-running is a no-op when the installed version is current.
-4. Writes its installed version to
-   `~/.local/state/omedora/installed-versions/<package>` so the update flow
-   can detect drift.
-5. Cleans up any temp directories it creates.
+Packages that aren't anywhere in Fedora's ecosystem are now built as **RPMs**
+under [`omedora/packaging/copr/`](../../../omedora/packaging/copr/) and served from the omedora
+dnf repo (a local repo today, a published COPR later). Their
+[`install/packages/fedora.toml`](../fedora.toml) entries use `source = "dnf"`
+with the RPM package `names` — the same install path as a Fedora-shipped
+package.
 
-See [`omedora/packages.md`](../../../omedora/packages.md) §4 for the full
-convention.
+See [`omedora/packages.md` §4](../../../omedora/packages.md#4-the-rpmcopr-tier-omedorapackagingcopr)
+for the RPM/COPR tier: spec conventions, the `build-local.sh` / `build-repo.sh`
+scripts, and how to add a new packaged app.
 
-Referenced from [`install/packages/fedora.toml`](../fedora.toml) entries with
-`source = "source"`.
+This directory is kept only as a pointer; it has no other contents.
