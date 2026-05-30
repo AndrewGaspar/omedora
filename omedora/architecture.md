@@ -412,10 +412,26 @@ Each row is classified by patch type:
 | `bin/omarchy-pkg-drop` | Prepend | Same shim |
 | `bin/omarchy-pkg-drop-fedora` | New | `dnf remove -y` |
 | `bin/omarchy-pkg-aur-add` | Prepend | Same shim — but on Fedora becomes the tier-fallback entry point |
-| `bin/omarchy-pkg-aur-add-fedora` | New | Reads package map, routes to dnf/COPR/flathub/source |
+| `bin/omarchy-pkg-aur-add-fedora` | New | Reads package map, routes to dnf (Fedora main / omedora repo) / COPR / flathub |
 | `install/packages/fedora.toml` | New | The package-mapping data file |
-| `install/packages/installers/*.sh` | New | Per-package source installers (only added when needed) |
+| `install/packages/installers/README.md` | New | Pointer only — the source-installer tier is **retired**; packages with no Fedora/COPR/Flathub home are RPMs under `omedora/packaging/copr/` (see [Packaging tier](#packaging-tier-rpmcopr)) |
 | `install/packages/fedora-upgrade.sh` | New | Major-Fedora-version migration handler |
+
+### Packaging tier (RPM/COPR)
+
+Packages with no Fedora / RPM Fusion / vetted-COPR / Flathub home are built as **RPMs** under `omedora/packaging/copr/` and served from the omedora dnf repo (a local repo today, a published COPR later). This replaces the retired source-installer tier; the `fedora.toml` entries are plain `source = "dnf"`. See [`packages.md` §4–§5](packages.md#4-the-rpmcopr-tier-omedorapackagingcopr) for spec conventions, build scripts, and repo injection.
+
+| File | Type | Status | Notes |
+| --- | --- | --- | --- |
+| `omedora/packaging/copr/walker.spec` | New | ✅ shipped | Binary-repackage of upstream walker release; `Requires: gtk4-layer-shell` |
+| `omedora/packaging/copr/elephant.spec` | New | ✅ shipped | Binary-repackage of elephant core + provider plugins + user service; `Requires: libqalculate` |
+| `omedora/packaging/copr/omedora-nerd-fonts.spec` | New | ✅ shipped | Binary-repackage (noarch) of CascadiaCode + JetBrainsMono Nerd Fonts |
+| `omedora/packaging/copr/swayosd.spec` | New | ✅ shipped | From-source (meson wrapping `cargo build`); ships server/client + libinput backend glue. Crate vendoring for hermetic builds is a follow-up |
+| `omedora/packaging/copr/terminaltexteffects.spec` | New | ✅ shipped | From-source Python via `pyproject-rpm-macros` (noarch); provides `tte` |
+| `omedora/packaging/copr/build-local.sh` | New | ✅ shipped | Builds one spec via `rpmbuild -ba` in a `fedora:44` container → `output/` |
+| `omedora/packaging/copr/build-repo.sh` | New | ✅ shipped | Builds all specs in its `SPECS=(...)` array + `createrepo_c` → `repo/` (the COPR stand-in) |
+| `omedora/packaging/copr/.gitignore` | New | ✅ shipped | Ignores build products `output/` + `repo/` |
+| `test/fedora/build-session.sh` (repo inject) | Edit | ✅ shipped | Builds the local repo, `podman cp`s it into the build container, drops `/etc/yum.repos.d/omedora-local.repo` so `install.sh`'s dnf resolves the omedora-repo packages |
 
 ### Install pipeline ([§6](#6-install-pipeline-gating))
 
@@ -521,7 +537,7 @@ Per-file status as of the current tip of `dev`. The roadmap in `testing.md` §10
 | `bin/fedora/pkg.py` | New | ✅ shipped | Python implementation of pkg-add/missing/present/drop/aur-add on Fedora; map resolution + dnf/rpm/flatpak/source dispatch |
 | `bin/omarchy-dev-validate-fedora-packages` | New | ✅ shipped | Package-map validator; mirrors `bin/omarchy-dev-bin-metadata` shape |
 | `install/packages/fedora.toml` | New | ✅ shipped | Package map (44 entries; bulks out per testing.md step 10) |
-| `install/packages/installers/` | New | ✅ shipped | Per-package source installers (currently empty; populated as needed) |
+| `install/packages/installers/` | New | ✅ shipped | Source-installer tier **retired** — only `README.md` (a pointer to `omedora/packaging/copr/`) remains. New non-Fedora packages are RPMs (see [Packaging tier](#packaging-tier-rpmcopr)) |
 | `install/preflight/fedora-repos.sh` | New | ✅ shipped | RPM Fusion + lionheartp/Hyprland COPR + Flathub remote enable |
 | `.github/workflows/test.yml` | New | ✅ shipped | CI workflow — four parallel jobs (shell-unit, arch-regression, fedora-integration, fedora-smoke) |
 | `install.sh` | Edit | planned (step 8) | Gate `login/all.sh` + `post-install/all.sh` behind Arch check; let preflight + packaging + config run on Fedora |

@@ -70,13 +70,13 @@ When upstream adds a package to `omarchy-base.packages` or to a feature install 
 
 1. Check Fedora main repos: `dnf search <name>`.
 2. Check RPM Fusion: `dnf --enablerepo=rpmfusion-free,rpmfusion-nonfree search <name>`.
-3. Check the allowed COPRs (see the allowlist in [`packages.md` §6](packages.md#6-review-checklist)). Currently just `lionheartp/Hyprland`.
+3. Check the allowed third-party COPRs (see the allowlist in [`packages.md` §7](packages.md#7-review-checklist)). Currently just `lionheartp/Hyprland`.
 4. Check Flathub: search https://flathub.org/.
-5. Only if all four fail: propose a source installer. **Flag it for human review in the commit body.**
+5. Only if all four fail: package it as an omedora RPM under `omedora/packaging/copr/` and route the entry to `source = "dnf"` (see [`packages.md` §4](packages.md#4-the-rpmcopr-tier-omedorapackagingcopr)). The source-installer tier is retired. If a spec isn't feasible right now, park the entry as `source = "skip"` with a TODO.
 
 Each map entry change goes in a commit with the rationale in the commit body. Detail the tier choice and any alternatives you considered. Future maintainers will read this history.
 
-**Never add a COPR to the allowlist without explicit human approval.** A new COPR requires a separate PR that updates `packages.md` § 6 with rationale (maintainer, build history, why we trust it).
+**Never add a third-party COPR to the allowlist without explicit human approval.** A new COPR requires a separate PR that updates `packages.md` § 7 with rationale (maintainer, build history, why we trust it). (This does not apply to the omedora repo — our own RPMs in `omedora/packaging/copr/` — which is reviewed as ordinary source.)
 
 ---
 
