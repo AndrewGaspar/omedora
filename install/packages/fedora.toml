@@ -174,8 +174,9 @@ source = "skip"
 reason = "TODO: source installer (proprietary iA Writer font; vendored from upstream). Not in Fedora main repos."
 
 [python-terminaltexteffects]
-source = "skip"
-reason = "TODO: pip install for the omedora user. Not in Fedora main repos."
+source = "dnf"
+names = ["python3-terminaltexteffects"]
+reason = "The `tte` terminal-effects CLI; not in Fedora main repos. Packaged from-source as an RPM in packaging/copr/ (pure Python, no runtime deps; ships /usr/bin/tte) and served from the omedora repo (local now, COPR later)."
 
 [tzupdate]
 source = "skip"
