@@ -135,3 +135,9 @@ if omarchy-cmd-missing fprintd-list || ! fprintd-list "$USER" 2>/dev/null | grep
   sed -i 's/fingerprint:enabled = .*/fingerprint:enabled = false/' ~/.config/hypr/hyprlock.conf
 fi
 ```
+
+---
+
+## This is Omedora
+
+This repository is **Omedora** — a Fedora port that builds *additively* on top of Omarchy (it still runs unchanged on Arch). The guidance above is Omarchy's and still applies. For the omedora-specific rules — patch discipline against upstream, the Fedora package map, the `omedora/` subfolder convention, and how the Fedora port is structured — also read [`omedora/AGENTS.md`](omedora/AGENTS.md) and the design in [`omedora/`](omedora/).

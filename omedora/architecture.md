@@ -516,6 +516,7 @@ Packages with no Fedora / RPM Fusion / vetted-COPR / Flathub home are built as *
 | `omedora/branding.md` | New | Brand surfacing rules |
 | `omedora/AGENTS.md` | New | Supplemental agent rules |
 | `omedora/testing.md` | New | Test strategy (the pyramid + container design + CI shape) |
+| `AGENTS.md` (root) | Edit | ✅ shipped | Append-only note at the end: this is Omedora, also read `omedora/AGENTS.md`. Brand-neutral pointer (no rebrand); lowest-risk append. |
 
 ### Testing (see [`testing.md`](testing.md))
 
