@@ -29,7 +29,7 @@ fi
 cd "$REPO"
 
 . "$REPO/test/helpers.sh"
-. "$REPO/test/fedora/lib/container.sh"
+. "$REPO/omedora/test/fedora/lib/container.sh"
 
 ensure_running_as_root
 

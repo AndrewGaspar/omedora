@@ -1,4 +1,4 @@
-# Container-side test helpers — sourced by test/fedora/integration.sh.
+# Container-side test helpers — sourced by omedora/test/fedora/integration.sh.
 # Run only inside the fedora:44 test image; assume /repo is the bind-mounted
 # repo and we have real dnf/rpm/flatpak available.
 #

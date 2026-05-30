@@ -4,7 +4,7 @@ This doc is the canonical strategy for testing omedora. It defines a four-layer 
 
 For the higher-level architecture this strategy serves, see [`architecture.md`](architecture.md). For agent-facing rules that reference this doc, see [`AGENTS.md`](AGENTS.md).
 
-> **Status:** L1, L2, L3 (audit-only), the CI workflow, install-pipeline gating, and L4-nested are **shipped** — see roadmap [§10](#10-implementation-roadmap) for the per-step status. L4-nested boots a real Omedora session inside `fedora:44` under **real PID-1 systemd** (`podman --systemd=always`): the install runs end-to-end in a logind session (Flatpaks and all), and launching Hyprland brings up the full autostart chain (waybar, mako, swaybg, hypridle, fcitx5) nested under the host compositor. The **L4-headless automated test suite** (`test/fedora/headless/`) — a TAP harness with screenshots-on-failure and a CI exit code — is the canonical L4 assertion path (closes #45). Follow-up: bulk-fill the package map (step 10). L4-VM is documented but operates manually.
+> **Status:** L1, L2, L3 (audit-only), the CI workflow, install-pipeline gating, and L4-nested are **shipped** — see roadmap [§10](#10-implementation-roadmap) for the per-step status. L4-nested boots a real Omedora session inside `fedora:44` under **real PID-1 systemd** (`podman --systemd=always`): the install runs end-to-end in a logind session (Flatpaks and all), and launching Hyprland brings up the full autostart chain (waybar, mako, swaybg, hypridle, fcitx5) nested under the host compositor. The **L4-headless automated test suite** (`omedora/test/fedora/headless/`) — a TAP harness with screenshots-on-failure and a CI exit code — is the canonical L4 assertion path (closes #45). Follow-up: bulk-fill the package map (step 10). L4-VM is documented but operates manually.
 
 ---
 
@@ -119,7 +119,7 @@ test/
     └── fixtures/                    # fixture TOML maps, migrations, os-release files
 ```
 
-Each L1 test is independently runnable: `bash test/distro-test.sh` produces TAP output and exits non-zero on failure. The L2/L3 orchestrators are also self-contained but require a built `test/fedora/` container image.
+Each L1 test is independently runnable: `bash test/distro-test.sh` produces TAP output and exits non-zero on failure. The L2/L3 orchestrators are also self-contained but require a built `omedora/test/fedora/` container image.
 
 ### Mocking
 
@@ -150,7 +150,7 @@ The new `bin/omarchy-dev-validate-fedora-packages` (planned) mirrors `bin/omarch
 
 ### Preinstalled tools
 
-In `test/fedora/Dockerfile`:
+In `omedora/test/fedora/Dockerfile`:
 
 - `dnf-plugins-core` — provides the `dnf copr` subcommand
 - `git` — for cloning omedora and exercising `omarchy-update-git`
@@ -261,14 +261,14 @@ Hyprland normally drives KMS/DRM directly — impossible in a container (needs s
 
 ### Run modes
 
-`test/fedora/run-session.sh` (default: interactive):
+`omedora/test/fedora/run-session.sh` (default: interactive):
 
 - **(default)** boots the session image under systemd and `machinectl shell`s into `session-launch.sh`, opening a nested Hyprland window on your desktop with the full Omedora session. Close the window to exit; the runner removes the container and restores the host socket mode. **Working — verified.**
 - **`--shell`** — boots systemd and drops you into a `machinectl shell` as omedora (no compositor) for poking around a real logind session.
 - **`--rebuild`** — rebuilds the session image (re-runs `build-session.sh`) first.
 - **`--keep`** — leaves the container running on exit for inspection.
 
-Scripted `hyprctl`-driven assertions (session smoke, walker open, screenshot) now live in the **[L4-headless automated test suite](#l4-headless-automated-test-suite-testfedoraheadless)** below — the canonical L4 assertion path (closes the old `smoke-assertions.sh` follow-up, task #45).
+Scripted `hyprctl`-driven assertions (session smoke, walker open, screenshot) now live in the **[L4-headless automated test suite](#l4-headless-automated-test-suite-omedoratestfedoraheadless)** below — the canonical L4 assertion path (closes the old `smoke-assertions.sh` follow-up, task #45).
 
 ### Headless mode (`--headless`): self-contained, parallelizable, CI-able
 
@@ -311,14 +311,14 @@ The full autostart chain (waybar, mako, swaybg, hypridle, fcitx5) comes up exact
 
 **Limitations:** software rendering (llvmpipe / vkms) is slow — fine for smoke assertions and screenshots, not for perf testing. The lionheartp Hyprland build's `hyprctl monitors` intermittently returns `unknown request` before the explicit output is created (the launcher works around it). `hyprctl dispatch exec …` needs the Lua quoting form `hl.dispatch("exec","<cmd>")`; launching clients directly with `WAYLAND_DISPLAY` set to Hyprland's socket is simpler for scripted driving.
 
-### L4-headless automated test suite (`test/fedora/headless/`)
+### L4-headless automated test suite (`omedora/test/fedora/headless/`)
 
 This is the **canonical way to write L4 assertions** — it subsumes the planned `smoke-assertions.sh` (roadmap step 13 / task #45). It boots **one** headless Omedora session (the `--headless` recipe above), then runs a suite of small assertion scripts against it via `hyprctl` / `grim`, in **TAP** style, with **screenshots-on-failure** and a **CI-friendly exit code**. It reuses the L1 TAP primitives (`test/helpers.sh`) so L1 and L4 tests speak the same language.
 
 **Layout**
 
 ```
-test/fedora/headless/
+omedora/test/fedora/headless/
 ├── run-tests.sh        # host orchestrator: boot one session, run the suite, report
 ├── lib.sh              # sourced by every test (in-container): session env + assertions
 ├── tests/
@@ -330,10 +330,10 @@ test/fedora/headless/
 **Run it**
 
 ```
-test/fedora/headless/run-tests.sh                 # build image if missing, run all tests
-test/fedora/headless/run-tests.sh --rebuild       # rebuild the session image first
-test/fedora/headless/run-tests.sh --test '10-*.sh' # run a subset (glob)
-test/fedora/headless/run-tests.sh --keep          # leave the container up for inspection
+omedora/test/fedora/headless/run-tests.sh                 # build image if missing, run all tests
+omedora/test/fedora/headless/run-tests.sh --rebuild       # rebuild the session image first
+omedora/test/fedora/headless/run-tests.sh --test '10-*.sh' # run a subset (glob)
+omedora/test/fedora/headless/run-tests.sh --keep          # leave the container up for inspection
 ```
 
 The orchestrator prints a TAP plan (`1..N`), one `ok`/`not ok` per test, and a `pass`/`fail` summary; it **exits non-zero iff any test failed** (the CI gate). Each run uses a **unique container name** (`omedora-htest-$$`), so two invocations run **concurrently** without colliding (verified — distinct containers, no shared host socket).
@@ -353,7 +353,7 @@ assert_layer walker "omarchy-menu renders a walker surface"
 
 `lib.sh` provides, on top of the shared TAP helpers (`pass`, `fail`, `assert_equals`, `assert_output_contains`, …): `headless_session_env`, `assert_layer`/`wait_for_layer`, `assert_client`/`wait_for_client`, `assert_monitor`, `assert_proc`, `screenshot`, `dump_state`. A failed `assert_*` auto-captures a `grim` screenshot + `hyprctl layers/clients/monitors` dumps + failed-unit list before exiting non-zero.
 
-**Artifacts.** On any failure the orchestrator copies that test's screenshots + state dumps to `test/fedora/headless/artifacts/<test>/` (git-ignored). A green run writes nothing.
+**Artifacts.** On any failure the orchestrator copies that test's screenshots + state dumps to `omedora/test/fedora/headless/artifacts/<test>/` (git-ignored). A green run writes nothing.
 
 **CI notes.** Same requirement as `--headless`: a DRM render node (`--device /dev/dri`). GPU-less runners: `sudo modprobe vkms`, then `OMEDORA_RENDER_NODE=/dev/dri/renderD<n>`. Build-once-then-run on a scheduled/on-demand job (the image build is ~15–30 min).
 
@@ -364,7 +364,7 @@ The original blocker was "GitHub Actions runners are headless — no compositor 
 ### File layout
 
 ```
-test/fedora/
+omedora/test/fedora/
 ├── Dockerfile              # L2/L3 base (docker)
 ├── integration.sh          # L2
 ├── smoke.sh                # L3 (audit)
@@ -428,11 +428,11 @@ Plus a check that `omarchy --help` (default invocation, no `OMARCHY_BRAND`) cont
 
 ### `fedora-integration` (medium, every PR)
 
-Builds `test/fedora/Dockerfile`, mounts the repo, runs `test/fedora/integration.sh`. Caches `/var/cache/dnf` keyed on `test/fedora/Dockerfile` SHA. Runtime typically 2-5 minutes warm.
+Builds `omedora/test/fedora/Dockerfile`, mounts the repo, runs `omedora/test/fedora/integration.sh`. Caches `/var/cache/dnf` keyed on `omedora/test/fedora/Dockerfile` SHA. Runtime typically 2-5 minutes warm.
 
 ### `fedora-smoke` (slow, gated)
 
-Same Dockerfile, runs `test/fedora/smoke.sh`. Triggered by:
+Same Dockerfile, runs `omedora/test/fedora/smoke.sh`. Triggered by:
 
 - `schedule: '0 6 * * *'` (nightly at 06:00 UTC)
 - Pull requests carrying the `smoke` label
@@ -517,14 +517,14 @@ Steps 1-7 are **shipped** (the test-infrastructure foundation: L1, L2, L3, CI). 
 | 3 | ✅ shipped | Brand shim + assertions | `bin/omarchy` (edit), `bin/omedora` (symlink), `bin/omarchy-version` (edit), brand assertions in `test/omarchy-cli-test.sh` | The CLI rebrand from [`architecture.md` §10](architecture.md#10-cli-rebrand-tactical). |
 | 4 | ✅ shipped | Package helpers + L1 test | `bin/omarchy-pkg-*` (edits with Fedora dispatch shim), `bin/fedora/pkg.py`, `test/mocks/{dnf,rpm,pacman,flatpak,sudo}`, `test/pkg-helper-test.sh` | The biggest helper change. |
 | 5 | ✅ shipped | Package map + validator | `install/packages/fedora.toml`, `bin/omarchy-dev-validate-fedora-packages`, `test/pkg-map-test.sh` | Starter set; grows incrementally per step 9. |
-| 6 | ✅ shipped | L2 + CI bring-up | `test/fedora/Dockerfile`, `test/fedora/integration.sh`, `test/fedora/lib/container.sh`, `.github/workflows/test.yml`, `test/fedora/run-integration.sh` | After this, every PR is regression-tested. |
-| 7 | ✅ shipped | L3 smoke (audit-only) | `test/fedora/smoke.sh`, `install/preflight/fedora-repos.sh`, `test/fedora/run-smoke.sh`, scheduled job in CI | Audits the package map against real dnf; does NOT yet run install.sh end-to-end. |
+| 6 | ✅ shipped | L2 + CI bring-up | `omedora/test/fedora/Dockerfile`, `omedora/test/fedora/integration.sh`, `omedora/test/fedora/lib/container.sh`, `.github/workflows/test.yml`, `omedora/test/fedora/run-integration.sh` | After this, every PR is regression-tested. |
+| 7 | ✅ shipped | L3 smoke (audit-only) | `omedora/test/fedora/smoke.sh`, `install/preflight/fedora-repos.sh`, `omedora/test/fedora/run-smoke.sh`, scheduled job in CI | Audits the package map against real dnf; does NOT yet run install.sh end-to-end. |
 | 8 | ✅ shipped | **Install-pipeline gating** (preflight + orchestrator) | `install.sh` (Arch gate around `login/` and `post-install/`), `install/preflight/guard.sh` (Fedora arm), `install/preflight/pacman.sh`, `install/preflight/disable-mkinitcpio.sh`, `install/preflight/all.sh` (source `fedora-repos.sh` on Fedora) | Unblocks running `install.sh` against `fedora:44` end-to-end. |
 | 9 | ✅ shipped | **Install-pipeline gating** (system-admin scope) | Arch-only gate on `install/config/all.sh` system-admin block (gpg, login, hardware, network, power, security, services, sudoers); per-script guards on `mimetypes.sh`, `theme.sh`, `nvim.sh`, `mise-work.sh` | System-admin concerns (sysctl, sudoers, /etc, systemd units) are the user's Fedora install's job — see [`architecture.md` §6](architecture.md#6-install-pipeline-gating). |
 | 10 | planned | **Bulk-fill the package map** | `install/packages/fedora.toml` (add entries for the ~30 unmapped packages the L3 audit currently surfaces) | The L3 audit's "unmapped + dnf MISSES" list is the punch list. Many entries currently `source = "skip"`. |
 | 11 | planned | **Wayland session entry** + Fedora-side config script | `default/wayland-sessions/omedora.desktop` (new), `install/config/wayland-session-fedora.sh` (new), wired into `install/config/all.sh` | The session entry the display manager picks up — used by L4-VM and (cosmetically) by L4-nested. |
-| 12 | ✅ shipped | **L4-nested image + runner (systemd)** | `test/fedora/omedora-session/Dockerfile.base` (FROM fedora:44, systemd + tree), `test/fedora/build-session.sh` (boot+install+commit), `test/fedora/omedora-session/session-launch.sh`, `test/fedora/run-session.sh` (podman `--systemd=always`) | Verified: real PID-1 systemd boots, install runs in a logind session (Flatpaks install), nested Hyprland brings up the full autostart chain. Supersedes the earlier shimmed image (no-init + systemctl/uwsm-app shims) — those are deleted. |
-| 13 | ✅ shipped | **L4-headless automated test suite** (was `smoke-assertions.sh`; closes #45) | `test/fedora/headless/run-tests.sh`, `test/fedora/headless/lib.sh`, `test/fedora/headless/tests/{00-session,10-walker}.sh`, `test/fedora/headless/.gitignore` | TAP suite over a headless session: `00-session` (IPC, monitor, autostart) + `10-walker` (#56 regression guard, ≥20 walker opens). Screenshots-on-failure, unique-named containers (parallelizable), exits non-zero iff any test fails. The canonical L4 assertion path — see [the suite section](#l4-headless-automated-test-suite-testfedoraheadless). |
+| 12 | ✅ shipped | **L4-nested image + runner (systemd)** | `omedora/test/fedora/omedora-session/Dockerfile.base` (FROM fedora:44, systemd + tree), `omedora/test/fedora/build-session.sh` (boot+install+commit), `omedora/test/fedora/omedora-session/session-launch.sh`, `omedora/test/fedora/run-session.sh` (podman `--systemd=always`) | Verified: real PID-1 systemd boots, install runs in a logind session (Flatpaks install), nested Hyprland brings up the full autostart chain. Supersedes the earlier shimmed image (no-init + systemctl/uwsm-app shims) — those are deleted. |
+| 13 | ✅ shipped | **L4-headless automated test suite** (was `smoke-assertions.sh`; closes #45) | `omedora/test/fedora/headless/run-tests.sh`, `omedora/test/fedora/headless/lib.sh`, `omedora/test/fedora/headless/tests/{00-session,10-walker}.sh`, `omedora/test/fedora/headless/.gitignore` | TAP suite over a headless session: `00-session` (IPC, monitor, autostart) + `10-walker` (#56 regression guard, ≥20 walker opens). Screenshots-on-failure, unique-named containers (parallelizable), exits non-zero iff any test fails. The canonical L4 assertion path — see [the suite section](#l4-headless-automated-test-suite-omedoratestfedoraheadless). |
 | 14 | deferred | VM smoke harness (optional) | `scripts/vm-smoke.sh` (new) | Deferred per user; lands if/when manual L4-VM workflow gets repetitive enough to automate. |
 
 Implementation commits should land tests **with** their corresponding code, not in batches. A package-helper patch arrives with the helper test that proves it. This is TDD-ish in spirit but pragmatic — we're not strict about tests-first vs code-first within a commit.

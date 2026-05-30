@@ -84,13 +84,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/dnf-cache
-          key: dnf-cache-${{ hashFiles('test/fedora/Dockerfile') }}-${{ github.sha }}
+          key: dnf-cache-${{ hashFiles('omedora/test/fedora/Dockerfile') }}-${{ github.sha }}
           restore-keys: |
-            dnf-cache-${{ hashFiles('test/fedora/Dockerfile') }}-
+            dnf-cache-${{ hashFiles('omedora/test/fedora/Dockerfile') }}-
             dnf-cache-
 
       - name: Build Fedora test image
-        run: docker build -t omedora-test:fedora44 -f test/fedora/Dockerfile test/fedora/
+        run: docker build -t omedora-test:fedora44 -f omedora/test/fedora/Dockerfile omedora/test/fedora/
 
       - name: Run L2 integration tests
         run: |
@@ -98,7 +98,7 @@ jobs:
             -v "${GITHUB_WORKSPACE}:/repo" \
             -v /tmp/dnf-cache:/var/cache/dnf \
             omedora-test:fedora44 \
-            bash /repo/test/fedora/integration.sh
+            bash /repo/omedora/test/fedora/integration.sh
 
   fedora-smoke:
     name: L3 Fedora smoke (full repo enable + package-map audit)
@@ -123,13 +123,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/dnf-cache
-          key: dnf-cache-smoke-${{ hashFiles('test/fedora/Dockerfile') }}-${{ github.sha }}
+          key: dnf-cache-smoke-${{ hashFiles('omedora/test/fedora/Dockerfile') }}-${{ github.sha }}
           restore-keys: |
-            dnf-cache-smoke-${{ hashFiles('test/fedora/Dockerfile') }}-
+            dnf-cache-smoke-${{ hashFiles('omedora/test/fedora/Dockerfile') }}-
             dnf-cache-
 
       - name: Build Fedora test image
-        run: docker build -t omedora-test:fedora44 -f test/fedora/Dockerfile test/fedora/
+        run: docker build -t omedora-test:fedora44 -f omedora/test/fedora/Dockerfile omedora/test/fedora/
 
       - name: Run L3 smoke
         run: |
@@ -137,4 +137,4 @@ jobs:
             -v "${GITHUB_WORKSPACE}:/repo" \
             -v /tmp/dnf-cache:/var/cache/dnf \
             omedora-test:fedora44 \
-            bash /repo/test/fedora/smoke.sh
+            bash /repo/omedora/test/fedora/smoke.sh

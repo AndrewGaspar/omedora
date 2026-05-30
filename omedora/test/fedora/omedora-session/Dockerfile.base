@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # L4-nested base image — Omedora-in-a-real-systemd-container.
 #
-# Unlike the old test/fedora/omedora-session/Dockerfile (a namespaced rootfs +
+# Unlike the old omedora/test/fedora/omedora-session/Dockerfile (a namespaced rootfs +
 # shims), this image boots PID-1 systemd so the container has a real system
 # D-Bus, systemd-logind, and per-user `systemd --user`. That lets us install
 # and run Omedora exactly the way a bare-metal Fedora 44 user would — no
@@ -9,7 +9,7 @@
 #
 # This Dockerfile builds only the BASE (Fedora + systemd + deps + the omedora
 # tree). The install does NOT run here — a Dockerfile RUN has no PID-1 systemd.
-# Instead test/fedora/build-session.sh boots this image, runs install.sh
+# Instead omedora/test/fedora/build-session.sh boots this image, runs install.sh
 # inside the live logind session, and commits the result. See omedora/testing.md
 # §6 and the migration plan.
 #
@@ -22,7 +22,7 @@ FROM registry.fedoraproject.org/fedora:44
 #   systemd / systemd-container → PID-1 init + `machinectl shell` login
 #   dbus-broker / polkit        → system bus + privilege prompts the session wants
 #   git gum jq python3 flatpak sudo dnf-plugins-core → what install.sh needs
-#     (mirrors test/fedora/Dockerfile's set so the install resolves the same way)
+#     (mirrors omedora/test/fedora/Dockerfile's set so the install resolves the same way)
 #   util-linux-script           → some omarchy helpers probe for `script`
 # NOTE: Fedora 44's dnf is dnf5, which caches packages under /var/cache/libdnf5
 # (not the dnf4 /var/cache/dnf). The BuildKit cache mount + keepcache=True only

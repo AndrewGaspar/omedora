@@ -8,7 +8,7 @@
 # Why not a Dockerfile RUN? A `podman build` step has no PID-1 systemd, so
 # `systemctl --user`, the session D-Bus, and `flatpak install --user` don't
 # work — exactly the gap the old shim stack papered over. Here we boot the
-# base image (test/fedora/omedora-session/Dockerfile.base) with
+# base image (omedora/test/fedora/omedora-session/Dockerfile.base) with
 # `podman run --systemd=always`, wait for systemd to settle, run the install
 # as the omedora user through `machinectl shell` (a real logind session), and
 # `podman commit` the finished container.
@@ -31,14 +31,14 @@
 # no install.sh patch.
 #
 # Usage:
-#   test/fedora/build-session.sh             # build pkgs image if needed, then config → session
-#   test/fedora/build-session.sh --rebuild   # force clean: base + pkgs + session (rebuilds the
+#   omedora/test/fedora/build-session.sh             # build pkgs image if needed, then config → session
+#   omedora/test/fedora/build-session.sh --rebuild   # force clean: base + pkgs + session (rebuilds the
 #                                            #   local RPM repo only if a spec changed; see below)
-#   test/fedora/build-session.sh --rebuild-repo  # also force-rebuild the local RPM repo (~3-4 min)
-#   test/fedora/build-session.sh --fast      # config-only: reuse the existing pkgs image,
+#   omedora/test/fedora/build-session.sh --rebuild-repo  # also force-rebuild the local RPM repo (~3-4 min)
+#   omedora/test/fedora/build-session.sh --fast      # config-only: reuse the existing pkgs image,
 #                                            #   re-run ONLY the config stages → session
 #                                            #   (alias: --config-only). ~10 s + boot, not ~14 min.
-#   test/fedora/build-session.sh --packages-only   # build/refresh just the pkgs image, no session
+#   omedora/test/fedora/build-session.sh --packages-only   # build/refresh just the pkgs image, no session
 #
 # The local omedora RPM repo (walker/elephant/fonts/…) is rebuilt only when a
 # *.spec or build-repo.sh/build-local.sh is newer than the built repomd.xml, so
@@ -59,7 +59,7 @@
 
 set -euo pipefail
 
-REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
 BASE_IMAGE="${OMEDORA_SYSTEMD_BASE_IMAGE:-omedora-test:fedora44-session-base}"
 SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session}"
 # Intermediate "packages installed" image; derived from SESSION_IMAGE's name so
@@ -75,10 +75,10 @@ DNF_CACHE_VOL="${OMEDORA_DNF_CACHE_VOL:-omedora-dnf-cache}"
 # persists the RPMs across builds.
 DNF_CACHE_DIR="/var/cache/libdnf5"
 HOST_LOG="${OMEDORA_SYSTEMD_BUILD_LOG:-/tmp/omedora-session-build.log}"
-DOCKERFILE="$REPO/test/fedora/omedora-session/Dockerfile.base"
+DOCKERFILE="$REPO/omedora/test/fedora/omedora-session/Dockerfile.base"
 COPR_DIR="$REPO/omedora/packaging/copr"
-SESSION_DIR="$REPO/test/fedora/omedora-session"
-STAGED_IN_IMAGE=/home/omedora/.local/share/omarchy/test/fedora/omedora-session/staged-install.sh
+SESSION_DIR="$REPO/omedora/test/fedora/omedora-session"
+STAGED_IN_IMAGE=/home/omedora/.local/share/omarchy/omedora/test/fedora/omedora-session/staged-install.sh
 
 rebuild=false
 rebuild_repo=false
@@ -213,7 +213,7 @@ fi
 if $fast; then
   if ! podman image exists "$PKGS_IMAGE"; then
     echo "--fast needs a packages image ($PKGS_IMAGE) but it doesn't exist." >&2
-    echo "Run a normal build first (test/fedora/build-session.sh) to create it." >&2
+    echo "Run a normal build first (omedora/test/fedora/build-session.sh) to create it." >&2
     exit 1
   fi
   log "Fast (config-only) build: booting packages image $PKGS_IMAGE"
@@ -228,7 +228,7 @@ if $fast; then
   commit_systemd "$BUILD_CTR" "$SESSION_IMAGE"
   podman rm -f "$BUILD_CTR" >/dev/null
   log "Done (fast). Session image: $SESSION_IMAGE"
-  echo "Launch it with: test/fedora/run-session.sh"
+  echo "Launch it with: omedora/test/fedora/run-session.sh"
   exit 0
 fi
 
@@ -274,7 +274,7 @@ fi
 
 if $packages_only; then
   log "Done (packages-only). Packages image: $PKGS_IMAGE"
-  echo "Apply config + build the session image with: test/fedora/build-session.sh --fast"
+  echo "Apply config + build the session image with: omedora/test/fedora/build-session.sh --fast"
   exit 0
 fi
 
@@ -292,5 +292,5 @@ commit_systemd "$BUILD_CTR" "$SESSION_IMAGE"
 podman rm -f "$BUILD_CTR" >/dev/null
 
 log "Done. Session image: $SESSION_IMAGE"
-echo "Launch it with: test/fedora/run-session.sh"
-echo "Iterate on config scripts fast with: test/fedora/build-session.sh --fast"
+echo "Launch it with: omedora/test/fedora/run-session.sh"
+echo "Iterate on config scripts fast with: omedora/test/fedora/build-session.sh --fast"

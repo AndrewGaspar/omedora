@@ -20,7 +20,7 @@ set -uo pipefail
 # Host compositor socket (bind-mounted by the runner at /tmp/host-wayland).
 if [[ ! -S /tmp/host-wayland ]]; then
   echo "ERROR: host Wayland socket not present at /tmp/host-wayland" >&2
-  echo "       Run via test/fedora/run-session.sh from a Wayland desktop." >&2
+  echo "       Run via omedora/test/fedora/run-session.sh from a Wayland desktop." >&2
   exit 2
 fi
 
