@@ -12,12 +12,15 @@
 # invocations but is NOT baked into the image. `keepcache=True` is dropped
 # into dnf.conf before each cache-mounted dnf call so the cache actually
 # persists rpms (default is keepcache=False, which deletes after install).
+# NOTE: Fedora 44 ships dnf5, which caches packages under /var/cache/libdnf5
+# (not the dnf4 /var/cache/dnf) — the cache mount MUST target the dnf5 path or
+# it stays empty and every rebuild re-downloads.
 
 FROM registry.fedoraproject.org/fedora:44
 
 # Install prereqs in one layer. dnf-plugins-core gives us `dnf copr enable`;
 # everything else is what omedora's helpers + tests need.
-RUN --mount=type=cache,target=/var/cache/dnf,sharing=locked \
+RUN --mount=type=cache,target=/var/cache/libdnf5,sharing=locked \
     printf 'keepcache=True\n' >>/etc/dnf/dnf.conf && \
     dnf install -y --setopt=install_weak_deps=False \
         dnf-plugins-core \
@@ -35,7 +38,7 @@ RUN --mount=type=cache,target=/var/cache/dnf,sharing=locked \
 
 # Warm the dnf metadata cache so the first `dnf install` inside a test isn't
 # a cold network fetch. Saves 5-30s per test run.
-RUN --mount=type=cache,target=/var/cache/dnf,sharing=locked \
+RUN --mount=type=cache,target=/var/cache/libdnf5,sharing=locked \
     dnf makecache --refresh
 
 # Create a non-root user for L3 smoke tests that need real sudo. L2 tests

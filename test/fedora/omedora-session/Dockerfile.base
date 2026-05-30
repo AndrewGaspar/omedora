@@ -24,7 +24,11 @@ FROM registry.fedoraproject.org/fedora:44
 #   git gum jq python3 flatpak sudo dnf-plugins-core → what install.sh needs
 #     (mirrors test/fedora/Dockerfile's set so the install resolves the same way)
 #   util-linux-script           → some omarchy helpers probe for `script`
-RUN --mount=type=cache,target=/var/cache/dnf,sharing=locked \
+# NOTE: Fedora 44's dnf is dnf5, which caches packages under /var/cache/libdnf5
+# (not the dnf4 /var/cache/dnf). The BuildKit cache mount + keepcache=True only
+# persist downloads if they target the dnf5 path. build-session.sh mounts its
+# named cache volume at the same /var/cache/libdnf5 path for the same reason.
+RUN --mount=type=cache,target=/var/cache/libdnf5,sharing=locked \
     printf 'keepcache=True\n' >>/etc/dnf/dnf.conf && \
     dnf install -y --setopt=install_weak_deps=False \
         systemd \
@@ -53,7 +57,7 @@ RUN --mount=type=cache,target=/var/cache/dnf,sharing=locked \
 # sway 1.11 only expose xdg_wm_base v5, so they can't host the nested Hyprland).
 # wayland-utils gives `wayland-info` for diagnosing what the host advertises.
 # This is TEST-ONLY scaffolding — it is not part of the Omedora desktop install.
-RUN --mount=type=cache,target=/var/cache/dnf,sharing=locked \
+RUN --mount=type=cache,target=/var/cache/libdnf5,sharing=locked \
     dnf install -y --setopt=install_weak_deps=False \
         labwc \
         wayland-utils && \
