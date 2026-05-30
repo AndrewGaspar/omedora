@@ -445,7 +445,10 @@ Packages with no Fedora / RPM Fusion / vetted-COPR / Flathub home are built as *
 | `install/preflight/disable-mkinitcpio.sh` | 1-line gate | Arch-only |
 | `install/config/all.sh` | Stage dispatch only if needed | Most config scripts work as-is via dispatched helpers |
 | `install/config/fix-powerprofilesctl-shebang.sh` | 1-line gate | Early-return when `/usr/bin/powerprofilesctl` is absent (Fedora keeps tuned-ppd + a bash shim, so there's no python shebang to patch) |
-| `install/config/powerprofilesctl-shim-fedora.sh` | New | Fedora-gated `powerprofilesctl` shim driving the PowerProfiles D-Bus API that tuned-ppd implements (omedora keeps tuned-ppd instead of swapping in power-profiles-daemon) |
+| `install/config/powerprofilesctl-shim-fedora.sh` | New | Fedora-gated installer: copies the shim to `~/.local/bin/powerprofilesctl`, only when `/usr/bin/powerprofilesctl` is absent (tuned-ppd systems). Wired into `install/config/all.sh`'s Fedora-only user block, ahead of the power-profile features |
+| `omedora/bin/powerprofilesctl-shim` | New | The shim source (tracked, testable). Bash `powerprofilesctl` implementing `get`/`list`/`set` against the PowerProfiles D-Bus API (`org.freedesktop.UPower.PowerProfiles` on the system bus) via `busctl`; defers to a real `/usr/bin/powerprofilesctl` if present. `list` output matches the `awk` in `omarchy-powerprofiles-{list,set}` |
+| `install/config/powerprofilesctl-rules.sh` | Prepend | Top-of-file Fedora dispatch: on Fedora, source `powerprofilesctl-rules-fedora.sh` and return; Arch body byte-for-byte unchanged. (Still Arch-gated in `all.sh` — the sibling exists for correctness if invoked on a tuned-ppd box) |
+| `install/config/powerprofilesctl-rules-fedora.sh` | New | tuned-ppd-aware variant: orders the udev `systemd-run` against `tuned-ppd.service` (no `power-profiles-daemon.service` on Fedora) and skips `systemctl enable power-profiles-daemon` unless that unit exists |
 | `install/config/hardware/all.sh` | Stage dispatch | Source `-fedora.sh` siblings if present; skip Arch-only entries on Fedora |
 | `install/config/hardware/{nvidia,vulkan,intel/*,apple/*,asus/*,framework/*,lenovo/*,fix-*}.sh` | 1-line gate | Most are Arch-only; gate at top with `return 0` on Fedora |
 | `install/config/hardware/nvidia-fedora.sh` | New | Hyprland env vars only (no dracut/mkinitcpio writes) |
