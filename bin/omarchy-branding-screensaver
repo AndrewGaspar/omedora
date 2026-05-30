@@ -19,7 +19,15 @@ text)
   omarchy-launch-editor ~/.config/omarchy/branding/screensaver.txt >/dev/null 2>&1 && omarchy-launch-screensaver force >/dev/null 2>&1
   ;;
 reset)
-  cp "$OMARCHY_PATH/logo.txt" ~/.config/omarchy/branding/screensaver.txt && omarchy-launch-screensaver force >/dev/null 2>&1
+  # Omedora: reset to the omedora wordmark on Fedora; fall back to upstream logo elsewhere
+  _omedora_logo="$OMARCHY_PATH/omedora/branding/logo.txt"
+  if [[ -f $_omedora_logo ]] && \
+     { [[ ${OMARCHY_BRAND:-} == "omedora" ]] || [[ $(omarchy-distro 2>/dev/null || echo arch) == "fedora" ]]; }; then
+    cp "$_omedora_logo" ~/.config/omarchy/branding/screensaver.txt
+  else
+    cp "$OMARCHY_PATH/logo.txt" ~/.config/omarchy/branding/screensaver.txt
+  fi
+  omarchy-launch-screensaver force >/dev/null 2>&1
   ;;
 *)
   echo "Usage: omarchy-branding-screensaver <image|text|reset>" >&2

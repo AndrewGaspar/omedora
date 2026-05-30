@@ -2,8 +2,17 @@
 
 # omarchy:summary=Display the Omarchy logo in the terminal using green color.
 
+# Omedora: prefer the omedora wordmark when brand=omedora or distro=fedora
+_omedora_logo="$OMARCHY_PATH/omedora/branding/logo.txt"
+if [[ -f $_omedora_logo ]] && \
+   { [[ ${OMARCHY_BRAND:-} == "omedora" ]] || [[ $(omarchy-distro 2>/dev/null || echo arch) == "fedora" ]]; }; then
+  _logo_path=$_omedora_logo
+else
+  _logo_path="$OMARCHY_PATH/logo.txt"
+fi
+
 clear
 echo -e "\033[32m"
-cat <~/.local/share/omarchy/logo.txt
+cat <"$_logo_path"
 echo -e "\033[0m"
 echo

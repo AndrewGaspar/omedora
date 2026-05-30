@@ -16,6 +16,11 @@ ansi_art='                 ▄▄▄
  ▀█████▀    ▀█   ███   █▀   ███   █▀   ███   ███  ███████▀   ███   █▀    ▀█████▀
                                        ███   █▀                                  '
 
+# Omedora: override banner when bootstrapping as omedora
+if [[ ${OMARCHY_BRAND:-} == "omedora" && -n ${ANSI_ART_OMEDORA:-} ]]; then
+  ansi_art=$ANSI_ART_OMEDORA
+fi
+
 clear
 echo -e "\n$ansi_art\n"
 
