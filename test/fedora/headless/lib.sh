@@ -168,3 +168,40 @@ assert_proc() {
     _fail_with_artifacts "$desc"
   fi
 }
+
+# wait_for_unit_active <unit> <timeout-seconds> — poll until a `systemctl --user`
+# unit reports active or the timeout elapses. Useful for D-Bus-activated units
+# (e.g. xdg-desktop-portal.service) that start on demand rather than at boot:
+# touching them to trigger activation, then waiting, is more robust than a bare
+# point-in-time read. Returns 0 if active, 1 on timeout. Emits no TAP line.
+wait_for_unit_active() {
+  local unit="$1"; local timeout="${2:-5}"
+  local deadline=$(( $(date +%s) + timeout ))
+  while (( $(date +%s) < deadline )); do
+    [[ "$(systemctl --user is-active "$unit" 2>/dev/null)" == "active" ]] && return 0
+    sleep 0.2
+  done
+  return 1
+}
+
+# assert_unit_active <unit> [desc] — a `systemctl --user` unit is active.
+assert_unit_active() {
+  local unit="$1"; local desc="${2:-user unit active: $unit}"
+  if [[ "$(systemctl --user is-active "$unit" 2>/dev/null)" == "active" ]]; then
+    pass "$desc"
+  else
+    _fail_with_artifacts "$desc"
+  fi
+}
+
+# assert_dbus_name <name> [desc] — a D-Bus name is owned or activatable on the
+# user bus (busctl --user list). Use to confirm a service is reachable even when
+# its backing systemd unit is dbus-activated and idle.
+assert_dbus_name() {
+  local name="$1"; local desc="${2:-D-Bus name available: $name}"
+  if busctl --user list 2>/dev/null | grep -q "^$name "; then
+    pass "$desc"
+  else
+    _fail_with_artifacts "$desc"
+  fi
+}
