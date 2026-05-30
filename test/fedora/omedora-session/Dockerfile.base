@@ -45,6 +45,24 @@ RUN --mount=type=cache,target=/var/cache/dnf,sharing=locked \
         sudo \
         util-linux-script
 
+# --- headless nesting host for the L4 --headless test ------------------------
+# labwc is the headless Wayland compositor that Omedora's Hyprland nests into
+# when run via session-launch-headless.sh (run-session.sh --headless). It is the
+# lightest Fedora 44 compositor that advertises the protocols Aquamarine 0.12's
+# nested backend requires: xdg_wm_base v6 AND zwp_linux_dmabuf_v1 (weston 15 and
+# sway 1.11 only expose xdg_wm_base v5, so they can't host the nested Hyprland).
+# wayland-utils gives `wayland-info` for diagnosing what the host advertises.
+# This is TEST-ONLY scaffolding — it is not part of the Omedora desktop install.
+RUN --mount=type=cache,target=/var/cache/dnf,sharing=locked \
+    dnf install -y --setopt=install_weak_deps=False \
+        labwc \
+        wayland-utils && \
+    # labwc ships with the cap_sys_nice file capability; under rootless podman
+    # that cap is not in the user-ns bounding set, so `systemd-run --user labwc`
+    # fails at exec (status 203/EXEC "Operation not permitted"). Strip it — labwc
+    # runs fine without realtime priority in a test container.
+    setcap -r /usr/bin/labwc || true
+
 # --- container-friendly systemd ----------------------------------------------
 # podman --systemd=always masks most problematic units and mounts the cgroup +
 # tmpfs scaffolding, but a couple still try (and fail) to touch host-owned
