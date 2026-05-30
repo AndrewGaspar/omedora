@@ -21,7 +21,13 @@ else
   export TERM_HEIGHT=24
 fi
 
-export LOGO_PATH="$OMARCHY_PATH/logo.txt"
+# Omedora: prefer the omedora wordmark when brand=omedora or distro=fedora
+if [[ -f "$OMARCHY_PATH/omedora/branding/logo.txt" ]] && \
+   { [[ ${OMARCHY_BRAND:-} == "omedora" ]] || [[ $(omarchy-distro 2>/dev/null || echo arch) == "fedora" ]]; }; then
+  export LOGO_PATH="$OMARCHY_PATH/omedora/branding/logo.txt"
+else
+  export LOGO_PATH="$OMARCHY_PATH/logo.txt"
+fi
 export LOGO_WIDTH=$(awk '{ if (length > max) max = length } END { print max+0 }' "$LOGO_PATH" 2>/dev/null || echo 0)
 export LOGO_HEIGHT=$(wc -l <"$LOGO_PATH" 2>/dev/null || echo 0)
 

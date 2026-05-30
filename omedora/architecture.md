@@ -492,10 +492,12 @@ Packages with no Fedora / RPM Fusion / vetted-COPR / Flathub home are built as *
 | --- | --- | --- |
 | `omedora/branding/logo.txt` | New | OMEDORA wordmark ASCII |
 | `omedora/branding/icon.txt` | Optional new | Reuse upstream `icon.txt` for v1; revisit later |
-| `bin/omarchy-show-logo` | Path swap | Prefer omedora/branding/logo.txt on Fedora |
-| `bin/omarchy-branding-screensaver` | Path swap | Same |
-| `boot.sh` | Prepend / substitute | Brand-aware ASCII banner |
-| `boot-omedora.sh` | New | Bootstrap wrapper that sets `OMARCHY_BRAND=omedora` |
+| `bin/omarchy-show-logo` | Path swap | Prefer omedora/branding/logo.txt on Fedora / brand=omedora |
+| `bin/omarchy-branding-screensaver` | Path swap | Same — `reset` case picks omedora logo on Fedora |
+| `install/helpers/presentation.sh` | Brand-aware LOGO_PATH | Prepend: if brand=omedora or distro=fedora, set LOGO_PATH to omedora/branding/logo.txt; Arch path unchanged below |
+| `install/config/branding.sh` | Fedora-gated | Seed screensaver.txt with omedora logo on Fedora; Arch path unchanged in else branch |
+| `boot.sh` | Prepend / substitute | Read `$ANSI_ART_OMEDORA` env var when `OMARCHY_BRAND=omedora`; Arch path unchanged |
+| `boot-omedora.sh` | New | Bootstrap wrapper that sets `OMARCHY_BRAND=omedora`, `OMARCHY_REPO`, inlines omedora logo, then sources `boot.sh` |
 
 ### Wayland session ([§13](#13-wayland-session-entry))
 
