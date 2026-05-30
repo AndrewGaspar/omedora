@@ -4,7 +4,7 @@
 # build-local.sh resolves a just-built sibling from the local /copr/repo. Fedora
 # 44 ships a stale 0.6.4; omedora vendors 0.6.8 (newer EVR ⇒ auto-upgrade).
 # Adapted from solopasha/hyprlandRPM. omedora conventions: pinned Version,
-# explicit Release + %changelog, soname via glob.
+# explicit Release + changelog, soname via glob.
 
 Name:           hyprlang
 Version:        0.6.8

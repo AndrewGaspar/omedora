@@ -4,7 +4,7 @@
 # xdg-desktop-portal-hyprland and bundled by hyprland itself. Not in Fedora 44.
 # Adapted from solopasha/hyprlandRPM (the maintained Fedora spec set the dropped
 # lionheartp/Hyprland COPR forked). omedora conventions: pinned Version,
-# explicit Release + %changelog.
+# explicit Release + changelog.
 
 Name:           hyprland-protocols
 Version:        0.7.0
