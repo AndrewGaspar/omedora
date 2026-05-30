@@ -1,0 +1,132 @@
+#!/bin/bash
+
+# omedora powerprofilesctl shim.
+#
+# Fedora Workstation ships tuned-ppd, which provides the PowerProfiles D-Bus
+# API but NOT the /usr/bin/powerprofilesctl CLI that Omarchy shells out to.
+# omedora keeps tuned-ppd (no daemon swap) and installs this small bash shim as
+# ~/.local/bin/powerprofilesctl so omarchy-powerprofiles-{list,set,init} and
+# omarchy-menu keep working.
+#
+# It drives the same D-Bus interface both power-profiles-daemon and tuned-ppd
+# expose on the SYSTEM bus:
+#   bus name : org.freedesktop.UPower.PowerProfiles
+#              (legacy alias net.hadess.PowerProfiles)
+#   path     : /org/freedesktop/UPower/PowerProfiles
+#   iface    : org.freedesktop.UPower.PowerProfiles
+#   props    : ActiveProfile (s, writable), Profiles (aa{sv}; each vardict has
+#              a "Profile" -> s key)
+#
+# Verified empirically against tuned-ppd 0.23 (Fedora 44) via busctl.
+#
+# Defensive: if a real /usr/bin/powerprofilesctl exists (Arch, or
+# Fedora-with-power-profiles-daemon), defer to it so we never shadow the
+# genuine CLI. The Fedora-gated installer
+# (install/config/powerprofilesctl-shim-fedora.sh) already refuses to install
+# when the real binary is present, but this self-guard keeps the shim correct
+# even if it is copied around manually.
+
+set -euo pipefail
+
+if [[ -x /usr/bin/powerprofilesctl ]]; then
+  exec /usr/bin/powerprofilesctl "$@"
+fi
+
+BUS_NAME="org.freedesktop.UPower.PowerProfiles"
+OBJ_PATH="/org/freedesktop/UPower/PowerProfiles"
+IFACE="org.freedesktop.UPower.PowerProfiles"
+
+die() {
+  echo "powerprofilesctl: $*" >&2
+  exit 1
+}
+
+# Read the ActiveProfile property. busctl prints:  s "balanced"
+get_active() {
+  local out
+  out=$(busctl --system get-property "$BUS_NAME" "$OBJ_PATH" "$IFACE" ActiveProfile 2>/dev/null) ||
+    die "could not read ActiveProfile from $BUS_NAME (is tuned-ppd or power-profiles-daemon running?)"
+  # Strip the leading `s ` type tag and the surrounding quotes.
+  out=${out#s }
+  out=${out#\"}
+  out=${out%\"}
+  printf '%s\n' "$out"
+}
+
+# Print the available profile names, newest/most-performant first is NOT
+# required here — omarchy-powerprofiles-list does its own `tac`. We just emit
+# them in the daemon's order (typically power-saver, balanced, performance).
+get_profiles() {
+  # busctl prints the Profiles property as one long line, e.g.:
+  #   aa{sv} 3 2 "Profile" s "power-saver" "Driver" s "tuned" 2 ...
+  # Pull out every value that follows a `"Profile" s ` token.
+  local out
+  out=$(busctl --system get-property "$BUS_NAME" "$OBJ_PATH" "$IFACE" Profiles 2>/dev/null) ||
+    die "could not read Profiles from $BUS_NAME (is tuned-ppd or power-profiles-daemon running?)"
+  printf '%s\n' "$out" |
+    grep -oE '"Profile" s "[^"]+"' |
+    sed -E 's/.*"Profile" s "([^"]+)"/\1/'
+}
+
+set_active() {
+  local profile=$1
+  [[ -n $profile ]] || die "set requires a profile name"
+  busctl --system set-property "$BUS_NAME" "$OBJ_PATH" "$IFACE" \
+    ActiveProfile s "$profile" 2>/dev/null ||
+    die "could not set ActiveProfile to '$profile'"
+}
+
+# `list` output must match what omarchy-powerprofiles-{list,set} parse with:
+#   awk '/^\s*[* ]\s*[a-zA-Z0-9\-]+:$/ { gsub(/^[*[:space:]]+|:$/,""); print }'
+# i.e. each profile name on its own line ending in ":", the active one
+# prefixed with "* " and the rest with two leading spaces. This mirrors the
+# real power-profiles-daemon CLI layout closely enough for those consumers.
+cmd_list() {
+  local active
+  active=$(get_active)
+  local p
+  while IFS= read -r p; do
+    [[ -n $p ]] || continue
+    if [[ $p == "$active" ]]; then
+      printf '* %s:\n' "$p"
+    else
+      printf '  %s:\n' "$p"
+    fi
+  done < <(get_profiles)
+}
+
+main() {
+  local cmd=${1:-list}
+  case "$cmd" in
+    get)
+      get_active
+      ;;
+    list)
+      cmd_list
+      ;;
+    set)
+      shift
+      set_active "${1:-}"
+      ;;
+    version)
+      echo "powerprofilesctl (omedora shim)"
+      ;;
+    -h | --help | help)
+      cat <<'EOF'
+Usage: powerprofilesctl [COMMAND]
+
+omedora bash shim driving the PowerProfiles D-Bus API (tuned-ppd / p-p-d).
+
+Commands:
+  get            Print the active power profile.
+  list           List available profiles (active prefixed with "* ").
+  set PROFILE    Set the active power profile.
+EOF
+      ;;
+    *)
+      die "unknown command '$cmd' (supported: get, list, set)"
+      ;;
+  esac
+}
+
+main "$@"

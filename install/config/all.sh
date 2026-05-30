@@ -22,6 +22,10 @@ run_logged $OMARCHY_INSTALL/config/omarchy-toggles.sh
 if [[ $(omarchy-distro 2>/dev/null || echo arch) == "fedora" ]]; then
 run_logged $OMARCHY_INSTALL/config/default-terminal-fedora.sh
 run_logged $OMARCHY_INSTALL/config/default-browser-fedora.sh
+# Fedora keeps tuned-ppd (not power-profiles-daemon), which provides the
+# PowerProfiles D-Bus API but no powerprofilesctl CLI. Install the shim before
+# anything exercises the power-profile features (menu, udev rules, boot init).
+run_logged $OMARCHY_INSTALL/config/powerprofilesctl-shim-fedora.sh
 fi
 
 # --- System-admin (Arch-only on omedora) ---
