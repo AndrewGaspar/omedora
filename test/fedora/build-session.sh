@@ -8,30 +8,30 @@
 # Why not a Dockerfile RUN? A `podman build` step has no PID-1 systemd, so
 # `systemctl --user`, the session D-Bus, and `flatpak install --user` don't
 # work — exactly the gap the old shim stack papered over. Here we boot the
-# base image (test/fedora/omedora-session-systemd/Dockerfile.base) with
+# base image (test/fedora/omedora-session/Dockerfile.base) with
 # `podman run --systemd=always`, wait for systemd to settle, run the install
 # as the omedora user through `machinectl shell` (a real logind session), and
 # `podman commit` the finished container.
 #
 # Usage:
-#   test/fedora/build-session-systemd.sh            # build base if needed, install, commit
-#   test/fedora/build-session-systemd.sh --rebuild  # force a clean base rebuild first
+#   test/fedora/build-session.sh            # build base if needed, install, commit
+#   test/fedora/build-session.sh --rebuild  # force a clean base rebuild first
 #
 # Products:
-#   omedora-test:fedora44-systemd-base     (Fedora + systemd + tree; CMD /sbin/init)
-#   omedora-test:fedora44-session-systemd  (the above, after install.sh; ready to run)
+#   omedora-test:fedora44-session-base     (Fedora + systemd + tree; CMD /sbin/init)
+#   omedora-test:fedora44-session  (the above, after install.sh; ready to run)
 #
-# Full install log is also copied out to /tmp/omedora-session-systemd-build.log.
+# Full install log is also copied out to /tmp/omedora-session-build.log.
 
 set -euo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-BASE_IMAGE="${OMEDORA_SYSTEMD_BASE_IMAGE:-omedora-test:fedora44-systemd-base}"
-SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session-systemd}"
+BASE_IMAGE="${OMEDORA_SYSTEMD_BASE_IMAGE:-omedora-test:fedora44-session-base}"
+SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session}"
 BUILD_CTR="${OMEDORA_BUILD_CTR:-omedora-session-build}"
 DNF_CACHE_VOL="${OMEDORA_DNF_CACHE_VOL:-omedora-dnf-cache}"
-HOST_LOG="${OMEDORA_SYSTEMD_BUILD_LOG:-/tmp/omedora-session-systemd-build.log}"
-DOCKERFILE="$REPO/test/fedora/omedora-session-systemd/Dockerfile.base"
+HOST_LOG="${OMEDORA_SYSTEMD_BUILD_LOG:-/tmp/omedora-session-build.log}"
+DOCKERFILE="$REPO/test/fedora/omedora-session/Dockerfile.base"
 
 rebuild=false
 [[ "${1:-}" == "--rebuild" ]] && rebuild=true
@@ -118,4 +118,4 @@ podman commit \
 podman rm -f "$BUILD_CTR" >/dev/null
 
 log "Done. Session image: $SESSION_IMAGE"
-echo "Launch it with: test/fedora/run-session-systemd.sh"
+echo "Launch it with: test/fedora/run-session.sh"

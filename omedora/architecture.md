@@ -534,11 +534,11 @@ Per-file status as of the current tip of `dev`. The roadmap in `testing.md` §10
 | `install/config/hardware/nvidia-fedora.sh` | New | planned (step 9) | Hyprland NVIDIA env vars only (no dracut writes — Fedora's akmod-nvidia handles drivers) |
 | `default/wayland-sessions/omedora.desktop` | New | planned (step 11) | The session entry GDM/SDDM displays as "Omedora" |
 | `install/config/wayland-session-fedora.sh` | New | planned (step 11) | Installs `omedora.desktop` to `/usr/share/wayland-sessions/` (or user fallback) |
-| `test/fedora/omedora-session/Dockerfile` | New | shipped | `FROM omedora-test:fedora44`, runs `install.sh` end-to-end as the `omedora` user (two-RUN pattern around BuildKit's 2MB log cap) |
-| `test/fedora/omedora-session/boot-session.sh` | New | shipped | Container-side launcher — `interactive` (uwsm → hyprland.desktop), `smoke` (hyprctl-driven), `headless` (Xvfb path planned) |
-| `test/fedora/omedora-session/systemctl-shim.sh` | New | shipped | No-op `systemctl` (enable/disable/restart) so build-time scripts that try to enable units don't fail under no-PID-1 |
-| `test/fedora/omedora-session/smoke-assertions.sh` | New | planned | hyprctl-driven assertions for the running session — follow-up |
-| `test/fedora/run-session.sh` | New | shipped | Host-side L4-nested runner; mounts Wayland socket, `/dev/dri`, render/video GIDs; flags `--interactive` / `--smoke` / `--headless` / `--shell` / `--rebuild` |
+| `test/fedora/omedora-session/Dockerfile.base` | New | shipped | `FROM fedora:44`; systemd + `systemd-container`/`systemd-pam` + dbus-broker + polkit + install toolchain + the omedora tree; `CMD /sbin/init`. Built/run under **podman** (`--systemd=always`) |
+| `test/fedora/build-session.sh` | New | shipped | Boots the base under systemd, runs `install.sh` as omedora via `machinectl shell` (real logind session — Flatpaks install), `podman commit`s to `omedora-test:fedora44-session` |
+| `test/fedora/omedora-session/session-launch.sh` | New | shipped | In-container launcher: nests Hyprland under the host compositor (`AQ_BACKENDS=wayland`). Launches `Hyprland` directly (uwsm start needs a seat/VT a container lacks); autostart's `uwsm-app` calls still hit the real `systemd --user` |
+| `test/fedora/omedora-session/smoke-assertions.sh` | New | planned | hyprctl-driven assertions for a scripted `--smoke` run — follow-up |
+| `test/fedora/run-session.sh` | New | shipped | L4-nested runner (podman `--systemd=always`); binds the host Wayland socket (widens to 0777, restores on exit) + `/dev/dri` + `/dev/rfkill`; flags `--shell` / `--rebuild` / `--keep` |
 
 ### Files explicitly NOT touched
 

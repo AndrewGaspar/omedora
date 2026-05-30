@@ -3,7 +3,7 @@
 # Launch the Omedora graphical session inside the systemd container.
 #
 # Runs AS the omedora user INSIDE a real logind session (entered via
-# `machinectl shell` by run-session-systemd.sh). Because it's a real session,
+# `machinectl shell` by run-session.sh). Because it's a real session,
 # XDG_RUNTIME_DIR, DBUS_SESSION_BUS_ADDRESS, and the `systemd --user` manager
 # are already set up by pam_systemd — exactly like a bare-metal TTY/DM login.
 #
@@ -33,7 +33,7 @@ set -uo pipefail
 export WAYLAND_DISPLAY=/tmp/host-wayland
 if [[ ! -S $WAYLAND_DISPLAY ]]; then
   echo "ERROR: host Wayland socket not present at $WAYLAND_DISPLAY" >&2
-  echo "       Run via test/fedora/run-session-systemd.sh from a Wayland desktop." >&2
+  echo "       Run via test/fedora/run-session.sh from a Wayland desktop." >&2
   exit 2
 fi
 
