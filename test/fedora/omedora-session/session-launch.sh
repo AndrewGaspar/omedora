@@ -37,6 +37,14 @@ if [[ ! -S $WAYLAND_DISPLAY ]]; then
   exit 2
 fi
 
+# omarchy's session environment — PATH (so omarchy-* bins resolve), TERMINAL,
+# BROWSER, EDITOR, mise — lives in ~/.config/uwsm/env, normally sourced by
+# `uwsm start`. We launch Hyprland directly, so source it ourselves. Without
+# this the omarchy bin dir isn't on PATH, and every keybind that calls
+# omarchy-menu / omarchy-launch-walker (Super+Space, the menus, theme switch,
+# screenshots, ...) silently fails with "command not found".
+[[ -f "$HOME/.config/uwsm/env" ]] && source "$HOME/.config/uwsm/env"
+
 # Nest under the host compositor instead of DRM/KMS.
 export AQ_BACKENDS=wayland
 export WLR_BACKENDS=wayland
