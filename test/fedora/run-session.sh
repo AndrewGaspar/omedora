@@ -106,6 +106,7 @@ fi
 # Iterate on the launch scripts without rebuilding the image.
 run_args+=(-v "$REPO/test/fedora/omedora-session/session-launch.sh:$LAUNCH_IN_IMAGE:ro")
 run_args+=(-v "$REPO/test/fedora/omedora-session/session-launch-headless.sh:$LAUNCH_HEADLESS_IN_IMAGE:ro")
+run_args+=(-v "$REPO/test/fedora/omedora-session/session-launch-common.sh:$LAUNCH_DIR_IN_IMAGE/session-launch-common.sh:ro")
 
 echo "Booting $SESSION_IMAGE under systemd..."
 podman run "${run_args[@]}" "$SESSION_IMAGE" >/dev/null
