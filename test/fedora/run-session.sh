@@ -99,9 +99,17 @@ if ! $headless; then
   run_args+=(-v "$host_sock:/tmp/host-wayland")
 fi
 [[ -e /dev/rfkill ]] && run_args+=(--device /dev/rfkill)
-# xdg-document-portal needs /dev/fuse (it FUSE-mounts the document store);
-# without it the portal service crash-loops with "device /dev/fuse not found".
-[[ -e /dev/fuse ]] && run_args+=(--device /dev/fuse)
+# xdg-document-portal FUSE-mounts a document store at /run/user/1000/doc, which
+# needs BOTH /dev/fuse AND mount(2) privilege. /dev/fuse alone is NOT enough:
+# rootless podman's user-ns drops CAP_SYS_ADMIN, so fusermount3's mount fails
+# with "Operation not permitted" (status 6/NOTCONFIGURED) and the unit lands in
+# `failed`. --cap-add SYS_ADMIN restores the mount capability inside the user-ns
+# so the portal starts cleanly (verified live: the unit goes active and
+# `portal on /run/user/1000/doc type fuse.portal` appears). Bare-metal Fedora's
+# user session already has this; the cap just re-grants what the rootless
+# container removed. Harness-only — no /etc, no system policy (§6 forbidden
+# surfaces apply to the omedora product, not the test runner).
+[[ -e /dev/fuse ]] && run_args+=(--device /dev/fuse --cap-add SYS_ADMIN)
 
 # Iterate on the launch scripts without rebuilding the image.
 run_args+=(-v "$REPO/test/fedora/omedora-session/session-launch.sh:$LAUNCH_IN_IMAGE:ro")

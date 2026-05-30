@@ -76,7 +76,19 @@ podman rm -f "$CTR" >/dev/null 2>&1 || true
 
 run_args=(-d --name "$CTR" --systemd=always --device /dev/dri)
 [[ -e /dev/rfkill ]] && run_args+=(--device /dev/rfkill)
-[[ -e /dev/fuse   ]] && run_args+=(--device /dev/fuse)
+# xdg-document-portal FUSE-mounts a document store at /run/user/1000/doc. That
+# needs BOTH /dev/fuse AND the ability to call mount(2): rootless podman's
+# user-ns has no CAP_SYS_ADMIN by default, so fusermount3's mount fails with
+# "Operation not permitted" (status 6/NOTCONFIGURED) and the unit ends up
+# `failed` — even though /dev/fuse is present. --cap-add SYS_ADMIN gives the
+# user-ns the mount capability, so document-portal starts cleanly (verified:
+# `portal on /run/user/1000/doc type fuse.portal`). On bare-metal Fedora the
+# real user session already has this; the cap only re-grants what the rootless
+# container drops. This is test scaffolding (the L4 harness), not the omedora
+# product — it touches no /etc and no system policy.
+if [[ -e /dev/fuse ]]; then
+  run_args+=(--device /dev/fuse --cap-add SYS_ADMIN)
+fi
 # Iterate on the launch scripts without rebuilding the image.
 run_args+=(-v "$REPO/test/fedora/omedora-session/session-launch-headless.sh:$LAUNCH_HEADLESS_IN_IMAGE:ro")
 run_args+=(-v "$REPO/test/fedora/omedora-session/session-launch-common.sh:$LAUNCH_DIR_IN_IMAGE/session-launch-common.sh:ro")

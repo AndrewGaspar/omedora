@@ -557,7 +557,10 @@ Per-file status as of the current tip of `dev`. The roadmap in `testing.md` §10
 | `test/fedora/build-session.sh` | New | shipped | Boots the base under systemd, runs `install.sh` as omedora via `machinectl shell` (real logind session — Flatpaks install), `podman commit`s to `omedora-test:fedora44-session` |
 | `test/fedora/omedora-session/session-launch.sh` | New | shipped | In-container launcher: nests Hyprland under the host compositor (`AQ_BACKENDS=wayland`). Launches `Hyprland` directly (uwsm start needs a seat/VT a container lacks); autostart's `uwsm-app` calls still hit the real `systemd --user` |
 | `test/fedora/omedora-session/smoke-assertions.sh` | New | planned | hyprctl-driven assertions for a scripted `--smoke` run — follow-up |
-| `test/fedora/run-session.sh` | New | shipped | L4-nested runner (podman `--systemd=always`); binds the host Wayland socket (widens to 0777, restores on exit) + `/dev/dri` + `/dev/rfkill`; flags `--shell` / `--rebuild` / `--keep` |
+| `test/fedora/run-session.sh` | New | shipped | L4-nested runner (podman `--systemd=always`); binds the host Wayland socket (widens to 0777, restores on exit) + `/dev/dri` + `/dev/rfkill` + `/dev/fuse` (with `--cap-add SYS_ADMIN` so xdg-document-portal's FUSE mount works in the rootless user-ns); flags `--shell` / `--rebuild` / `--keep` |
+| `test/fedora/headless/run-tests.sh` | New | shipped | L4-headless host orchestrator: boots one self-contained headless session (labwc + nested Hyprland, no host socket), copies the suite in, runs each `tests/*.sh` in the logind session via `machinectl shell`, aggregates TAP. Adds `/dev/fuse` + `--cap-add SYS_ADMIN` when fuse is present (document-portal mount) |
+| `test/fedora/headless/lib.sh` | New | shipped | In-container TAP helper library for the headless suite (`headless_session_env`, session-aware asserts, artifact capture; `wait_for_unit_active` / `assert_unit_active` / `assert_dbus_name` for dbus-activated units like the portals) |
+| `test/fedora/headless/tests/20-portals.sh` | New | shipped | L4 acceptance for xdg-desktop-portal (task #55): asserts the dbus-activated main portal + hyprland & gtk backends are active and own their D-Bus names, and (when `/dev/fuse` present) that xdg-document-portal FUSE-mounts the doc store |
 
 ### Files explicitly NOT touched
 
