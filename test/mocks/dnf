@@ -1,6 +1,6 @@
 #!/bin/bash
 # Mock dnf — records invocation into $MOCK_LOG and exits 0.
-# Used by test/pkg-helper-test.sh and test/fedora/integration.sh.
+# Used by test/pkg-helper-test.sh and omedora/test/fedora/integration.sh.
 #
 # Test-time controls (env vars):
 #   MOCK_LOG       Path to append the invocation log (default: /tmp/mock.log)

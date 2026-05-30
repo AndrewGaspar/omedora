@@ -20,7 +20,7 @@
 # difference is the phase split point. No stage logic is duplicated or
 # reordered here; it just calls into the upstream/omedora install tree. So the
 # committed images are byte-equivalent to what a plain `install.sh` produces,
-# and the default build path (test/fedora/build-session.sh with no flags) still
+# and the default build path (omedora/test/fedora/build-session.sh with no flags) still
 # runs the whole thing in one go.
 #
 # It does NOT touch install.sh, so it adds zero upstream-rebase surface.

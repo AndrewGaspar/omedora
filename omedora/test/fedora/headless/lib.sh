@@ -2,7 +2,7 @@
 #
 # In-container helper library for the L4-headless automated test suite.
 #
-# Every test under test/fedora/headless/tests/ sources THIS file as its first
+# Every test under omedora/test/fedora/headless/tests/ sources THIS file as its first
 # line, then calls `headless_session_env` to attach to the live nested Hyprland
 # session. It builds on the shared TAP primitives in test/helpers.sh (pass,
 # fail, assert_output_contains, assert_equals, ...) so L1 and L4 tests speak the
@@ -13,7 +13,7 @@
 # `machinectl shell` by run-tests.sh). The host orchestrator copies this file +
 # the tests/ dir into the container and runs each test there.
 #
-# Convention for a test (test/fedora/headless/tests/NN-name.sh):
+# Convention for a test (omedora/test/fedora/headless/tests/NN-name.sh):
 #   #!/bin/bash
 #   source "$(dirname -- "${BASH_SOURCE[0]}")/../lib.sh"
 #   headless_session_env
@@ -30,7 +30,9 @@ OMARCHY_PATH="${OMARCHY_PATH:-$HOME/.local/share/omarchy}"
 _HELPERS="$OMARCHY_PATH/test/helpers.sh"
 if [[ ! -f $_HELPERS ]]; then
   # Fall back to a path relative to this file (e.g. running from a checkout).
-  _HELPERS="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)/helpers.sh"
+  # This file lives at omedora/test/fedora/headless/lib.sh; the upstream TAP
+  # helpers stay at the repo-root test/helpers.sh (four levels up).
+  _HELPERS="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../../.." && pwd)/test/helpers.sh"
 fi
 # shellcheck source=/dev/null
 . "$_HELPERS"

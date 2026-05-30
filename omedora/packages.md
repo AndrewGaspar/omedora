@@ -240,7 +240,7 @@ Conventions shared across specs: `Source0:` uses macros (`%{url}`, `%{version}`,
 
 The local repo from [`build-repo.sh`](#build-scripts) is the **stand-in for a published COPR**: a directory of RPMs plus `createrepo_c` metadata that dnf can install from. The L4-nested session build wires it into the install container so `install.sh`'s `dnf install` resolves the omedora-repo packages (with their deps) exactly as a real COPR would.
 
-`test/fedora/build-session.sh` does this in two steps:
+`omedora/test/fedora/build-session.sh` does this in two steps:
 
 1. **Build the repo** (step 0): if `omedora/packaging/copr/repo/repodata/repomd.xml` is missing (or `--rebuild`), it runs `build-repo.sh` first.
 2. **Inject it** (step 2.5), after the base image is booted but before `install.sh` runs:
@@ -275,7 +275,7 @@ To take a package from `source = "skip"` (or a missing entry) to an installed om
 1. **Write the spec.** Add `omedora/packaging/copr/<name>.spec`, picking the right [flavor](#spec-conventions) (binary-repackage / from-source meson-cargo / Python pyproject). Lead with a comment explaining the choice. Iterate with `omedora/packaging/copr/build-local.sh <name>.spec` until it builds clean in the `fedora:44` container.
 2. **Add it to `build-repo.sh`.** Append the spec filename to the `SPECS=(...)` array so the local repo (and the future COPR) builds it.
 3. **Flip the `fedora.toml` entry.** Set `source = "dnf"` and `names = [...]` to the RPM `Name:` field(s). Note in `reason` that the name resolves to an omedora-repo RPM, not a Fedora-shipped one.
-4. **Rebuild + test.** `test/fedora/build-session.sh --rebuild` rebuilds the repo, injects it, and runs `install.sh` — the most faithful end-to-end check that dnf resolves the new package and its deps.
+4. **Rebuild + test.** `omedora/test/fedora/build-session.sh --rebuild` rebuilds the repo, injects it, and runs `install.sh` — the most faithful end-to-end check that dnf resolves the new package and its deps.
 
 ---
 

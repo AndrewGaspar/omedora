@@ -114,7 +114,7 @@ sudo bash -c 'printf "[omedora-local]\nname=Omedora local packages\nbaseurl=file
   >/etc/yum.repos.d/omedora-local.repo'
 ```
 
-> This is exactly what `test/fedora/build-session.sh` does (step 2.5), translated from `podman cp` + `exec` into direct host commands. The `file://` URL must point at the directory containing `repodata/` — `realpath` expands the `~` for the `sudo` context.
+> This is exactly what `omedora/test/fedora/build-session.sh` does (step 2.5), translated from `podman cp` + `exec` into direct host commands. The `file://` URL must point at the directory containing `repodata/` — `realpath` expands the `~` for the `sudo` context.
 
 Verify `dnf` can see the repo:
 

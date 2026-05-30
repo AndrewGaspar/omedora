@@ -3,9 +3,9 @@
 #
 # See omedora/testing.md §5 for design rationale.
 #
-# Build:  docker build -t omedora-test:fedora44 -f test/fedora/Dockerfile test/fedora/
+# Build:  docker build -t omedora-test:fedora44 -f omedora/test/fedora/Dockerfile omedora/test/fedora/
 # Run L2: docker run --rm -v "$PWD:/repo" omedora-test:fedora44 \
-#           bash /repo/test/fedora/integration.sh
+#           bash /repo/omedora/test/fedora/integration.sh
 #
 # dnf downloads are cached in a BuildKit cache mount so iterative rebuilds
 # don't re-fetch packages from mirrors. Cache survives across `docker build`

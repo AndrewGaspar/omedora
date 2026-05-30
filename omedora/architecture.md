@@ -431,7 +431,7 @@ Packages with no Fedora / RPM Fusion / vetted-COPR / Flathub home are built as *
 | `omedora/packaging/copr/build-local.sh` | New | ✅ shipped | Builds one spec via `rpmbuild -ba` in a `fedora:44` container → `output/` |
 | `omedora/packaging/copr/build-repo.sh` | New | ✅ shipped | Builds all specs in its `SPECS=(...)` array + `createrepo_c` → `repo/` (the COPR stand-in) |
 | `omedora/packaging/copr/.gitignore` | New | ✅ shipped | Ignores build products `output/` + `repo/` |
-| `test/fedora/build-session.sh` (repo inject) | Edit | ✅ shipped | Builds the local repo, `podman cp`s it into the build container, drops `/etc/yum.repos.d/omedora-local.repo` so `install.sh`'s dnf resolves the omedora-repo packages |
+| `omedora/test/fedora/build-session.sh` (repo inject) | Edit | ✅ shipped | Builds the local repo, `podman cp`s it into the build container, drops `/etc/yum.repos.d/omedora-local.repo` so `install.sh`'s dnf resolves the omedora-repo packages |
 
 ### Install pipeline ([§6](#6-install-pipeline-gating))
 
@@ -532,11 +532,11 @@ Per-file status as of the current tip of `dev`. The roadmap in `testing.md` §10
 | `test/pkg-helper-test.sh` | New | ✅ shipped | L1 unit test for package-helper dispatch (mocks `dnf`/`rpm`/`pacman`/`flatpak`/`sudo`) |
 | `test/pkg-map-test.sh` | New | ✅ shipped | L1 unit test wrapping `omarchy-dev-validate-fedora-packages` |
 | `test/mocks/{dnf,rpm,pacman,flatpak,sudo}` | New | ✅ shipped | Shell mocks — record invocations to `$MOCK_LOG`, exit 0 by default |
-| `test/fedora/Dockerfile` | New | ✅ shipped | L2/L3 container base image (`fedora:44` + prereqs) |
-| `test/fedora/integration.sh` | New | ✅ shipped | L2 orchestrator |
-| `test/fedora/lib/container.sh` | New | ✅ shipped | Container test helpers (`assert_dnf_installed`, `assert_copr_enabled`) |
-| `test/fedora/smoke.sh` | New | ✅ shipped | L3 audit-only smoke (scheduled / label-gated) |
-| `test/fedora/run-integration.sh`, `run-smoke.sh` | New | ✅ shipped | Host-side runners for L2 / L3 |
+| `omedora/test/fedora/Dockerfile` | New | ✅ shipped | L2/L3 container base image (`fedora:44` + prereqs) |
+| `omedora/test/fedora/integration.sh` | New | ✅ shipped | L2 orchestrator |
+| `omedora/test/fedora/lib/container.sh` | New | ✅ shipped | Container test helpers (`assert_dnf_installed`, `assert_copr_enabled`) |
+| `omedora/test/fedora/smoke.sh` | New | ✅ shipped | L3 audit-only smoke (scheduled / label-gated) |
+| `omedora/test/fedora/run-integration.sh`, `run-smoke.sh` | New | ✅ shipped | Host-side runners for L2 / L3 |
 | `bin/fedora/pkg.py` | New | ✅ shipped | Python implementation of pkg-add/missing/present/drop/aur-add on Fedora; map resolution + dnf/rpm/flatpak/source dispatch |
 | `bin/omarchy-dev-validate-fedora-packages` | New | ✅ shipped | Package-map validator; mirrors `bin/omarchy-dev-bin-metadata` shape |
 | `install/packages/fedora.toml` | New | ✅ shipped | Package map (44 entries; bulks out per testing.md step 10) |
@@ -553,14 +553,14 @@ Per-file status as of the current tip of `dev`. The roadmap in `testing.md` §10
 | `install/config/hardware/nvidia-fedora.sh` | New | planned (step 9) | Hyprland NVIDIA env vars only (no dracut writes — Fedora's akmod-nvidia handles drivers) |
 | `default/wayland-sessions/omedora.desktop` | New | planned (step 11) | The session entry GDM/SDDM displays as "Omedora" |
 | `install/config/wayland-session-fedora.sh` | New | planned (step 11) | Installs `omedora.desktop` to `/usr/share/wayland-sessions/` (or user fallback) |
-| `test/fedora/omedora-session/Dockerfile.base` | New | shipped | `FROM fedora:44`; systemd + `systemd-container`/`systemd-pam` + dbus-broker + polkit + install toolchain + the omedora tree; `CMD /sbin/init`. Built/run under **podman** (`--systemd=always`) |
-| `test/fedora/build-session.sh` | New | shipped | Boots the base under systemd, runs `install.sh` as omedora via `machinectl shell` (real logind session — Flatpaks install), `podman commit`s to `omedora-test:fedora44-session` |
-| `test/fedora/omedora-session/session-launch.sh` | New | shipped | In-container launcher: nests Hyprland under the host compositor (`AQ_BACKENDS=wayland`). Launches `Hyprland` directly (uwsm start needs a seat/VT a container lacks); autostart's `uwsm-app` calls still hit the real `systemd --user` |
-| `test/fedora/omedora-session/smoke-assertions.sh` | New | planned | hyprctl-driven assertions for a scripted `--smoke` run — follow-up |
-| `test/fedora/run-session.sh` | New | shipped | L4-nested runner (podman `--systemd=always`); binds the host Wayland socket (widens to 0777, restores on exit) + `/dev/dri` + `/dev/rfkill` + `/dev/fuse` (with `--cap-add SYS_ADMIN` so xdg-document-portal's FUSE mount works in the rootless user-ns); flags `--shell` / `--rebuild` / `--keep` |
-| `test/fedora/headless/run-tests.sh` | New | shipped | L4-headless host orchestrator: boots one self-contained headless session (labwc + nested Hyprland, no host socket), copies the suite in, runs each `tests/*.sh` in the logind session via `machinectl shell`, aggregates TAP. Adds `/dev/fuse` + `--cap-add SYS_ADMIN` when fuse is present (document-portal mount) |
-| `test/fedora/headless/lib.sh` | New | shipped | In-container TAP helper library for the headless suite (`headless_session_env`, session-aware asserts, artifact capture; `wait_for_unit_active` / `assert_unit_active` / `assert_dbus_name` for dbus-activated units like the portals) |
-| `test/fedora/headless/tests/20-portals.sh` | New | shipped | L4 acceptance for xdg-desktop-portal (task #55): asserts the dbus-activated main portal + hyprland & gtk backends are active and own their D-Bus names, and (when `/dev/fuse` present) that xdg-document-portal FUSE-mounts the doc store |
+| `omedora/test/fedora/omedora-session/Dockerfile.base` | New | shipped | `FROM fedora:44`; systemd + `systemd-container`/`systemd-pam` + dbus-broker + polkit + install toolchain + the omedora tree; `CMD /sbin/init`. Built/run under **podman** (`--systemd=always`) |
+| `omedora/test/fedora/build-session.sh` | New | shipped | Boots the base under systemd, runs `install.sh` as omedora via `machinectl shell` (real logind session — Flatpaks install), `podman commit`s to `omedora-test:fedora44-session` |
+| `omedora/test/fedora/omedora-session/session-launch.sh` | New | shipped | In-container launcher: nests Hyprland under the host compositor (`AQ_BACKENDS=wayland`). Launches `Hyprland` directly (uwsm start needs a seat/VT a container lacks); autostart's `uwsm-app` calls still hit the real `systemd --user` |
+| `omedora/test/fedora/omedora-session/smoke-assertions.sh` | New | planned | hyprctl-driven assertions for a scripted `--smoke` run — follow-up |
+| `omedora/test/fedora/run-session.sh` | New | shipped | L4-nested runner (podman `--systemd=always`); binds the host Wayland socket (widens to 0777, restores on exit) + `/dev/dri` + `/dev/rfkill` + `/dev/fuse` (with `--cap-add SYS_ADMIN` so xdg-document-portal's FUSE mount works in the rootless user-ns); flags `--shell` / `--rebuild` / `--keep` |
+| `omedora/test/fedora/headless/run-tests.sh` | New | shipped | L4-headless host orchestrator: boots one self-contained headless session (labwc + nested Hyprland, no host socket), copies the suite in, runs each `tests/*.sh` in the logind session via `machinectl shell`, aggregates TAP. Adds `/dev/fuse` + `--cap-add SYS_ADMIN` when fuse is present (document-portal mount) |
+| `omedora/test/fedora/headless/lib.sh` | New | shipped | In-container TAP helper library for the headless suite (`headless_session_env`, session-aware asserts, artifact capture; `wait_for_unit_active` / `assert_unit_active` / `assert_dbus_name` for dbus-activated units like the portals) |
+| `omedora/test/fedora/headless/tests/20-portals.sh` | New | shipped | L4 acceptance for xdg-desktop-portal (task #55): asserts the dbus-activated main portal + hyprland & gtk backends are active and own their D-Bus names, and (when `/dev/fuse` present) that xdg-document-portal FUSE-mounts the doc store |
 
 ### Files explicitly NOT touched
 

@@ -15,10 +15,10 @@
 # compositor, so there's no shared host socket to fight over.
 #
 # Usage:
-#   test/fedora/headless/run-tests.sh                 # build if missing, run all
-#   test/fedora/headless/run-tests.sh --rebuild       # rebuild the image first
-#   test/fedora/headless/run-tests.sh --keep          # leave the container up
-#   test/fedora/headless/run-tests.sh --test '10-*'   # run a subset (glob)
+#   omedora/test/fedora/headless/run-tests.sh                 # build if missing, run all
+#   omedora/test/fedora/headless/run-tests.sh --rebuild       # rebuild the image first
+#   omedora/test/fedora/headless/run-tests.sh --keep          # leave the container up
+#   omedora/test/fedora/headless/run-tests.sh --test '10-*'   # run a subset (glob)
 #
 # Requirements: podman with --systemd support and a DRM render node
 # (--device /dev/dri). On GPU-less CI: `sudo modprobe vkms`, then
@@ -26,8 +26,8 @@
 
 set -euo pipefail
 
-REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
-HEADLESS_DIR="$REPO/test/fedora/headless"
+REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../../.." && pwd)
+HEADLESS_DIR="$REPO/omedora/test/fedora/headless"
 SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session}"
 CTR="${OMEDORA_HTEST_CTR:-omedora-htest-$$}"
 ARTIFACTS_DIR="$HEADLESS_DIR/artifacts"
@@ -36,7 +36,7 @@ ARTIFACTS_DIR="$HEADLESS_DIR/artifacts"
 export TMPDIR="${TMPDIR:-/var/tmp/podman-tmp}"
 mkdir -p "$TMPDIR"
 
-LAUNCH_DIR_IN_IMAGE=/home/omedora/.local/share/omarchy/test/fedora/omedora-session
+LAUNCH_DIR_IN_IMAGE=/home/omedora/.local/share/omarchy/omedora/test/fedora/omedora-session
 LAUNCH_HEADLESS_IN_IMAGE="$LAUNCH_DIR_IN_IMAGE/session-launch-headless.sh"
 # Where we drop the suite inside the container (omedora-owned, on PATH-free tmp).
 SUITE_IN_CTR=/home/omedora/headless-suite
@@ -59,7 +59,7 @@ log() { printf '\033[1;34m[htest]\033[0m %s\n' "$*"; }
 if $rebuild || ! podman image exists "$SESSION_IMAGE"; then
   log "Building session image..."
   rebuild_flag=(); $rebuild && rebuild_flag=(--rebuild)
-  "$REPO/test/fedora/build-session.sh" "${rebuild_flag[@]}"
+  "$REPO/omedora/test/fedora/build-session.sh" "${rebuild_flag[@]}"
 fi
 
 # --- boot one headless container ---------------------------------------------
@@ -90,8 +90,8 @@ if [[ -e /dev/fuse ]]; then
   run_args+=(--device /dev/fuse --cap-add SYS_ADMIN)
 fi
 # Iterate on the launch scripts without rebuilding the image.
-run_args+=(-v "$REPO/test/fedora/omedora-session/session-launch-headless.sh:$LAUNCH_HEADLESS_IN_IMAGE:ro")
-run_args+=(-v "$REPO/test/fedora/omedora-session/session-launch-common.sh:$LAUNCH_DIR_IN_IMAGE/session-launch-common.sh:ro")
+run_args+=(-v "$REPO/omedora/test/fedora/omedora-session/session-launch-headless.sh:$LAUNCH_HEADLESS_IN_IMAGE:ro")
+run_args+=(-v "$REPO/omedora/test/fedora/omedora-session/session-launch-common.sh:$LAUNCH_DIR_IN_IMAGE/session-launch-common.sh:ro")
 
 log "Booting $SESSION_IMAGE as container '$CTR'..."
 podman run "${run_args[@]}" "$SESSION_IMAGE" >/dev/null

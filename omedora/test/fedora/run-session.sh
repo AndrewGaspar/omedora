@@ -17,11 +17,11 @@
 #             hyprctl and screenshot with grim. See session-launch-headless.sh.
 #
 # Usage:
-#   test/fedora/run-session.sh             # host-nested (needs a Wayland desktop)
-#   test/fedora/run-session.sh --headless  # self-contained headless session
-#   test/fedora/run-session.sh --rebuild   # rebuild the session image first
-#   test/fedora/run-session.sh --shell     # boot, then machinectl shell (no compositor)
-#   test/fedora/run-session.sh --keep      # don't remove the container on exit
+#   omedora/test/fedora/run-session.sh             # host-nested (needs a Wayland desktop)
+#   omedora/test/fedora/run-session.sh --headless  # self-contained headless session
+#   omedora/test/fedora/run-session.sh --rebuild   # rebuild the session image first
+#   omedora/test/fedora/run-session.sh --shell     # boot, then machinectl shell (no compositor)
+#   omedora/test/fedora/run-session.sh --keep      # don't remove the container on exit
 #
 # Requirements:
 #   host-nested: a running Wayland desktop on the host. podman --systemd support.
@@ -37,10 +37,10 @@
 
 set -euo pipefail
 
-REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
 SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session}"
 RUN_CTR="${OMEDORA_SESSION_CTR:-omedora-session}"
-LAUNCH_DIR_IN_IMAGE=/home/omedora/.local/share/omarchy/test/fedora/omedora-session
+LAUNCH_DIR_IN_IMAGE=/home/omedora/.local/share/omarchy/omedora/test/fedora/omedora-session
 LAUNCH_IN_IMAGE="$LAUNCH_DIR_IN_IMAGE/session-launch.sh"
 LAUNCH_HEADLESS_IN_IMAGE="$LAUNCH_DIR_IN_IMAGE/session-launch-headless.sh"
 
@@ -68,7 +68,7 @@ fi
 if $rebuild || ! podman image exists "$SESSION_IMAGE"; then
   echo "Building session image (this runs install.sh inside a systemd container)..."
   rebuild_flag=(); $rebuild && rebuild_flag=(--rebuild)
-  "$REPO/test/fedora/build-session.sh" "${rebuild_flag[@]}"
+  "$REPO/omedora/test/fedora/build-session.sh" "${rebuild_flag[@]}"
 fi
 
 # --- widen the host socket (host-nested only); clean up on exit --------------
@@ -112,9 +112,9 @@ fi
 [[ -e /dev/fuse ]] && run_args+=(--device /dev/fuse --cap-add SYS_ADMIN)
 
 # Iterate on the launch scripts without rebuilding the image.
-run_args+=(-v "$REPO/test/fedora/omedora-session/session-launch.sh:$LAUNCH_IN_IMAGE:ro")
-run_args+=(-v "$REPO/test/fedora/omedora-session/session-launch-headless.sh:$LAUNCH_HEADLESS_IN_IMAGE:ro")
-run_args+=(-v "$REPO/test/fedora/omedora-session/session-launch-common.sh:$LAUNCH_DIR_IN_IMAGE/session-launch-common.sh:ro")
+run_args+=(-v "$REPO/omedora/test/fedora/omedora-session/session-launch.sh:$LAUNCH_IN_IMAGE:ro")
+run_args+=(-v "$REPO/omedora/test/fedora/omedora-session/session-launch-headless.sh:$LAUNCH_HEADLESS_IN_IMAGE:ro")
+run_args+=(-v "$REPO/omedora/test/fedora/omedora-session/session-launch-common.sh:$LAUNCH_DIR_IN_IMAGE/session-launch-common.sh:ro")
 
 echo "Booting $SESSION_IMAGE under systemd..."
 podman run "${run_args[@]}" "$SESSION_IMAGE" >/dev/null
