@@ -126,9 +126,14 @@ fi
 # Drop lib.sh + tests/ into an omedora-owned dir so the omedora session shell
 # can read+run them (machinectl shell runs as omedora).
 podman exec "$CTR" rm -rf "$SUITE_IN_CTR"
-podman exec "$CTR" mkdir -p "$SUITE_IN_CTR/tests"
+podman exec "$CTR" mkdir -p "$SUITE_IN_CTR/tests" "$SUITE_IN_CTR/fixtures"
 podman cp "$HEADLESS_DIR/lib.sh"   "$CTR:$SUITE_IN_CTR/lib.sh"
 podman cp "$HEADLESS_DIR/tests/."  "$CTR:$SUITE_IN_CTR/tests/"
+# Committed fixtures (e.g. the 30-visual reference screenshot) the tests diff
+# against. Optional — only present once a visual test ships.
+if [[ -d "$HEADLESS_DIR/fixtures" ]]; then
+  podman cp "$HEADLESS_DIR/fixtures/." "$CTR:$SUITE_IN_CTR/fixtures/"
+fi
 podman exec "$CTR" chown -R omedora:omedora "$SUITE_IN_CTR"
 
 # --- discover + run tests -----------------------------------------------------
