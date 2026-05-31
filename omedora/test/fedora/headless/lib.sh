@@ -81,6 +81,99 @@ screenshot() {
   grim "$ARTIFACTS/${name}.png" >/dev/null 2>&1 || true
 }
 
+# assert_screenshot_matches <reference.png> <threshold-pct> [desc] [exclusions...]
+# ---------------------------------------------------------------------------
+# Tolerance-based screenshot-diff assertion: grab the live output with grim,
+# mask the same dynamic rectangles in BOTH the candidate and the committed
+# reference, then compare. Emits ONE TAP line (pass/fail) and, on failure,
+# saves the candidate + a visual diff to $ARTIFACTS for inspection.
+#
+# Why a diff (not a pixel-perfect compare): the headless session renders via
+# llvmpipe (software). In practice two captures of the same good session are
+# byte-identical here, but we still diff with a fuzz + a percentage threshold
+# so trivial AA / theme-noise never flakes the gate. The signal we actually
+# want is coarse: "are the big static structures (the waybar band, the
+# wallpaper) actually DRAWN?" — a missing waybar or a black/fallback wallpaper
+# moves the differing-pixel fraction from ~0% to tens of percent, far above any
+# sane threshold.
+#
+# Args:
+#   reference      path to the committed reference PNG (same geometry as grim)
+#   threshold-pct  max % of pixels allowed to differ (e.g. 1.0). The metric is
+#                  ImageMagick `compare -metric AE -fuzz <FUZZ>` normalized by
+#                  the pixel count; a per-pixel colour delta below FUZZ doesn't
+#                  count as a difference.
+#   desc           TAP description (optional)
+#   exclusions     zero or more "x,y,w,h" rectangles (logical px) masked to
+#                  solid black in BOTH images before diffing. These are the
+#                  dynamic regions (clock, workspace marker, tray, ...). The
+#                  CALLER documents what each rectangle is and why.
+#
+# Tunables via env (defaults are sane for the headless llvmpipe session):
+#   SCREENSHOT_DIFF_FUZZ   per-pixel colour tolerance (default 5%)
+assert_screenshot_matches() {
+  local reference="$1"; local threshold="$2"; local desc="${3:-screenshot matches reference}"
+  shift 3 || true
+  local exclusions=("$@")
+  local fuzz="${SCREENSHOT_DIFF_FUZZ:-5%}"
+
+  if ! command -v grim >/dev/null || ! command -v magick >/dev/null; then
+    _fail_with_artifacts "$desc (grim/magick missing in session)"
+    return
+  fi
+  if [[ ! -f $reference ]]; then
+    _fail_with_artifacts "$desc (reference not found: $reference)"
+    return
+  fi
+
+  local tag="${TEST_NAME}"
+  local cand="$ARTIFACTS/${tag}-candidate.png"
+  local cand_m="$ARTIFACTS/${tag}-candidate-masked.png"
+  local ref_m="$ARTIFACTS/${tag}-reference-masked.png"
+  local diffimg="$ARTIFACTS/${tag}-diff.png"
+
+  if ! grim "$cand" >/dev/null 2>&1; then
+    _fail_with_artifacts "$desc (grim capture failed)"
+    return
+  fi
+
+  # Reference and candidate must share geometry, or the diff is meaningless.
+  local rgeom cgeom
+  rgeom=$(magick identify -format '%wx%h' "$reference" 2>/dev/null)
+  cgeom=$(magick identify -format '%wx%h' "$cand" 2>/dev/null)
+  if [[ "$rgeom" != "$cgeom" ]]; then
+    _fail_with_artifacts "$desc (geometry mismatch: ref=$rgeom candidate=$cgeom)"
+    return
+  fi
+
+  # Build the mask draw-list shared by both images.
+  local -a draw=()
+  local rect x y w h
+  for rect in "${exclusions[@]}"; do
+    IFS=, read -r x y w h <<<"$rect"
+    draw+=(-draw "rectangle $x,$y $((x + w - 1)),$((y + h - 1))")
+  done
+
+  magick "$cand"      -fill black "${draw[@]}" "$cand_m" 2>/dev/null
+  magick "$reference" -fill black "${draw[@]}" "$ref_m"  2>/dev/null
+
+  # compare -metric AE prints "<count> (<normalized-fraction>)"; the normalized
+  # fraction is differing-pixels / total-pixels — exactly the % we threshold on.
+  local out frac pct
+  out=$(magick compare -metric AE -fuzz "$fuzz" "$ref_m" "$cand_m" "$diffimg" 2>&1) || true
+  frac=$(printf '%s\n' "$out" | grep -oE '\(([0-9.eE+-]+)\)' | tr -d '()' | head -1)
+  [[ -n $frac ]] || frac=1   # unparseable => treat as fully different
+  pct=$(python3 -c "print(f'{float('$frac')*100:.4f}')" 2>/dev/null || echo 100)
+
+  if python3 -c "import sys; sys.exit(0 if float('$frac')*100 <= float('$threshold') else 1)"; then
+    pass "$desc (diff ${pct}% <= ${threshold}%)"
+  else
+    # Keep the candidate + diff visible even on failure (artifacts only copied
+    # out by the runner on a non-zero exit, which fail triggers).
+    _fail_with_artifacts "$desc (diff ${pct}% > ${threshold}% — component missing/blank?)"
+  fi
+}
+
 # dump_state <name> — hyprctl layers/clients/monitors -j + failed user units.
 dump_state() {
   local name="$1"
