@@ -84,6 +84,11 @@ EOF
     # step for you.
     dnf builddep -y --setopt=keepcache=1 ~/rpmbuild/SPECS/'"$spec"' >/dev/null
 
+    # Vendored Rust specs ship a committed *-vendor.tar.* as a local SourceN
+    # (a bare filename, not a URL). spectool can'\''t fetch those, so copy any
+    # tracked vendor tarballs from /copr/vendor into SOURCES/ before building.
+    cp /copr/vendor/*-vendor.tar.* ~/rpmbuild/SOURCES/ 2>/dev/null || true
+
     # Download every Source0/SourceN URL declared in the spec into SOURCES/.
     spectool -g -R ~/rpmbuild/SPECS/'"$spec"'
 
