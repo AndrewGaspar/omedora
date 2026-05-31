@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1
+# L4-nested Workstation base — the standard L4 base + the REAL Fedora Workstation
+# package set, so the Omedora session image is built and tested on top of the base
+# most users actually layer Omedora onto (rather than the minimal fedora:44 set in
+# Dockerfile.base). That minimal base hides a whole class of layering bugs — power
+# (tuned-ppd vs power-profiles-daemon), portal-backend competition with
+# xdg-desktop-portal-gnome, and the GNOME-as-fallback login coexistence — none of
+# which exist when there's no GNOME at all. TEST-ONLY scaffolding; NOT the product.
+#
+# This is the second tier of a two-tier build: it FROMs the standard base image
+# (built from Dockerfile.base) so it reuses ALL of that setup (systemd tuning, the
+# omedora user, the baked tree, labwc) with zero drift. omedora/test/fedora/
+# build-session.sh --workstation builds the standard base first, then this layer
+# on top, then runs the normal packages+config install phases against it.
+
+ARG BASE=omedora-test:fedora44-session-base
+FROM ${BASE}
+
+# The actual Fedora Workstation environment group: GNOME, GDM, NetworkManager,
+# pipewire, the ppd-service provider (tuned-ppd on Fedora 41+),
+# xdg-desktop-portal-gnome, etc. Weak deps stay ON (the base only disabled them for
+# its own minimal install) so this matches a real Workstation install — that
+# fidelity is the entire point. Downloads persist in the same shared dnf5 cache
+# volume the base layer uses (keepcache=True was set in Dockerfile.base).
+RUN --mount=type=cache,target=/var/cache/libdnf5,sharing=locked \
+    dnf -y group install workstation-product-environment
+
+# Boot to multi-user.target in the CONTAINER so the automated headless path stays
+# deterministic: we launch the session explicitly via `machinectl shell` + a nested
+# compositor (session-launch-headless.sh), and we never want GDM auto-starting and
+# racing for the seat/DRM device — which it can't acquire under rootless podman
+# anyway (no real seat0 master-of-device).
+#
+# Crucially we do NOT mask GDM: it stays installed + unmasked so the login-layer
+# coexistence is REAL — GDM is present, Omedora's wayland-session entry lands in its
+# list, and GNOME remains a selectable session. That's what 90-workstation.sh
+# asserts and what a future L4-VM run can exercise as a live greeter. On real
+# hardware the product keeps graphical.target + GDM; this target override is a
+# container-only concession, not a product change.
+RUN systemctl set-default multi-user.target || true
