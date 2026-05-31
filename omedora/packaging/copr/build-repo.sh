@@ -22,6 +22,14 @@ SPECS=(
   # task #59 back-fill (all build-tested):
   lazygit.spec lazydocker.spec mise.spec starship.spec usage.spec
   satty.spec bluetui.spec hyprland-preview-share-picker.spec omarchy-nvim.spec
+  # task #66: the vendored Hyprland stack, IN BUILD ORDER (deep intra-stack
+  # BuildRequires — each -devel must be in the local repo before the next
+  # builds). Replaces the dropped third-party lionheartp/Hyprland COPR.
+  glaze.spec hyprland-protocols.spec hyprutils.spec hyprwayland-scanner.spec
+  hyprlang.spec hyprgraphics.spec hyprwire.spec hyprcursor.spec aquamarine.spec
+  hyprtoolkit.spec hyprland.spec hyprland-guiutils.spec hyprlock.spec
+  hypridle.spec hyprpicker.spec hyprsunset.spec hyprshot.spec
+  xdg-desktop-portal-hyprland.spec
   # claude-code.spec is intentionally NOT built here — parked pending a
   # redistribution-licensing decision before any public COPR (proprietary binary).
 )

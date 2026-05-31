@@ -67,6 +67,18 @@ EOF
     rpmdev-setuptree
     cp "/copr/'"$spec"'" ~/rpmbuild/SPECS/
 
+    # Stage any LOCAL (non-URL) Source files the spec references — e.g.
+    # hyprland.spec ships macros.hyprland as a sibling Source. spectool -g only
+    # fetches URL sources, so these plain filenames must be copied in by hand
+    # (a COPR uploads them alongside the spec). We match SourceN: lines whose
+    # value has no "://" and copy the matching sibling file from /copr.
+    grep -iE "^Source[0-9]*:" /copr/'"$spec"' | sed -E "s/^[^:]+:[[:space:]]*//" | while read -r src; do
+      case "$src" in
+        *://*) : ;;                                  # URL — spectool fetches it
+        *) [[ -f "/copr/$src" ]] && cp "/copr/$src" ~/rpmbuild/SOURCES/ ;;
+      esac
+    done
+
     # Install the spec'\''s BuildRequires (e.g. systemd-rpm-macros for
     # %%{_userunitdir}, or just-built sibling -devel packages). A COPR does this
     # step for you.
