@@ -84,13 +84,53 @@ EOF
     # step for you.
     dnf builddep -y --setopt=keepcache=1 ~/rpmbuild/SPECS/'"$spec"' >/dev/null
 
-    # Vendored Rust specs ship a committed *-vendor.tar.* as a local SourceN
-    # (a bare filename, not a URL). spectool can'\''t fetch those, so copy any
-    # tracked vendor tarballs from /copr/vendor into SOURCES/ before building.
-    cp /copr/vendor/*-vendor.tar.* ~/rpmbuild/SOURCES/ 2>/dev/null || true
-
     # Download every Source0/SourceN URL declared in the spec into SOURCES/.
     spectool -g -R ~/rpmbuild/SPECS/'"$spec"'
+
+    # GENERATE the Rust vendor tarball at SRPM-gen time (was: committed in Git
+    # LFS). The from-source Rust specs (swayosd/satty/bluetui) declare a local
+    # SourceN named <name>-<version>-vendor.tar.zst (a bare filename, not a URL,
+    # so spectool can'\''t fetch it). Rather than commit a ~64 MB tarball, we
+    # regenerate it deterministically from the upstream release tarball'\''s
+    # committed Cargo.lock: Source0 is a version-pinned GitHub tag tarball, the
+    # lock pins every transitive dep, and crates.io (name,version) content is
+    # immutable, so `cargo vendor` produces a bit-identical crate set every time.
+    # The rpmbuild (build) phase stays fully offline against this dir; only this
+    # source-prep step needs network (this container has it). A future COPR
+    # .copr/Makefile (#60) must run the same `cargo vendor` in its SRPM step so
+    # COPR'\''s offline build phase has the vendor dir.
+    #
+    # Generic + guarded: act only for a *-vendor.tar.* SourceN that is NOT
+    # already in SOURCES/, so non-Rust specs are untouched.
+    grep -iE "^Source[0-9]*:" /copr/'"$spec"' | sed -E "s/^[^:]+:[[:space:]]*//" | while read -r src; do
+      case "$src" in
+        *-vendor.tar.*)
+          # Resolve %{name}/%{version} macros in the SourceN value.
+          read -r nv_name nv_version < <(rpmspec -q --srpm --qf "%{name} %{version}\n" /copr/'"$spec"')
+          vendor_tar="$HOME/rpmbuild/SOURCES/${nv_name}-${nv_version}-vendor.tar.zst"
+          [[ -f "$vendor_tar" ]] && continue   # already present — nothing to do
+          echo "==> Generating vendor tarball: $(basename "$vendor_tar")"
+          # Extract the already-fetched Source0 upstream tarball to a temp dir
+          # and cd into its single top-level directory.
+          work=$(mktemp -d)
+          # Resolve Source0 from the macro-expanded spec; SOURCES/ holds it under
+          # its URL basename (what spectool -g fetched it as).
+          src0=$(rpmspec -P /copr/'"$spec"' | sed -nE "s/^Source0:[[:space:]]*//p" | head -n1)
+          src0_file="$HOME/rpmbuild/SOURCES/$(basename "$src0")"
+          tar -C "$work" -xf "$src0_file"
+          topdir=$(find "$work" -mindepth 1 -maxdepth 1 -type d | head -n1)
+          # `cargo vendor` reads the committed Cargo.lock. We do NOT pass
+          # --locked: swayosd'\''s lock pins its own root version (0.3.0) below its
+          # Cargo.toml (0.3.1), which --locked rejects; the lock still governs
+          # the dependency set (the self-version rewrite is a dep-set no-op).
+          ( cd "$topdir" && cargo vendor vendor >/dev/null )
+          # Tar reproducibly (normalized metadata) so re-runs are byte-identical.
+          tar --sort=name --mtime="@0" --owner=0 --group=0 --numeric-owner \
+            -C "$topdir" -caf "$vendor_tar" vendor
+          rm -rf "$work"
+          ;;
+      esac
+    done
 
     # -ba = build Both the binary RPM and the source RPM.
     rpmbuild -ba ~/rpmbuild/SPECS/'"$spec"'
