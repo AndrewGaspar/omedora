@@ -323,7 +323,11 @@ omedora/test/fedora/headless/
 ├── lib.sh              # sourced by every test (in-container): session env + assertions
 ├── tests/
 │   ├── 00-session.sh   # smoke: Hyprland IPC, ≥1 monitor, waybar/mako/swaybg up
-│   └── 10-walker.sh    # #56 guard: omarchy-launch-walker --dmenu renders a walker layer, ≥20×
+│   ├── 10-walker.sh    # #56 guard: omarchy-launch-walker --dmenu renders a walker layer, ≥20×
+│   ├── 20-portals.sh   # xdg-desktop-portal frontend + hyprland/gtk backends active
+│   └── 30-visual.sh    # visual diff: waybar + wallpaper are actually DRAWN (not just running)
+├── fixtures/
+│   └── 30-visual-reference.png   # committed known-good screenshot (1920×1080) 30-visual diffs against
 └── .gitignore          # ignores artifacts/
 ```
 
@@ -354,6 +358,38 @@ assert_layer walker "omarchy-menu renders a walker surface"
 `lib.sh` provides, on top of the shared TAP helpers (`pass`, `fail`, `assert_equals`, `assert_output_contains`, …): `headless_session_env`, `assert_layer`/`wait_for_layer`, `assert_client`/`wait_for_client`, `assert_monitor`, `assert_proc`, `screenshot`, `dump_state`. A failed `assert_*` auto-captures a `grim` screenshot + `hyprctl layers/clients/monitors` dumps + failed-unit list before exiting non-zero.
 
 **Artifacts.** On any failure the orchestrator copies that test's screenshots + state dumps to `omedora/test/fedora/headless/artifacts/<test>/` (git-ignored). A green run writes nothing.
+
+#### `30-visual.sh` — screenshot-diff: the session must *look* right
+
+`00-session.sh` asserts the autostart **processes** are running (`assert_proc waybar/swaybg/mako`). But a process can be alive and **not visually present**: a uwsm app-daemon autostart race has been seen to drop waybar + swaybg from actually *rendering* while the processes (sometimes) still exist — a black screen with no bar and no wallpaper that the process-based test happily passes. `30-visual.sh` exists to catch exactly that **visual-component-missing** class of bug.
+
+**What it checks.** It `grim`s the whole headless output (fixed 1920×1080 — the launcher's headless monitor) and diffs it against a committed reference (`fixtures/30-visual-reference.png`) using the new `assert_screenshot_matches` helper. The metric is ImageMagick `compare -metric AE -fuzz 5%` normalized to a **differing-pixel fraction**; the test passes if **≤ 1.0 %** of pixels differ. This is deliberately *tolerance-based*, not pixel-perfect — the session renders via llvmpipe and we only want the coarse signal "are the big static structures drawn?" Empirically: two captures of the same good session diff at **0.0 %**; a **missing waybar** diffs at **~2.8 %**; a **black/fallback wallpaper** at **~95 %**; a fully-broken (no bar + no wallpaper) session at **~98 %** — so 1 % sits in a wide, robust gap.
+
+**Exclusion-zone approach.** Most of the waybar is time/state-dependent (clock, workspace marker, network/battery icons), so those regions are **masked to solid black in BOTH the reference and the candidate before diffing**. The exclusion list is a small declarative `x,y,w,h # reason` array at the top of `30-visual.sh`; each rectangle is documented with *what* it is and *why*. They were derived from the **real** waybar layout (`config/waybar/config.jsonc`, top bar, height 26 × monitor scale 2.0 = 52 px band) by scanning the captured band for content clusters — not guessed:
+
+| Rectangle (x,y,w,h) | Masked content | Why dynamic |
+|---|---|---|
+| `20,0,272,52` | left: omarchy menu glyph + `hyprland/workspaces` | active-workspace marker (`󱓻`) + which workspaces are occupied are state-dependent |
+| `825,0,285,52` | center: `clock#horizontal` + weather/update/screen-recording/idle/notification-silencing indicators | clock changes every minute; indicators are state-dependent |
+| `1645,0,260,52` | right: tray + bluetooth + network + pulseaudio + cpu + battery | network/battery/bluetooth icons + tray are state-dependent |
+
+What's left **unmasked and therefore asserted**: the solid waybar background band across the rest of the top 52 px (proves the bar is drawn — if it's missing, those rows show wallpaper/black) and the **entire** wallpaper region below (proves swaybg painted the real background, not a black fallback).
+
+**Regenerating the reference** (do this only when the UI *legitimately* changes — waybar height, wallpaper, static layout). Boot a session with `run-tests.sh --keep`, attach as `omedora`, and **confirm the components are truly up** — both the `wallpaper` and `waybar` layers must appear in `hyprctl layers` (the autostart race can drop them). If missing, relaunch them as persistent user units before capturing:
+
+```bash
+WL=$(hyprctl instances -j | python3 -c 'import sys,json;print(json.load(sys.stdin)[0]["wl_socket"])')
+SIG=$(ls -t "$XDG_RUNTIME_DIR/hypr" | head -1)
+systemd-run --user --unit=ref-swaybg --setenv=WAYLAND_DISPLAY=$WL --setenv=HYPRLAND_INSTANCE_SIGNATURE=$SIG \
+  swaybg -i ~/.config/omarchy/current/background -m fill
+systemd-run --user --unit=ref-waybar --setenv=WAYLAND_DISPLAY=$WL --setenv=HYPRLAND_INSTANCE_SIGNATURE=$SIG waybar
+makoctl dismiss --all      # clear transient notifications
+grim omedora/test/fedora/headless/fixtures/30-visual-reference.png
+```
+
+The dynamic content (clock, etc.) in the reference is irrelevant because it's masked. After regenerating, re-check the exclusion rectangles still cover every dynamic cluster (re-scan the band if the layout moved). **Note:** on a *fresh* `run-tests.sh` boot the autostart race (being fixed separately) can leave the session visually broken, in which case `30-visual` correctly reports `not ok` — that is the test doing its job, not a flake.
+
+> **Runner note.** `run-tests.sh` copies `fixtures/` into the container alongside `lib.sh` + `tests/`, so committed reference images are available to the in-container test at `../fixtures/`.
 
 **CI notes.** Same requirement as `--headless`: a DRM render node (`--device /dev/dri`). GPU-less runners: `sudo modprobe vkms`, then `OMEDORA_RENDER_NODE=/dev/dri/renderD<n>`. Build-once-then-run on a scheduled/on-demand job (the image build is ~15–30 min).
 
