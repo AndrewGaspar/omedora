@@ -325,9 +325,13 @@ omedora/test/fedora/headless/
 │   ├── 00-session.sh   # smoke: Hyprland IPC, ≥1 monitor, waybar/mako/swaybg up
 │   ├── 10-walker.sh    # #56 guard: omarchy-launch-walker --dmenu renders a walker layer, ≥20×
 │   ├── 20-portals.sh   # xdg-desktop-portal frontend + hyprland/gtk backends active
-│   └── 30-visual.sh    # visual diff: waybar + wallpaper are actually DRAWN (not just running)
+│   ├── 30-visual.sh    # visual diff: waybar + wallpaper are actually DRAWN (not just running)
+│   ├── 40-menu.sh      # golden-image: omarchy control menu (Super+Alt+Space) renders
+│   └── 50-launcher.sh  # golden-image: walker app launcher (Super+Space) renders
 ├── fixtures/
-│   └── 30-visual-reference.png   # committed known-good screenshot (1920×1080) 30-visual diffs against
+│   ├── 30-visual-reference.png    # committed known-good screenshot (1920×1080) 30-visual diffs against
+│   ├── 40-menu-reference.png      # committed golden baseline (1920×1080) 40-menu diffs against
+│   └── 50-launcher-reference.png  # committed golden baseline (1920×1080) 50-launcher diffs against
 └── .gitignore          # ignores artifacts/
 ```
 
@@ -390,6 +394,52 @@ grim omedora/test/fedora/headless/fixtures/30-visual-reference.png
 The dynamic content (clock, etc.) in the reference is irrelevant because it's masked. After regenerating, re-check the exclusion rectangles still cover every dynamic cluster (re-scan the band if the layout moved). **Note:** on a *fresh* `run-tests.sh` boot the autostart race (being fixed separately) can leave the session visually broken, in which case `30-visual` correctly reports `not ok` — that is the test doing its job, not a flake.
 
 > **Runner note.** `run-tests.sh` copies `fixtures/` into the container alongside `lib.sh` + `tests/`, so committed reference images are available to the in-container test at `../fixtures/`.
+
+#### `40-menu.sh` / `50-launcher.sh` — golden-image tests for the menus
+
+`40-menu.sh` and `50-launcher.sh` are **golden-image** screenshot tests for the two main walker surfaces:
+
+| Test | Trigger (exactly what the keybind runs) | Bind |
+|---|---|---|
+| `40-menu.sh` | `setsid uwsm-app -- omarchy-menu` (no arg → `show_main_menu` → `omarchy-launch-walker --dmenu`) | `SUPER + ALT + SPACE` (`o.bind_menu(…, "Omarchy menu", nil)` → `omarchy-menu`) |
+| `50-launcher.sh` | `setsid uwsm-app -- omarchy-launch-walker` (no `--dmenu` → the app launcher) | `SUPER + SPACE` (`o.bind(…, { omarchy = "walker" })` → `omarchy-launch-walker`) |
+
+Both are walker layer-surfaces (gtk4-layer-shell, same render path as `10-walker`). Each test triggers the menu the way its bind does, waits for the `walker` layer to map (`wait_for_layer walker 10`), `grim`s the live 1920×1080 output, and diffs it against a committed baseline (`fixtures/40-menu-reference.png`, `fixtures/50-launcher-reference.png`) via `assert_screenshot_matches`. After capturing, each test closes the menu (`walker --close` + kill) and waits for the layer to tear down so it can't leak into a later test — they're idempotent and re-runnable.
+
+**Why golden-image (and a lenient threshold).** These menus are deliberately **high-entropy**: the omarchy menu's option list and the launcher's installed-app list both change legitimately across upstream versions. We accept that on **one explicit condition** — the baseline is **affirmatively regenerated** when a rebase onto a new upstream version changes a menu. So these are golden-image gates, **not** bulletproof pixel diffs: the threshold is **25 %** of pixels (`-fuzz 5%` AE, same metric as `30-visual`), tuned to catch **structural** regressions (menu didn't open / blank or black panel / wrong menu / no walker layer) while tolerating llvmpipe software-render noise **and** the row-by-row churn of menu/app text across versions. Empirically: when the menu renders, two captures of the same good session diff at **~0 %** (verified: 40-menu **0.0000 %**, 50-launcher **0.0126 %**); a plain desktop with **no menu open** diffs at **~95–97 %** (verified: **97.34 %** vs the menu baseline, **95.22 %** vs the launcher baseline). 25 % sits in that wide gap.
+
+**Exclusion zones.** Only the genuinely-nondeterministic bit is masked: each menu's search field carries a **blinking text cursor**, so the one search-field row is masked to black in both ref and candidate (`690,55,320,65` for 40-menu's "Go…" field; `360,180,1000,70` for 50-launcher's "Search…" field — both located by cropping the committed baseline, both well inside the panel). Per the golden-image contract we lean on the **threshold** for the rest of the content variance rather than masking every row.
+
+**Regenerating a baseline — this is the whole point of these tests.** When a rebase changes a menu, `40-menu`/`50-launcher` will go **red on purpose**. That is the test asking a human to look. Do this, in order:
+
+1. **Eyeball the failure.** Open the failed run's artifacts:
+   `omedora/test/fedora/headless/artifacts/40-menu/40-menu-candidate.png` (+ `-diff.png`), or the `50-launcher/` equivalents. Confirm the menu **actually rendered** and the change is the expected upstream change. **A blank/black panel is a real regression — do NOT regenerate; fix the regression.**
+2. **Confirm the change is intended** (e.g. upstream added/renamed a menu entry, or the installed-app set changed) — i.e. the new look is what you *want* to be the new known-good.
+3. **Regenerate + commit the new baseline** from a known-good headless session (never your live desktop — use the headless container):
+
+   ```bash
+   export TMPDIR=/var/tmp/podman-tmp
+   omedora/test/fedora/headless/run-tests.sh --keep --test '00-*'   # boot a clean 1920×1080 headless session
+   CTR=omedora-htest-$(…)   # the container name the runner printed (--keep leaves it up)
+   podman exec "$CTR" su - omedora -c '
+     export XDG_RUNTIME_DIR=/run/user/1000
+     [[ -f $HOME/.config/uwsm/env ]] && source $HOME/.config/uwsm/env
+     export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t $XDG_RUNTIME_DIR/hypr | head -1)
+     export WAYLAND_DISPLAY=$(hyprctl instances -j | python3 -c "import sys,json;print(json.load(sys.stdin)[0][\"wl_socket\"])")
+     # 40-menu: setsid uwsm-app -- omarchy-menu          (50-launcher: omarchy-launch-walker)
+     setsid uwsm-app -- omarchy-menu >/dev/null 2>&1 &
+     for i in $(seq 1 50); do hyprctl layers -j | grep -q "\"namespace\": \"walker\"" && break; sleep 0.2; done
+     sleep 1
+     hyprctl layers -j | grep -q "\"namespace\": \"walker\"" || { echo "walker layer MISSING — do not commit"; exit 1; }
+     grim /home/omedora/40-menu-reference.png'
+   podman cp "$CTR:/home/omedora/40-menu-reference.png" \
+     omedora/test/fedora/headless/fixtures/40-menu-reference.png
+   podman rm -f "$CTR"
+   ```
+
+   **Verify the new baseline visually shows the menu** (not a blank/black panel) before committing it. Commit with a message noting the upstream version it was regenerated for, then re-run `run-tests.sh --test '40-*'` (or `'50-*'`) to confirm green. If the search-field cursor moved (panel geometry changed upstream), re-locate the exclusion rectangle by cropping the new baseline.
+
+> The same affirmative-regenerate procedure is documented inline in each test's header comment, so a contributor who hits the red test sees it at the point of failure.
 
 **CI notes.** Same requirement as `--headless`: a DRM render node (`--device /dev/dri`). GPU-less runners: `sudo modprobe vkms`, then `OMEDORA_RENDER_NODE=/dev/dri/renderD<n>`. Build-once-then-run on a scheduled/on-demand job (the image build is ~15–30 min).
 
