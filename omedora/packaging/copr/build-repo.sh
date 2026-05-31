@@ -30,6 +30,9 @@ SPECS=(
   hyprtoolkit.spec hyprland.spec hyprland-guiutils.spec hyprlock.spec
   hypridle.spec hyprpicker.spec hyprsunset.spec hyprshot.spec
   xdg-desktop-portal-hyprland.spec
+  # uwsm (the session manager omedora launches through) was ALSO provided by
+  # the dropped lionheartp/Hyprland COPR, not Fedora — so it's vendored too.
+  uwsm.spec
   # claude-code.spec is intentionally NOT built here — parked pending a
   # redistribution-licensing decision before any public COPR (proprietary binary).
 )
