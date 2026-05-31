@@ -1,1 +1,0 @@
-omedora/packaging/copr/vendor/*.tar.zst filter=lfs diff=lfs merge=lfs -text
