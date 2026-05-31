@@ -87,6 +87,44 @@ EOF
     # Download every Source0/SourceN URL declared in the spec into SOURCES/.
     spectool -g -R ~/rpmbuild/SPECS/'"$spec"'
 
+    # INTEGRITY GATE: verify each just-fetched remote source against its
+    # committed sha256 pin BEFORE we build, so an upstream tarball/binary that
+    # changed underneath us aborts the build here (with a clear message) rather
+    # than silently flowing into the RPM. Pins live in /copr/<spec>.sources, one
+    # per remote SourceN, in `sha256sum -c` format: "<hash>  <fetched-basename>".
+    # The basename is exactly what spectool -g wrote into SOURCES/ (the part
+    # after #/ for renamed sources, else the URL basename). We do NOT pin the
+    # locally generated *-vendor.tar.* (built below, not fetched) — cargo'\''s
+    # per-crate checksums already anchor it to this pinned Source0'\''s Cargo.lock.
+    # A spec with no .sources file is skipped (safety net; all remote-source
+    # specs ship one). See OMEDORA-SOURCES.md for the format + re-pin workflow.
+    sources_pin="/copr/'"$spec"'.sources"
+    if [[ -f "$sources_pin" ]]; then
+      echo "==> Verifying fetched sources against $(basename "$sources_pin")"
+      while read -r want_hash want_file; do
+        [[ -z "$want_hash" || "$want_hash" == \#* ]] && continue
+        got_path="$HOME/rpmbuild/SOURCES/$want_file"
+        if [[ ! -f "$got_path" ]]; then
+          echo "SOURCE PIN ERROR: pinned source not fetched: $want_file" >&2
+          echo "  (declared in $(basename "$sources_pin") but missing from SOURCES/)" >&2
+          exit 1
+        fi
+        got_hash=$(sha256sum "$got_path" | awk "{print \$1}")
+        if [[ "$got_hash" != "$want_hash" ]]; then
+          echo "SOURCE PIN MISMATCH: $want_file" >&2
+          echo "  expected sha256: $want_hash" >&2
+          echo "  got sha256:      $got_hash" >&2
+          echo "  The upstream source changed since it was pinned. If this is a" >&2
+          echo "  legitimate upstream change, verify the new content and re-pin" >&2
+          echo "  $(basename "$sources_pin") (see OMEDORA-SOURCES.md). Aborting." >&2
+          exit 1
+        fi
+        echo "    ok: $want_file"
+      done < "$sources_pin"
+    else
+      echo "==> No sources pin file ($(basename "$sources_pin")); skipping source verification" >&2
+    fi
+
     # GENERATE the Rust vendor tarball at SRPM-gen time (was: committed in Git
     # LFS). The from-source Rust specs (swayosd/satty/bluetui) declare a local
     # SourceN named <name>-<version>-vendor.tar.zst (a bare filename, not a URL,
