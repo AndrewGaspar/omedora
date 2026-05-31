@@ -47,13 +47,12 @@ This section walks through installing Omedora by hand on a **fresh Fedora 44 Wor
 
 ### 1. Prerequisites
 
-Install `podman`, `createrepo_c`, `git`, `git-lfs`, and `gum` on the Fedora host.
+Install `podman`, `createrepo_c`, `git`, and `gum` on the Fedora host.
 
-`gum` is required **before** `install.sh` runs — the preflight stage uses it for styled output. `podman` is needed to build the RPMs. `createrepo_c` assembles the local repo. **`git-lfs` is required** because the Rust vendor tarballs (`omedora/packaging/copr/vendor/*-vendor.tar.zst`, used as hermetic build sources for swayosd/satty/bluetui) are stored in Git LFS — without it, the clone fetches 133-byte pointer files and `build-repo.sh` will fail building those specs.
+`gum` is required **before** `install.sh` runs — the preflight stage uses it for styled output. `podman` is needed to build the RPMs. `createrepo_c` assembles the local repo.
 
 ```bash
-sudo dnf install -y podman createrepo_c git git-lfs gum
-git lfs install
+sudo dnf install -y podman createrepo_c git gum
 ```
 
 Make sure your user is in the `wheel` group (standard on Workstation). The installer calls `sudo` for system-level writes; it must not require a password prompt mid-install. If your wheel sudo needs a password, either enter it proactively (`sudo -v`) or add yourself to a NOPASSWD rule for the duration.
@@ -67,8 +66,6 @@ git clone https://github.com/AndrewGaspar/omedora.git ~/.local/share/omarchy
 ```
 
 > **Why `~/.local/share/omarchy`?** That is the path the installer hardcodes (`OMARCHY_PATH`). Cloning omedora there is exactly what `boot.sh` does via `OMARCHY_REPO=AndrewGaspar/omedora`. Do not clone to a different path.
-
-> **Git LFS:** with `git lfs install` done first (prerequisites above), the clone automatically materializes the vendor tarballs. If you cloned before installing git-lfs, run `git -C ~/.local/share/omarchy lfs pull` to replace the pointer files with the real tarballs.
 
 If you want a specific branch (the development branch is `dev`):
 
