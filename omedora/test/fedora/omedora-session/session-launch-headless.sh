@@ -69,6 +69,77 @@ if [[ -n $NODE ]]; then
   log "pinning render node: $NODE"
 fi
 
+# --- 1g. GNOME session branch (interactive coexistence check) ----------------
+# When asked for GNOME (run-session.sh --workstation --gnome), run GNOME Shell
+# INSTEAD of the Omedora/Hyprland stack — the container-friendly stand-in for
+# "log out of Hyprland, log into GNOME" (the real GDM greeter can't run in
+# rootless nested podman: no seat/DRM master). GNOME Shell 50 dropped the old
+# `--nested` flag and won't nest into another compositor, so we run mutter's OWN
+# headless display server with a virtual monitor — a self-contained GNOME session
+# on its own wayland socket (no labwc needed for this path). Best-effort /
+# interactive: GNOME under software/llvmpipe rendering is heavy and NOT golden-imaged.
+if [[ "$SESSION" == "gnome" ]]; then
+  command -v gnome-shell >/dev/null || {
+    echo "gnome-shell not installed — this needs the --workstation image" >&2; exit 2; }
+  log "starting GNOME Shell (headless display server, virtual monitor $RES)"
+  systemctl --user reset-failed omedora-gnome 2>/dev/null || true
+  # gnome-shell needs its own session bus (dbus-run-session) for its many bus
+  # services. --headless + --virtual-monitor gives a usable output without a seat
+  # (mutter auto-picks the DRM render node passed via --device /dev/dri). NOTE:
+  # plain `--wayland` would NOT nest into a parent compositor on mutter 50 — it
+  # falls back to a headless native backend anyway — so we ask for it explicitly.
+  systemd-run --user --quiet --unit=omedora-gnome \
+    --setenv=XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+    --setenv=XDG_CURRENT_DESKTOP=GNOME \
+    --setenv=XDG_SESSION_TYPE=wayland \
+    dbus-run-session -- gnome-shell --wayland --headless --virtual-monitor "$RES"
+
+  # GNOME Shell opens its own wayland socket once mutter is up; wait for it (and
+  # bail if the unit fails fast).
+  GNOME_WL=""
+  for _ in $(seq 1 40); do
+    [[ "$(systemctl --user is-active omedora-gnome 2>/dev/null)" == "failed" ]] && {
+      echo "GNOME Shell failed to start:" >&2
+      journalctl --user -u omedora-gnome --no-pager | tail -30 >&2
+      exit 1
+    }
+    GNOME_WL=$(ls "$XDG_RUNTIME_DIR" 2>/dev/null | grep -E '^wayland-[0-9]+$' | head -1)
+    [[ -n $GNOME_WL ]] && break
+    sleep 0.5
+  done
+  [[ -n $GNOME_WL ]] && log "GNOME Shell up on socket: $GNOME_WL" \
+    || log "GNOME Shell unit active but no wayland socket yet (continuing)"
+
+  cat <<EOF
+
+================ GNOME session is up ===========================
+  GNOME Shell:  systemd --user unit 'omedora-gnome' (headless, virtual ${RES})
+                WAYLAND_DISPLAY=${GNOME_WL:-<pending>}
+  Proves GNOME runs as a selectable fallback alongside Omedora/Hyprland on the
+  Workstation base. (The real GDM greeter/session-picker is an L4-VM thing.)
+  Drive it (inside the container, as omedora):
+    export XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=${GNOME_WL:-wayland-0}
+    # NB: grim won't work — Mutter has no wlr-screencopy. Use GNOME's own API:
+    gdbus call --session -d org.gnome.Shell.Screenshot \\
+      -o /org/gnome/Shell/Screenshot -m org.gnome.Shell.Screenshot.Screenshot \\
+      true false /tmp/gnome.png
+  Stop it:
+    systemctl --user stop omedora-gnome
+================================================================
+EOF
+
+  if [[ -n "${OMEDORA_HEADLESS_KEEP:-}" ]]; then
+    log "GNOME session left running (OMEDORA_HEADLESS_KEEP set); returning."
+    exit 0
+  fi
+  log "blocking until the GNOME session ends (Ctrl-C to stop)..."
+  while [[ "$(systemctl --user is-active omedora-gnome 2>/dev/null)" == "active" ]]; do
+    sleep 2
+  done
+  log "GNOME session ended."
+  exit 0
+fi
+
 # --- 1. start the headless host compositor (labwc) --------------------------
 # Transient user unit so it survives this shell. labwc ships with cap_sys_nice
 # (file capability) which isn't in rootless podman's user-ns bounding set, so
@@ -97,69 +168,6 @@ for _ in $(seq 1 30); do
 done
 [[ -n $HOST_WL ]] || { echo "labwc never created a wayland socket" >&2; exit 1; }
 log "labwc up on host socket: $HOST_WL"
-
-# --- 2g. GNOME session branch (interactive coexistence check) ----------------
-# When asked for GNOME (run-session.sh --workstation --gnome), nest GNOME Shell
-# into labwc INSTEAD of Hyprland. This proves GNOME is a live, selectable session
-# on the Workstation base — the real GDM greeter can't run in rootless nested
-# podman (no seat/DRM master), so this is the container-friendly stand-in for
-# "log out of Hyprland, log into GNOME". Best-effort + interactive: GNOME Shell
-# under software rendering (llvmpipe) is heavy and is NOT golden-imaged.
-if [[ "$SESSION" == "gnome" ]]; then
-  command -v gnome-shell >/dev/null || {
-    echo "gnome-shell not installed — this needs the --workstation image" >&2; exit 2; }
-  log "starting nested GNOME Shell (Mutter --nested) -> $HOST_WL"
-  systemctl --user reset-failed omedora-gnome 2>/dev/null || true
-  # Mutter's nested mode runs GNOME Shell as a Wayland client of labwc. It needs
-  # its own session bus (dbus-run-session) for gnome-shell's many bus services.
-  systemd-run --user --quiet --unit=omedora-gnome \
-    --setenv=XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
-    --setenv=WAYLAND_DISPLAY="$HOST_WL" \
-    --setenv=GDK_BACKEND=wayland \
-    --setenv=XDG_CURRENT_DESKTOP=GNOME \
-    --setenv=XDG_SESSION_TYPE=wayland \
-    --setenv=MUTTER_DEBUG_DUMMY_MODE_SPECS="$RES" \
-    dbus-run-session -- gnome-shell --nested --wayland
-
-  # Confirm Mutter came up (a nested GNOME opens a SECOND wayland socket) and
-  # didn't immediately crash.
-  up=false
-  for _ in $(seq 1 30); do
-    [[ "$(systemctl --user is-active omedora-gnome 2>/dev/null)" == "failed" ]] && {
-      echo "GNOME Shell failed to start:" >&2
-      journalctl --user -u omedora-gnome --no-pager | tail -30 >&2
-      exit 1
-    }
-    socks=$(ls "$XDG_RUNTIME_DIR" 2>/dev/null | grep -cE '^wayland-[0-9]+$')
-    [[ "${socks:-0}" -ge 2 ]] && { up=true; break; }
-    sleep 0.5
-  done
-  $up && log "nested GNOME Shell is up" || log "GNOME Shell unit active but no nested socket yet (continuing)"
-
-  cat <<EOF
-
-================ GNOME (nested) session is up ==================
-  labwc (host):   WAYLAND_DISPLAY=$HOST_WL
-  GNOME Shell:    systemd --user unit 'omedora-gnome' (Mutter --nested)
-  This proves GNOME is a selectable fallback alongside Omedora/Hyprland on
-  the Workstation base. The real GDM greeter/session-picker is an L4-VM thing.
-
-  Stop it:
-    systemctl --user stop omedora-gnome omedora-labwc
-================================================================
-EOF
-
-  if [[ -n "${OMEDORA_HEADLESS_KEEP:-}" ]]; then
-    log "GNOME session left running (OMEDORA_HEADLESS_KEEP set); returning."
-    exit 0
-  fi
-  log "blocking until the GNOME session ends (Ctrl-C to stop)..."
-  while [[ "$(systemctl --user is-active omedora-gnome 2>/dev/null)" == "active" ]]; do
-    sleep 2
-  done
-  log "GNOME session ended."
-  exit 0
-fi
 
 # --- 2. nest Omedora's Hyprland into labwc via uwsm start --------------------
 # Same uwsm launch the host-nested path uses (PATH propagation, proper scopes),
