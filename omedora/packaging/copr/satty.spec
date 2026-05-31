@@ -6,15 +6,18 @@
 # is NOT on Flathub (no com.gabm.satty or any variant exists; verified against
 # the Flathub appstream + search API in May 2026). So we compile it ourselves.
 #
-# Build model mirrors swayosd.spec: `cargo` fetches crates from the network at
-# build time (the fedora:44 build container has network; a COPR build host does
-# too). A fully hermetic/offline build would vendor the crates — the same
-# follow-up swayosd carries, not done here.
+# HERMETIC / VENDORED build (COPR-ready). COPR builds in mock, where the
+# rpmbuild (build) phase has NO network — only SRPM generation does. So we do
+# NOT fetch crates at build time; we ship a committed `cargo vendor` tarball
+# (Source1) of upstream's pinned Cargo.lock and build fully offline against it.
+# `%%cargo_prep -v vendor` writes .cargo/config.toml with `[net] offline = true`
+# + `[source.vendored-sources]`, so cargo never touches crates.io; a successful
+# build proves every needed crate was vendored.
 #
 # Unlike swayosd, Satty has NO meson wrapper and NO blueprint-compiler step:
 # the UI is built in Rust via relm4, so the toolchain is just cargo + the GTK4 /
 # libadwaita -devel libraries the gtk4-rs/libadwaita-rs crates link against.
-# %install follows upstream's Makefile `install` target (binary + .desktop +
+# %%install follows upstream's Makefile `install` target (binary + .desktop +
 # scalable icon + license).
 
 Name:           satty
@@ -22,13 +25,23 @@ Version:        0.20.1
 Release:        1%{?dist}
 Summary:        A screenshot annotation tool inspired by Swappy and Flameshot
 
-# Upstream LICENSE is MPL-2.0.
-License:        MPL-2.0
+# VENDORED LICENSE: the binary statically links its whole crate tree, so the
+# License tag aggregates the licenses of ALL bundled crates, not just Satty's
+# own (MPL-2.0, upstream LICENSE). The expression below is the AND of every
+# distinct license emitted by `%%cargo_license_summary` over the vendored
+# Cargo.lock; see the shipped LICENSE.dependencies / cargo-vendor.txt for the
+# full per-crate breakdown.
+License:        MPL-2.0 AND (Apache-2.0 OR MIT) AND ((Apache-2.0 OR MIT) AND CC0-1.0 AND MIT) AND ((MIT OR Apache-2.0) AND Unicode-3.0) AND Apache-2.0 AND (Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT) AND (BSD-3-Clause OR Apache-2.0) AND CC0-1.0 AND (CC0-1.0 OR Apache-2.0) AND ISC AND MIT AND (MIT OR Apache-2.0) AND (MIT OR Apache-2.0 OR Zlib) AND (Unlicense OR MIT) AND Zlib AND (Zlib OR Apache-2.0 OR MIT)
 URL:            https://github.com/gabm/Satty
 
-# Upstream source tarball. `spectool -g` (run by build-local.sh) fetches this
-# into SOURCES/. GitHub's archive for tag vX.Y.Z unpacks to Satty-X.Y.Z/.
+# Source0: upstream source tarball. `spectool -g` (run by build-local.sh)
+# fetches this into SOURCES/. GitHub's archive for tag vX.Y.Z unpacks to
+# Satty-X.Y.Z/.
 Source0:        %{url}/archive/refs/tags/v%{version}/Satty-%{version}.tar.gz
+# Source1: committed `cargo vendor` tarball of upstream's pinned Cargo.lock
+# (tracked under vendor/ next to this spec; copied into SOURCES/ by
+# build-local.sh / supplied by the SRPM on COPR). Unpacks to vendor/.
+Source1:        %{name}-%{version}-vendor.tar.zst
 
 # Compiled for x86_64 (the only arch omedora targets right now).
 ExclusiveArch:  x86_64
@@ -37,6 +50,9 @@ ExclusiveArch:  x86_64
 # The Rust toolchain compiles the workspace (satty + satty_cli crates).
 BuildRequires:  cargo
 BuildRequires:  rust
+# cargo-rpm-macros provides %%cargo_prep / %%cargo_build / the license macros and
+# the hermetic offline .cargo/config.toml seal. >= 24 has the -v vendor flag.
+BuildRequires:  cargo-rpm-macros >= 24
 # gcc links the binary against the C GTK stack.
 BuildRequires:  gcc
 # pkg-config drives the -sys crates' library discovery.
@@ -69,9 +85,18 @@ screenshot keybinding.
 %prep
 # GitHub tag archive unpacks to Satty-%{version}/.
 %autosetup -n Satty-%{version}
+# Unpack the committed vendor tarball (creates ./vendor/), then have
+# %%cargo_prep wire .cargo/config.toml to it with offline mode on.
+%setup -q -T -D -a 1 -n Satty-%{version}
+%cargo_prep -v vendor
 
 %build
-cargo build --release --locked
+# Offline build of the workspace against the vendored sources (no crates.io).
+%cargo_build
+# Record the bundled crates' licenses + manifest for the %%license payload.
+%{cargo_license_summary}
+%{cargo_license} > LICENSE.dependencies
+%{cargo_vendor_manifest}
 
 %install
 # Mirror upstream Makefile's `install` target (PREFIX=%{_prefix}).
@@ -86,6 +111,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/satty.desktop
 
 %files
 %license LICENSE
+# Aggregated dependency license info from the vendored crate tree.
+%license LICENSE.dependencies
+%license cargo-vendor.txt
 %doc README.md
 %{_bindir}/satty
 %{_datadir}/applications/satty.desktop
@@ -94,4 +122,4 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/satty.desktop
 %changelog
 * Sat May 30 2026 omedora <noreply@omedora> - 0.20.1-1
 - Initial from-source (cargo) build of Satty (Rust/GTK4, relm4; no meson).
-- Crates fetched from network at build time; vendoring is a COPR follow-up.
+- Hermetic vendored/offline build (committed cargo-vendor tarball; COPR-ready).
