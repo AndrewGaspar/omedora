@@ -1,7 +1,10 @@
 # Enable the Fedora-side repos omedora needs:
 #   - RPM Fusion (free + nonfree) for codecs and nonfree libs
-#   - The lionheartp/Hyprland COPR (only if Hyprland isn't already in main repos)
 #   - The Flathub remote (idempotent)
+#
+# The Hyprland stack is no longer pulled from a third-party COPR: the whole
+# hyprwm stack is vendored as omedora RPMs (omedora/packaging/copr/) and served
+# from the omedora repo, so there is no COPR to enable here (task #66).
 #
 # This script is only sourced from install/preflight/all.sh on Fedora hosts.
 # Safe to re-run; every operation is idempotent.
@@ -24,16 +27,10 @@ if ! rpm -q rpmfusion-nonfree-release >/dev/null 2>&1; then
     "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VERSION}.noarch.rpm"
 fi
 
-# --- Hyprland COPR ---------------------------------------------------------
-# Only enable if Hyprland isn't already in Fedora main repos. This lets the
-# COPR usage drop off gracefully when Fedora absorbs Hyprland upstream.
-
-if ! dnf --disablerepo='_copr_*' list available hyprland >/dev/null 2>&1; then
-  echo "Hyprland not in Fedora main repos for this release — enabling lionheartp/Hyprland COPR"
-  sudo dnf copr enable -y lionheartp/Hyprland
-else
-  echo "Hyprland already in Fedora main repos — skipping COPR enable"
-fi
+# --- Hyprland ---------------------------------------------------------------
+# Hyprland and the rest of the hyprwm stack are vendored as omedora RPMs and
+# resolved from the omedora repo (see install/packages/fedora.toml). No COPR is
+# enabled here anymore — the lionheartp/Hyprland COPR was retired in task #66.
 
 # --- Flathub remote --------------------------------------------------------
 

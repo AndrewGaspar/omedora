@@ -20,6 +20,11 @@
 # Crates are fetched from the network at build time (the fedora:44 build
 # container has network; a COPR build host does too), matching swayosd.spec.
 # A fully hermetic/offline build would `cargo vendor` — tracked as a follow-up.
+#
+# Runtime dep note: `Requires: xdg-desktop-portal-hyprland` now resolves from
+# the omedora repo (vendored as omedora/packaging/copr/xdg-desktop-portal-
+# hyprland.spec). It used to come from the lionheartp/Hyprland COPR, which was
+# retired in task #66.
 
 %global protocols_commit 3a5c2bda1c1a4e55cc1330c782547695a93f05b2
 
