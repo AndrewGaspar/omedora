@@ -72,7 +72,7 @@ When upstream adds a package to `omarchy-base.packages` or to a feature install 
 
 1. Check Fedora main repos: `dnf search <name>`.
 2. Check RPM Fusion: `dnf --enablerepo=rpmfusion-free,rpmfusion-nonfree search <name>`.
-3. Check the allowed third-party COPRs (see the allowlist in [`packages.md` §7](packages.md#7-review-checklist)). Currently just `lionheartp/Hyprland`.
+3. Check the allowed third-party COPRs (see the allowlist in [`packages.md` §7](packages.md#7-review-checklist)). The allowlist is currently empty (`lionheartp/Hyprland` was retired in task #66 when the hyprwm stack was vendored).
 4. Check Flathub: search https://flathub.org/.
 5. Only if all four fail: package it as an omedora RPM under `omedora/packaging/copr/` and route the entry to `source = "dnf"` (see [`packages.md` §4](packages.md#4-the-rpmcopr-tier-omedorapackagingcopr)). The source-installer tier is retired. If a spec isn't feasible right now, park the entry as `source = "skip"` with a TODO.
 
