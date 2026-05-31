@@ -39,6 +39,10 @@
 #                                            #   re-run ONLY the config stages → session
 #                                            #   (alias: --config-only). ~10 s + boot, not ~14 min.
 #   omedora/test/fedora/build-session.sh --packages-only   # build/refresh just the pkgs image, no session
+#   omedora/test/fedora/build-session.sh --workstation  # build on a Fedora Workstation base
+#                                            #   (standard base + workstation-product-environment);
+#                                            #   produces a separate omedora-test:fedora44-session-workstation*
+#                                            #   image lineage. Combine with --fast/--rebuild/etc. as usual.
 #
 # The local omedora RPM repo (walker/elephant/fonts/…) is rebuilt only when a
 # *.spec or build-repo.sh/build-local.sh is newer than the built repomd.xml, so
@@ -60,13 +64,10 @@
 set -euo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
-BASE_IMAGE="${OMEDORA_SYSTEMD_BASE_IMAGE:-omedora-test:fedora44-session-base}"
-SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session}"
-# Intermediate "packages installed" image; derived from SESSION_IMAGE's name so
-# a custom OMEDORA_SYSTEMD_SESSION_IMAGE gets a matching pkgs image, but can be
-# overridden directly.
-PKGS_IMAGE="${OMEDORA_SYSTEMD_PKGS_IMAGE:-${SESSION_IMAGE%%:*}:${SESSION_IMAGE##*:}-pkgs}"
-BUILD_CTR="${OMEDORA_BUILD_CTR:-omedora-session-build}"
+# Image/container names are resolved AFTER arg parsing so --workstation can apply a
+# "-workstation" infix (see the resolution block below). DNF_CACHE_VOL is shared by
+# both variants on purpose — the standard + Workstation bases pull a lot of the same
+# RPMs, so they warm each other's cache.
 DNF_CACHE_VOL="${OMEDORA_DNF_CACHE_VOL:-omedora-dnf-cache}"
 # Fedora 44 ships dnf5, whose package cache lives under /var/cache/libdnf5 (NOT
 # the dnf4 path /var/cache/dnf). Mounting the persistent volume at the dnf4 path
@@ -75,7 +76,11 @@ DNF_CACHE_VOL="${OMEDORA_DNF_CACHE_VOL:-omedora-dnf-cache}"
 # persists the RPMs across builds.
 DNF_CACHE_DIR="/var/cache/libdnf5"
 HOST_LOG="${OMEDORA_SYSTEMD_BUILD_LOG:-/tmp/omedora-session-build.log}"
-DOCKERFILE="$REPO/omedora/test/fedora/omedora-session/Dockerfile.base"
+DOCKERFILE_BASE="$REPO/omedora/test/fedora/omedora-session/Dockerfile.base"
+DOCKERFILE_WORKSTATION="$REPO/omedora/test/fedora/omedora-session/Dockerfile.workstation"
+# The standard base image name is fixed (it's what the Workstation tier FROMs);
+# --workstation does NOT rename it.
+STD_BASE_IMAGE="omedora-test:fedora44-session-base"
 COPR_DIR="$REPO/omedora/packaging/copr"
 SESSION_DIR="$REPO/omedora/test/fedora/omedora-session"
 STAGED_IN_IMAGE=/home/omedora/.local/share/omarchy/omedora/test/fedora/omedora-session/staged-install.sh
@@ -84,12 +89,14 @@ rebuild=false
 rebuild_repo=false
 fast=false
 packages_only=false
+workstation=false
 for arg in "$@"; do
   case "$arg" in
     --rebuild)                 rebuild=true ;;
     --rebuild-repo)            rebuild_repo=true ;;
     --fast|--config-only)      fast=true ;;
     --packages-only)           packages_only=true ;;
+    --workstation)             workstation=true ;;
     --help|-h) grep '^# ' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown arg: $arg" >&2; exit 2 ;;
   esac
@@ -99,6 +106,20 @@ if $fast && $rebuild; then
   echo "--fast and --rebuild are mutually exclusive (--fast reuses the pkgs image)" >&2
   exit 2
 fi
+
+# --- resolve image/container names (after parsing, so --workstation applies) --
+# --workstation builds/runs on a SECOND-tier base = the standard base + the Fedora
+# Workstation package set (Dockerfile.workstation). It gets its own "-workstation"
+# image lineage + build container so it never collides with the standard build.
+# Explicit OMEDORA_SYSTEMD_* env overrides still win.
+variant=""; $workstation && variant="-workstation"
+BASE_IMAGE="${OMEDORA_SYSTEMD_BASE_IMAGE:-omedora-test:fedora44-session${variant}-base}"
+SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session${variant}}"
+# Intermediate "packages installed" image; derived from SESSION_IMAGE's name so a
+# custom OMEDORA_SYSTEMD_SESSION_IMAGE gets a matching pkgs image, but can be
+# overridden directly.
+PKGS_IMAGE="${OMEDORA_SYSTEMD_PKGS_IMAGE:-${SESSION_IMAGE%%:*}:${SESSION_IMAGE##*:}-pkgs}"
+BUILD_CTR="${OMEDORA_BUILD_CTR:-omedora-session${variant}-build}"
 
 log() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 
@@ -237,11 +258,32 @@ fi
 # =============================================================================
 
 # --- 1. Build the base image -------------------------------------------------
-if $rebuild || ! podman image exists "$BASE_IMAGE"; then
-  log "Building base image $BASE_IMAGE"
-  podman build -t "$BASE_IMAGE" -f "$DOCKERFILE" "$REPO"
+# Standard build: one base from Dockerfile.base. --workstation build: the SAME
+# standard base, then a second tier (Dockerfile.workstation) FROM it that adds the
+# Fedora Workstation package set — so the install phases below run on a realistic
+# Workstation layering instead of the minimal base.
+if $workstation; then
+  # The Workstation tier FROMs the standard base, so that must exist first.
+  if $rebuild || ! podman image exists "$STD_BASE_IMAGE"; then
+    log "Building standard base image $STD_BASE_IMAGE (Workstation tier builds FROM it)"
+    podman build -t "$STD_BASE_IMAGE" -f "$DOCKERFILE_BASE" "$REPO"
+  else
+    log "Standard base image $STD_BASE_IMAGE already present (use --rebuild to force)"
+  fi
+  if $rebuild || ! podman image exists "$BASE_IMAGE"; then
+    log "Building Workstation base image $BASE_IMAGE (standard base + workstation-product-environment)"
+    podman build -t "$BASE_IMAGE" --build-arg "BASE=$STD_BASE_IMAGE" \
+      -f "$DOCKERFILE_WORKSTATION" "$REPO"
+  else
+    log "Workstation base image $BASE_IMAGE already present (use --rebuild to force)"
+  fi
 else
-  log "Base image $BASE_IMAGE already present (use --rebuild to force)"
+  if $rebuild || ! podman image exists "$BASE_IMAGE"; then
+    log "Building base image $BASE_IMAGE"
+    podman build -t "$BASE_IMAGE" -f "$DOCKERFILE_BASE" "$REPO"
+  else
+    log "Base image $BASE_IMAGE already present (use --rebuild to force)"
+  fi
 fi
 
 # Decide whether to rebuild the PACKAGES image. It's the expensive layer; reuse

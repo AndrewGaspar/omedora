@@ -19,6 +19,9 @@
 #   omedora/test/fedora/headless/run-tests.sh --rebuild       # rebuild the image first
 #   omedora/test/fedora/headless/run-tests.sh --keep          # leave the container up
 #   omedora/test/fedora/headless/run-tests.sh --test '10-*'   # run a subset (glob)
+#   omedora/test/fedora/headless/run-tests.sh --workstation   # run the suite on a Fedora
+#                                            #   Workstation base (00-50 + the SKIP-gated
+#                                            #   90-workstation coexistence test)
 #
 # Requirements: podman with --systemd support and a DRM render node
 # (--device /dev/dri). On GPU-less CI: `sudo modprobe vkms`, then
@@ -28,9 +31,10 @@ set -euo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../../.." && pwd)
 HEADLESS_DIR="$REPO/omedora/test/fedora/headless"
-SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session}"
-CTR="${OMEDORA_HTEST_CTR:-omedora-htest-$$}"
 ARTIFACTS_DIR="$HEADLESS_DIR/artifacts"
+# SESSION_IMAGE / CTR are resolved after arg parsing so --workstation can select
+# the "-workstation" image lineage + a distinct (ws-) container name, letting a
+# Workstation run and a standard run run concurrently.
 
 # Default /tmp has a tiny quota in this environment; podman needs a real TMPDIR.
 export TMPDIR="${TMPDIR:-/var/tmp/podman-tmp}"
@@ -41,25 +45,33 @@ LAUNCH_HEADLESS_IN_IMAGE="$LAUNCH_DIR_IN_IMAGE/session-launch-headless.sh"
 # Where we drop the suite inside the container (omedora-owned, on PATH-free tmp).
 SUITE_IN_CTR=/home/omedora/headless-suite
 
-rebuild=false; keep=false; test_glob='*.sh'
+rebuild=false; keep=false; test_glob='*.sh'; workstation=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --rebuild) rebuild=true ;;
-    --keep)    keep=true ;;
-    --test)    shift; test_glob="$1" ;;
+    --rebuild)     rebuild=true ;;
+    --keep)        keep=true ;;
+    --test)        shift; test_glob="$1" ;;
+    --workstation) workstation=true ;;
     --help|-h) grep '^# ' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
   shift
 done
 
+# Resolve image + container names (after parsing, so --workstation applies). The
+# Workstation run gets a "ws-" container prefix so it never collides with a
+# concurrent standard run. Explicit OMEDORA_* env still wins.
+variant=""; ctr_variant=""; $workstation && { variant="-workstation"; ctr_variant="ws-"; }
+SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session${variant}}"
+CTR="${OMEDORA_HTEST_CTR:-omedora-htest-${ctr_variant}$$}"
+
 log() { printf '\033[1;34m[htest]\033[0m %s\n' "$*"; }
 
 # --- build the image if needed -----------------------------------------------
 if $rebuild || ! podman image exists "$SESSION_IMAGE"; then
   log "Building session image..."
-  rebuild_flag=(); $rebuild && rebuild_flag=(--rebuild)
-  "$REPO/omedora/test/fedora/build-session.sh" "${rebuild_flag[@]}"
+  build_flags=(); $rebuild && build_flags+=(--rebuild); $workstation && build_flags+=(--workstation)
+  "$REPO/omedora/test/fedora/build-session.sh" "${build_flags[@]}"
 fi
 
 # --- boot one headless container ---------------------------------------------

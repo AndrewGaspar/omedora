@@ -22,6 +22,9 @@
 #   omedora/test/fedora/run-session.sh --rebuild   # rebuild the session image first
 #   omedora/test/fedora/run-session.sh --shell     # boot, then machinectl shell (no compositor)
 #   omedora/test/fedora/run-session.sh --keep      # don't remove the container on exit
+#   omedora/test/fedora/run-session.sh --workstation           # run on a Fedora Workstation base
+#   omedora/test/fedora/run-session.sh --workstation --gnome   # nest GNOME instead of Hyprland
+#                                            #   (the GNOME fallback; implies --workstation --headless)
 #
 # Requirements:
 #   host-nested: a running Wayland desktop on the host. podman --systemd support.
@@ -38,23 +41,34 @@
 set -euo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
-SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session}"
-RUN_CTR="${OMEDORA_SESSION_CTR:-omedora-session}"
+# SESSION_IMAGE / RUN_CTR are resolved after arg parsing so --workstation can pick
+# the "-workstation" image lineage + a distinct container name.
 LAUNCH_DIR_IN_IMAGE=/home/omedora/.local/share/omarchy/omedora/test/fedora/omedora-session
 LAUNCH_IN_IMAGE="$LAUNCH_DIR_IN_IMAGE/session-launch.sh"
 LAUNCH_HEADLESS_IN_IMAGE="$LAUNCH_DIR_IN_IMAGE/session-launch-headless.sh"
 
-rebuild=false; shell_only=false; keep=false; headless=false
+rebuild=false; shell_only=false; keep=false; headless=false; workstation=false; gnome=false
 for arg in "$@"; do
   case "$arg" in
-    --rebuild)  rebuild=true ;;
-    --shell)    shell_only=true ;;
-    --keep)     keep=true ;;
-    --headless) headless=true ;;
+    --rebuild)     rebuild=true ;;
+    --shell)       shell_only=true ;;
+    --keep)        keep=true ;;
+    --headless)    headless=true ;;
+    --workstation) workstation=true ;;
+    # --gnome nests GNOME instead of Hyprland to show the GNOME fallback on the
+    # Workstation base. The nested-GNOME path lives in the headless launcher and
+    # needs gnome-shell (Workstation image), so it implies --workstation + --headless.
+    --gnome)       gnome=true; workstation=true; headless=true ;;
     --help|-h) grep '^# ' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown arg: $arg" >&2; exit 2 ;;
   esac
 done
+
+# Resolve image + container names (after parsing, so --workstation applies). An
+# explicit OMEDORA_SYSTEMD_SESSION_IMAGE / OMEDORA_SESSION_CTR still wins.
+variant=""; $workstation && variant="-workstation"
+SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session${variant}}"
+RUN_CTR="${OMEDORA_SESSION_CTR:-omedora-session${variant}}"
 
 # --- preconditions -----------------------------------------------------------
 if ! $headless; then
@@ -67,8 +81,8 @@ fi
 # --- build the session image if needed ---------------------------------------
 if $rebuild || ! podman image exists "$SESSION_IMAGE"; then
   echo "Building session image (this runs install.sh inside a systemd container)..."
-  rebuild_flag=(); $rebuild && rebuild_flag=(--rebuild)
-  "$REPO/omedora/test/fedora/build-session.sh" "${rebuild_flag[@]}"
+  build_flags=(); $rebuild && build_flags+=(--rebuild); $workstation && build_flags+=(--workstation)
+  "$REPO/omedora/test/fedora/build-session.sh" "${build_flags[@]}"
 fi
 
 # --- widen the host socket (host-nested only); clean up on exit --------------
@@ -149,6 +163,8 @@ if $headless; then
   [[ -n "${OMEDORA_RENDER_NODE:-}" ]] && setenv_args+=(--setenv=OMEDORA_RENDER_NODE="$OMEDORA_RENDER_NODE")
   [[ -n "${OMEDORA_HEADLESS_RES:-}" ]] && setenv_args+=(--setenv=OMEDORA_HEADLESS_RES="$OMEDORA_HEADLESS_RES")
   [[ -n "${OMEDORA_HEADLESS_KEEP:-}" ]] && setenv_args+=(--setenv=OMEDORA_HEADLESS_KEEP="$OMEDORA_HEADLESS_KEEP")
+  # --gnome → nest GNOME Shell instead of Hyprland (proves the GNOME fallback).
+  $gnome && setenv_args+=(--setenv=OMEDORA_HEADLESS_SESSION=gnome)
   exec podman exec -it "$RUN_CTR" machinectl shell "${setenv_args[@]}" \
     omedora@.host "$LAUNCH_HEADLESS_IN_IMAGE"
 fi

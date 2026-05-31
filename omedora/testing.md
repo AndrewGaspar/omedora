@@ -443,6 +443,30 @@ Both are walker layer-surfaces (gtk4-layer-shell, same render path as `10-walker
 
 **CI notes.** Same requirement as `--headless`: a DRM render node (`--device /dev/dri`). GPU-less runners: `sudo modprobe vkms`, then `OMEDORA_RENDER_NODE=/dev/dri/renderD<n>`. Build-once-then-run on a scheduled/on-demand job (the image build is ~15–30 min).
 
+### Workstation-base variant (`--workstation`)
+
+The default L4 base (`Dockerfile.base`) is a *minimal* `fedora:44` (systemd + a few install deps + labwc). But Omedora is installed **on top of an existing Fedora**, in practice **Fedora Workstation** — and that heavier base is where a whole class of *layering* bugs lives that the minimal base can't surface: the `tuned-ppd` vs `power-profiles-daemon` power conflict, `xdg-desktop-portal-gnome` competing with the hyprland portal backend, and the GNOME-as-fallback login coexistence. None of those exist when there's no GNOME at all.
+
+`--workstation` builds + runs the **same** install on a second-tier base that adds the real Workstation package set:
+
+- **`Dockerfile.workstation`** `FROM`s the standard base and `dnf -y group install workstation-product-environment` (GNOME, GDM, NetworkManager, pipewire, the ppd-service provider, `xdg-desktop-portal-gnome`, …). It sets the **container** default target to `multi-user.target` (the automated path launches the session explicitly via `machinectl shell`; GDM can't acquire a seat under rootless podman anyway) but leaves **GDM unmasked/installed** so the login-layer coexistence is real. On bare metal the product keeps `graphical.target` + GDM — this target override is a container-only concession.
+- The flag threads through all three entry points (each gets its own `-workstation` image lineage + container name, so a Workstation run and a standard run can run **concurrently**):
+
+  ```bash
+  export TMPDIR=/var/tmp/podman-tmp
+  omedora/test/fedora/build-session.sh --workstation          # build standard base, layer Workstation, install on top
+  omedora/test/fedora/headless/run-tests.sh --workstation      # full suite (00–50) + the 90-workstation coexistence test
+  omedora/test/fedora/run-session.sh --workstation --headless  # interactive Omedora/Hyprland session on the Workstation base
+  ```
+
+- **`90-workstation.sh`** asserts the coexistence invariants (Workstation set present, both wayland-session entries registered, GDM unmasked, `gnome-shell` launchable, `powerprofilesctl` works while `power-profiles-daemon`'s own daemon is not the active provider, the GNOME portal backend is present). It is **SKIP-gated**: on the standard base (no `gnome-shell`) it emits TAP SKIPs and passes, so the one `tests/` dir serves both runs — a plain `run-tests.sh` shows `90-workstation` as SKIP, `--workstation` runs it for real.
+
+**GNOME fallback.** Omedora's Fedora session install is *additive* (`install/config/wayland-session-fedora.sh` keeps the existing DM and only drops the `omedora.desktop` session entry), so on real hardware **GDM offers both "GNOME" and "Omedora (Hyprland uwsm)"** and you can log out of Hyprland into GNOME at will (GDM remembers your last pick — Omedora forces no default). The real **greeter/session-picker UX is an L4-VM thing** (it needs a real seat + DRM master the rootless container can't give). The container stand-in is **`run-session.sh --workstation --gnome`**, which nests GNOME Shell (Mutter `--nested`) into labwc instead of Hyprland (`OMEDORA_HEADLESS_SESSION=gnome`) — best-effort/interactive, proving GNOME runs and is reachable, not golden-imaged.
+
+**Expected power outcome / possible real finding.** On Fedora 41+, Workstation's default ppd-service is **`tuned-ppd`**, which is exactly what Omedora's skip-PPD + shim design (`install/packages/fedora.toml` `[power-profiles-daemon]`) targets — so the `--workstation` install should be **conflict-free** and `90-workstation` green. If the group instead pulls `power-profiles-daemon`, the Omedora packages phase aborts on the mutual `Conflict` (there is **no** `dnf swap`/`--allowerasing` today) — a genuine finding this variant exists to catch, fixed separately (e.g. a Fedora-gated `dnf swap`).
+
+**Cost.** The Workstation base is ~1.5–2 GB; it's cached as an image layer and shares the dnf5 cache volume with the standard base, so it's a one-time cost. The variant is **opt-in** — never built or run unless you pass `--workstation`.
+
 ### Why this *can now* be in CI
 
 The original blocker was "GitHub Actions runners are headless — no compositor to nest under." `--headless` removes that: the container brings its own compositor. The remaining requirement is a **DRM render node**, satisfied on GPU-less runners by loading **`vkms`** (`sudo modprobe vkms` in a CI step, then `OMEDORA_RENDER_NODE=/dev/dri/renderD128`). The systemd image build (~15–30 min) is still at the upper edge of practical CI runtime, so the pragmatic plan is a **scheduled / on-demand** CI job (not every push) that builds once, caches the image, and runs the `--headless` smoke. The earlier Xvfb + `x11`-backend idea is unnecessary.
@@ -456,18 +480,19 @@ omedora/test/fedora/
 ├── smoke.sh                # L3 (audit)
 ├── omedora-session/        # L4-nested (podman, systemd)
 │   ├── Dockerfile.base               # FROM fedora:44; systemd + deps + omedora tree (+ labwc for --headless); CMD /sbin/init
+│   ├── Dockerfile.workstation        # FROM the base + workstation-product-environment (the --workstation variant)
 │   ├── session-launch.sh             # in-container: nests Hyprland under the HOST compositor
-│   ├── session-launch-headless.sh    # in-container: starts labwc + nests Hyprland into it (no host desktop)
+│   ├── session-launch-headless.sh    # in-container: starts labwc + nests Hyprland (or GNOME, via OMEDORA_HEADLESS_SESSION) into it
 │   └── session-launch-common.sh      # shared uwsm-start setup for both launchers
 ├── headless/               # L4-headless automated test suite (TAP, screenshots-on-fail, CI gate)
-│   ├── run-tests.sh                  # host orchestrator: boot one session, run tests/, report
+│   ├── run-tests.sh                  # host orchestrator: boot one session, run tests/, report (--workstation for the WS base)
 │   ├── lib.sh                        # in-container: session env + headless assertions
-│   ├── tests/                        # NN-name.sh assertion scripts (00-session, 10-walker, …)
+│   ├── tests/                        # NN-name.sh assertion scripts (00-session, 10-walker, …, 90-workstation [SKIP-gated])
 │   └── .gitignore                    # ignores artifacts/
-├── build-session.sh        # boot base under systemd, install via machinectl shell, commit
+├── build-session.sh        # boot base under systemd, install via machinectl shell, commit (--workstation for the WS base)
 ├── run-integration.sh      # L2 host-side runner
 ├── run-smoke.sh            # L3 host-side runner
-└── run-session.sh          # L4-nested runner: --shell | --rebuild | --keep
+└── run-session.sh          # L4-nested runner: --shell | --rebuild | --keep | --workstation | --gnome
 ```
 
 ---
@@ -611,7 +636,8 @@ Steps 1-7 are **shipped** (the test-infrastructure foundation: L1, L2, L3, CI). 
 | 11 | planned | **Wayland session entry** + Fedora-side config script | `default/wayland-sessions/omedora.desktop` (new), `install/config/wayland-session-fedora.sh` (new), wired into `install/config/all.sh` | The session entry the display manager picks up — used by L4-VM and (cosmetically) by L4-nested. |
 | 12 | ✅ shipped | **L4-nested image + runner (systemd)** | `omedora/test/fedora/omedora-session/Dockerfile.base` (FROM fedora:44, systemd + tree), `omedora/test/fedora/build-session.sh` (boot+install+commit), `omedora/test/fedora/omedora-session/session-launch.sh`, `omedora/test/fedora/run-session.sh` (podman `--systemd=always`) | Verified: real PID-1 systemd boots, install runs in a logind session (Flatpaks install), nested Hyprland brings up the full autostart chain. Supersedes the earlier shimmed image (no-init + systemctl/uwsm-app shims) — those are deleted. |
 | 13 | ✅ shipped | **L4-headless automated test suite** (was `smoke-assertions.sh`; closes #45) | `omedora/test/fedora/headless/run-tests.sh`, `omedora/test/fedora/headless/lib.sh`, `omedora/test/fedora/headless/tests/{00-session,10-walker}.sh`, `omedora/test/fedora/headless/.gitignore` | TAP suite over a headless session: `00-session` (IPC, monitor, autostart) + `10-walker` (#56 regression guard, ≥20 walker opens). Screenshots-on-failure, unique-named containers (parallelizable), exits non-zero iff any test fails. The canonical L4 assertion path — see [the suite section](#l4-headless-automated-test-suite-omedoratestfedoraheadless). |
-| 14 | deferred | VM smoke harness (optional) | `scripts/vm-smoke.sh` (new) | Deferred per user; lands if/when manual L4-VM workflow gets repetitive enough to automate. |
+| 14 | ✅ shipped | **L4-headless Workstation-base variant** | `omedora/test/fedora/omedora-session/Dockerfile.workstation`, `--workstation` on `build-session.sh`/`run-session.sh`/`headless/run-tests.sh`, `--gnome` + `OMEDORA_HEADLESS_SESSION` in `run-session.sh`/`session-launch-headless.sh`, `omedora/test/fedora/headless/tests/90-workstation.sh` | Build+test the install on a real Fedora Workstation base (`workstation-product-environment`) to surface layering conflicts (power/portal) the minimal base hides, and verify the GNOME-as-fallback login coexistence. Opt-in; `90-workstation` SKIPs off-Workstation. See [the variant section](#workstation-base-variant---workstation). |
+| 15 | deferred | VM smoke harness (optional) | `scripts/vm-smoke.sh` (new) | Deferred per user; lands if/when manual L4-VM workflow gets repetitive enough to automate. |
 
 Implementation commits should land tests **with** their corresponding code, not in batches. A package-helper patch arrives with the helper test that proves it. This is TDD-ish in spirit but pragmatic — we're not strict about tests-first vs code-first within a commit.
 
