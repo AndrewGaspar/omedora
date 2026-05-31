@@ -24,6 +24,11 @@
 # swayosd's cargo fetch); a COPR host has network too.
 
 %global pkgs_commit 3ee1cd94953d30ee441329190d41fd69662576e1
+# LazyVim starter pinned to a commit (not refs/heads/main) so the source is
+# reproducible and the .sources sha256 pin is stable. Bump deliberately when
+# re-vendoring against a newer starter (the starter is only the base config
+# layer baked at build time; see %build).
+%global lazyvim_commit 803bc181d7c0d6d5eeba9274d9be49b287294d99
 
 Name:           omarchy-nvim
 Version:        2026.5.25
@@ -39,7 +44,9 @@ URL:            https://github.com/omacom-io/omarchy-pkgs
 # archive for a commit unpacks to omarchy-pkgs-<commit>/.
 Source0:        %{url}/archive/%{pkgs_commit}/omarchy-pkgs-%{pkgs_commit}.tar.gz
 # LazyVim starter (the base config the omarchy overrides layer on top of).
-Source1:        https://github.com/LazyVim/starter/archive/refs/heads/main.tar.gz
+# Pinned to a commit (renamed for a stable filename) — was refs/heads/main,
+# a moving branch whose sha256 pin broke on every upstream push.
+Source1:        https://github.com/LazyVim/starter/archive/%{lazyvim_commit}.tar.gz#/lazyvim-starter-%{lazyvim_commit}.tar.gz
 
 # --- Build toolchain -------------------------------------------------------
 # neovim runs the headless `:Lazy! sync`; git clones the plugins; node/npm +
@@ -72,7 +79,7 @@ links the active omarchy theme.
 # omarchy-pkgs tarball unpacks to omarchy-pkgs-<commit>/. Work from the
 # omarchy-nvim subdir; stage the LazyVim starter alongside it.
 %setup -q -n omarchy-pkgs-%{pkgs_commit}
-tar -xf %{SOURCE1}   # -> starter-main/
+tar -xf %{SOURCE1}   # -> starter-%{lazyvim_commit}/
 
 %build
 set -e
@@ -88,7 +95,7 @@ export XDG_CACHE_HOME="$HOME/.cache"
 mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_STATE_HOME" "$XDG_CACHE_HOME"
 
 # LazyVim starter -> nvim config, then layer omarchy's overrides on top.
-cp -r starter-main "$XDG_CONFIG_HOME/nvim"
+cp -r starter-%{lazyvim_commit} "$XDG_CONFIG_HOME/nvim"
 rm -rf "$XDG_CONFIG_HOME/nvim/.git"
 cp -r "$PKG/lua" "$XDG_CONFIG_HOME/nvim/"
 cp -r "$PKG/plugin" "$XDG_CONFIG_HOME/nvim/"
