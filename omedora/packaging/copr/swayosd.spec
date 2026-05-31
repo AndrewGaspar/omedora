@@ -6,10 +6,16 @@
 # custom_target. meson drives cargo, sassc compiles the SCSS theme, and
 # glib-compile-resources bundles the GResource.
 #
-# We build with `cargo` fetching crates from the network at build time (the
-# fedora:44 build container has network; a COPR build host does too). For a
-# fully hermetic/offline COPR build we'd vendor the crates (cargo vendor +
-# .cargo/config.toml as an extra Source) — tracked as a follow-up, not done here.
+# HERMETIC / VENDORED build (COPR-ready). COPR builds in mock, where the
+# rpmbuild (build) phase has NO network — only SRPM generation does. So cargo
+# must never reach crates.io at build time. Because the build is meson-driven
+# (meson's custom_target shells out to `cargo build`) rather than a bare
+# %%cargo_build, we vendor by hand: %%prep unpacks a committed `cargo vendor`
+# tarball (Source1) and writes a project-root .cargo/config.toml that sets
+# `[net] offline = true` + `[source.vendored-sources]` (absolute vendor path).
+# Cargo discovers that config from meson's CARGO_MANIFEST_PATH (the source root)
+# and builds fully offline against vendor/. We keep %%meson_build; a successful
+# offline build proves every needed crate was vendored.
 #
 # SwayOSD has two halves:
 #   - swayosd-server / swayosd-client: the per-user OSD daemon + the CLI that
@@ -25,13 +31,23 @@ Version:        0.3.1
 Release:        1%{?dist}
 Summary:        GTK based on-screen-display for audio, brightness and caps-lock
 
-# Upstream LICENSE is GPLv3.
-License:        GPL-3.0-or-later
+# VENDORED LICENSE: the binaries statically link their whole crate tree, so the
+# License tag aggregates the licenses of ALL bundled crates, not just SwayOSD's
+# own GPL-3.0-or-later (upstream LICENSE is GPLv3). The expression below is the
+# AND of every distinct license reported by cargo2rpm's license-summary over the
+# vendored Cargo.lock. (This is a meson-driven build, so we compute it from the
+# vendored tree rather than via %%cargo_license_summary in %%build.)
+License:        GPL-3.0-or-later AND (MIT OR Apache-2.0) AND ((MIT OR Apache-2.0) AND Unicode-3.0) AND Apache-2.0 AND (Apache-2.0 OR MIT) AND (Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT) AND MIT AND (MIT OR Apache-2.0 OR LGPL-2.1-or-later) AND (MIT OR Apache-2.0 OR Zlib) AND MPL-2.0 AND (Unlicense OR MIT) AND (Zlib OR Apache-2.0 OR MIT)
 URL:            https://github.com/ErikReider/SwayOSD
 
-# Upstream source tarball. `spectool -g` (run by build-local.sh) fetches this
-# into SOURCES/. GitHub's archive for tag vX.Y.Z unpacks to SwayOSD-X.Y.Z/.
+# Source0: upstream source tarball. `spectool -g` (run by build-local.sh)
+# fetches this into SOURCES/. GitHub's archive for tag vX.Y.Z unpacks to
+# SwayOSD-X.Y.Z/.
 Source0:        %{url}/archive/refs/tags/v%{version}/SwayOSD-%{version}.tar.gz
+# Source1: committed `cargo vendor` tarball of upstream's pinned Cargo.lock
+# (tracked under vendor/ next to this spec; copied into SOURCES/ by
+# build-local.sh / supplied by the SRPM on COPR). Unpacks to vendor/.
+Source1:        %{name}-%{version}-vendor.tar.zst
 
 # Compiled for x86_64 (the only arch omedora targets right now).
 ExclusiveArch:  x86_64
@@ -44,6 +60,10 @@ BuildRequires:  gcc
 # Rust toolchain: meson's custom_target shells out to `cargo build`.
 BuildRequires:  cargo
 BuildRequires:  rust
+# cargo-rpm-macros pulls in cargo2rpm (used to derive the vendored License tag)
+# and keeps this spec consistent with the other vendored Rust specs. The hermetic
+# .cargo/config.toml here is written by hand (meson drives cargo, not %%cargo_build).
+BuildRequires:  cargo-rpm-macros >= 24
 # sassc compiles style/style.scss -> style.css at build time (required program).
 BuildRequires:  sassc
 # glib-compile-resources (from glib2-devel) bundles the GResource; glib2-devel
@@ -83,16 +103,43 @@ brightness/backlight keys can be handled without root.
 %prep
 # GitHub tag archive unpacks to SwayOSD-%{version}/.
 %autosetup -n SwayOSD-%{version}
+# Unpack the committed vendor tarball (creates ./vendor/ in the source root).
+%setup -q -T -D -a 1 -n SwayOSD-%{version}
+# Hermetic seal for the meson-driven cargo build: write a project-root
+# .cargo/config.toml that points cargo at the vendored sources and forbids any
+# network access. meson sets CARGO_MANIFEST_PATH to this source root, so cargo
+# discovers this config and resolves every crate from vendor/ offline. We use an
+# absolute path because meson runs cargo with its own CARGO_TARGET_DIR/CWD.
+mkdir -p .cargo
+cat > .cargo/config.toml <<EOF
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "$(pwd)/vendor"
+
+[net]
+offline = true
+EOF
 
 %build
 %meson
 %meson_build
+# Record the bundled crates' licenses + manifest for the %%license payload.
+# cargo2rpm reads the offline vendored-sources config we wrote in %%prep, so
+# these run without any network access.
+cargo2rpm --path Cargo.toml license-summary
+cargo2rpm --path Cargo.toml license-breakdown > LICENSE.dependencies
+cargo2rpm write-vendor-manifest
 
 %install
 %meson_install
 
 %files
 %license LICENSE
+# Aggregated dependency license info from the vendored crate tree.
+%license LICENSE.dependencies
+%license cargo-vendor.txt
 %doc README.md
 # The OSD daemon + CLI omedora drives via its own user unit.
 %{_bindir}/swayosd-server
@@ -117,4 +164,5 @@ brightness/backlight keys can be handled without root.
 - Initial from-source build of SwayOSD (meson wrapping cargo build).
 - Ships swayosd-server/-client + the libinput backend and its polkit/udev/dbus/
   systemd-system glue so brightness keys work without root.
-- Crates fetched from network at build time; vendoring is a COPR follow-up.
+- Hermetic vendored/offline build: meson's cargo custom_target builds against a
+  committed cargo-vendor tarball via a project-root .cargo/config.toml (COPR-ready).
