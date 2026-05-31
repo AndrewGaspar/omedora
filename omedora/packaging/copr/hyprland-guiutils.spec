@@ -28,6 +28,11 @@ BuildRequires:  pkgconfig(hyprutils)
 BuildRequires:  pkgconfig(hyprtoolkit)
 BuildRequires:  pkgconfig(pango)
 BuildRequires:  pkgconfig(cairo)
+# CMakeLists.txt pkg_check_modules also requires these (the build fails its
+# configure step without them): pixman-1, xkbcommon and libdrm.
+BuildRequires:  pkgconfig(pixman-1)
+BuildRequires:  pkgconfig(xkbcommon)
+BuildRequires:  pkgconfig(libdrm)
 
 # Successor to the Qt-based hyprland-qtutils; let dnf migrate cleanly if a user
 # ever had a qtutils build from the dropped COPR.
