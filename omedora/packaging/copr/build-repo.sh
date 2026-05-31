@@ -10,6 +10,13 @@
 # the repo URL (or flipping fedora.toml entries to source = "copr").
 #
 # Output: packaging/copr/repo/ (a ready-to-serve dnf repo; gitignored).
+#
+# Rust vendor tarballs: the from-source Rust specs (swayosd/satty/bluetui) are
+# NOT committed with their cargo-vendor tarball. build-local.sh generates each
+# deterministically at SRPM-gen time from the upstream release tarball's
+# committed Cargo.lock (the rpmbuild build phase still runs fully offline against
+# it). A future COPR .copr/Makefile (#60) must do the same `cargo vendor` in its
+# SRPM step so COPR's offline build phase has the vendor dir.
 
 set -euo pipefail
 
