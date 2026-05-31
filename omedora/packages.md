@@ -218,7 +218,7 @@ Each `.spec` is a single RPM. Three flavors, by how the upstream ships:
 | Flavor | When | Example specs | How it works |
 | --- | --- | --- | --- |
 | **Binary-repackage** | Upstream ships a prebuilt release binary | `walker.spec`, `elephant.spec`, `omedora-nerd-fonts.spec` | No `%build`; `%install` just drops the prebuilt binary/asset into place. Disable debuginfo + strip (`%global debug_package %{nil}` / `%global __os_install_post %{nil}`) since there's no source to process — important for `elephant`, whose Go plugins fail to load if stripped. The payoff over a raw installer: dnf tracking + `Requires:` pulling deps (e.g. `walker` → `gtk4-layer-shell`, `elephant` → `libqalculate`). |
-| **From-source (meson/cargo)** | Upstream ships no binaries; it's a compiled project | `swayosd.spec` | A real `%build`: SwayOSD is Rust whose `meson` build wraps `cargo build`. `BuildRequires:` names the full toolchain (meson, ninja, gcc, cargo/rust, sassc, glib2-devel, the gtk4/libinput/pulse/dbus/evdev/systemd `-devel` libs). Crates are fetched from the network at build time. |
+| **From-source (meson/cargo)** | Upstream ships no binaries; it's a compiled project | `swayosd.spec`, `satty.spec`, `bluetui.spec` | A real `%build`: e.g. SwayOSD is Rust whose `meson` build wraps `cargo build`. `BuildRequires:` names the full toolchain (cargo/rust + the C `-devel` libs the `-sys` crates link). Hermetic/offline: the build runs against a `cargo vendor` tarball (an extra `Source`) generated at SRPM-gen time from upstream's committed `Cargo.lock` (see [Hermetic vendored build](#hermetic-vendored-build) below), so the build phase never touches crates.io. |
 | **From-source (Python pyproject)** | A Python project | `terminaltexteffects.spec` | Uses Fedora's `pyproject-rpm-macros`: `%pyproject_buildrequires` derives build deps, `%pyproject_wheel`/`%pyproject_install`/`%pyproject_save_files` build and capture the wheel + console scripts (`tte`). `BuildArch: noarch`. The only network fetch is the PyPI sdist. The most hermetic of the three. |
 
 Conventions shared across specs: `Source0:` uses macros (`%{url}`, `%{version}`, `%{pypi_source}`) so URLs stay in sync with `Version:`; `spectool -g` (run by the build script) downloads every `SourceN`; the header comment explains *why* this flavor was chosen. Keep the `%changelog` and `Version:` current when bumping.
@@ -232,9 +232,13 @@ Conventions shared across specs: `Source0:` uses macros (`%{url}`, `%{version}`,
 
 `output/` and `repo/` are **gitignored** (`omedora/packaging/copr/.gitignore`) — they're build products, rebuilt on demand. Only the specs and scripts are tracked.
 
-### Hermetic-build follow-up
+### Hermetic vendored build
 
-`swayosd.spec` fetches its cargo crates over the network at build time. A real COPR build host has network too, so this works — but a fully hermetic/offline build wants the crates vendored (`cargo vendor` + a `.cargo/config.toml` shipped as an extra `Source`). That's tracked as a follow-up, not done yet. The Python and binary-repackage specs don't have this gap (their only fetch is the declared `SourceN`).
+The from-source Rust specs (`swayosd.spec`, `satty.spec`, `bluetui.spec`) build **fully offline**: COPR builds in mock, where the rpmbuild (build) phase has no network — only SRPM generation does. So cargo must never reach crates.io at build time. Each spec ships a `cargo vendor` tarball as an extra `Source` and a `.cargo/config.toml` with `[net] offline = true` (written by `%cargo_prep -v vendor`, or by hand for the meson-driven swayosd), so the build resolves every crate from the vendored tree.
+
+**The vendor tarball is not committed.** It's generated deterministically at SRPM-gen time, not stored in the repo (it used to live in Git LFS at ~64 MB total). `build-local.sh`, after `spectool -g` fetches `Source0`, regenerates any `*-vendor.tar.*` `SourceN` that isn't already present: it extracts the upstream release tarball, runs `cargo vendor` against its committed `Cargo.lock`, and re-tars with normalized metadata (`--sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner`) so re-runs are byte-identical. This is deterministic because `Source0` is a version-pinned GitHub tag tarball, the lock pins every transitive dep, and crates.io `(name,version)` content is immutable. (swayosd's lock pins its own root version below its `Cargo.toml`, so it uses plain `cargo vendor`, not `--locked`.)
+
+When the real COPR lands, its `.copr/Makefile` (#60) must run the same `cargo vendor` in its SRPM step so COPR's offline build phase has the vendor dir. The Python and binary-repackage specs don't need any of this (their only fetch is the declared `SourceN`).
 
 ---
 
