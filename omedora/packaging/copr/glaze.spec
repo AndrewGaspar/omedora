@@ -11,8 +11,12 @@
 
 %global debug_package %{nil}
 
+# NOTE: Hyprland 0.55.2's `start` + main CMake require glaze in the range
+# [7, 8); we therefore pin a 7.x (not solopasha's older 5.5.2, which predates
+# that bump and made hyprland FetchContent-clone glaze at build time — fatal in
+# the offline build root).
 Name:           glaze
-Version:        5.5.2
+Version:        7.7.1
 Release:        1%{?dist}
 Summary:        Extremely fast, in memory, JSON and interface library
 
@@ -54,6 +58,7 @@ Development files for %{name}.
 %{_includedir}/%{name}/
 
 %changelog
-* Sat May 30 2026 omedora <noreply@omedora> - 5.5.2-1
-- Initial omedora build of glaze (adapted from solopasha/hyprlandRPM).
+* Sat May 30 2026 omedora <noreply@omedora> - 7.7.1-1
+- Initial omedora build of glaze 7.7.1 (adapted from solopasha/hyprlandRPM).
 - BuildRequire-only header lib for Hyprland; not in Fedora/RPM Fusion.
+- Pinned to 7.x (Hyprland 0.55.2 requires glaze >=7,<8).
