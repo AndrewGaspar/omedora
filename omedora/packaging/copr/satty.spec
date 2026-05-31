@@ -8,11 +8,16 @@
 #
 # HERMETIC / VENDORED build (COPR-ready). COPR builds in mock, where the
 # rpmbuild (build) phase has NO network — only SRPM generation does. So we do
-# NOT fetch crates at build time; we ship a committed `cargo vendor` tarball
-# (Source1) of upstream's pinned Cargo.lock and build fully offline against it.
-# `%%cargo_prep -v vendor` writes .cargo/config.toml with `[net] offline = true`
-# + `[source.vendored-sources]`, so cargo never touches crates.io; a successful
-# build proves every needed crate was vendored.
+# NOT fetch crates at build time; we build fully offline against a `cargo vendor`
+# tarball (Source1) of upstream's pinned Cargo.lock. `%%cargo_prep -v vendor`
+# writes .cargo/config.toml with `[net] offline = true` + `[source.vendored-
+# sources]`, so cargo never touches crates.io; a successful build proves every
+# needed crate was vendored.
+#
+# The vendor tarball is NOT committed: build-local.sh generates it at SRPM-gen
+# time from upstream's committed Cargo.lock (Source0 is a version-pinned tag
+# tarball + an immutable crate set, so it's deterministic). A future COPR
+# .copr/Makefile (#60) must run the same `cargo vendor` in its SRPM step.
 #
 # Unlike swayosd, Satty has NO meson wrapper and NO blueprint-compiler step:
 # the UI is built in Rust via relm4, so the toolchain is just cargo + the GTK4 /
@@ -38,9 +43,10 @@ URL:            https://github.com/gabm/Satty
 # fetches this into SOURCES/. GitHub's archive for tag vX.Y.Z unpacks to
 # Satty-X.Y.Z/.
 Source0:        %{url}/archive/refs/tags/v%{version}/Satty-%{version}.tar.gz
-# Source1: committed `cargo vendor` tarball of upstream's pinned Cargo.lock
-# (tracked under vendor/ next to this spec; copied into SOURCES/ by
-# build-local.sh / supplied by the SRPM on COPR). Unpacks to vendor/.
+# Source1: `cargo vendor` tarball of upstream's pinned Cargo.lock. NOT committed:
+# build-local.sh generates it deterministically into SOURCES/ at SRPM-gen time
+# (a COPR .copr/Makefile, #60, must do the same in its SRPM step). Unpacks to
+# vendor/.
 Source1:        %{name}-%{version}-vendor.tar.zst
 
 # Compiled for x86_64 (the only arch omedora targets right now).
@@ -85,7 +91,7 @@ screenshot keybinding.
 %prep
 # GitHub tag archive unpacks to Satty-%{version}/.
 %autosetup -n Satty-%{version}
-# Unpack the committed vendor tarball (creates ./vendor/), then have
+# Unpack the (build-time-generated) vendor tarball (creates ./vendor/), then have
 # %%cargo_prep wire .cargo/config.toml to it with offline mode on.
 %setup -q -T -D -a 1 -n Satty-%{version}
 %cargo_prep -v vendor
@@ -122,4 +128,5 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/satty.desktop
 %changelog
 * Sat May 30 2026 omedora <noreply@omedora> - 0.20.1-1
 - Initial from-source (cargo) build of Satty (Rust/GTK4, relm4; no meson).
-- Hermetic vendored/offline build (committed cargo-vendor tarball; COPR-ready).
+- Hermetic vendored/offline build (cargo-vendor tarball generated at SRPM-gen
+  time from upstream's Cargo.lock; COPR-ready).

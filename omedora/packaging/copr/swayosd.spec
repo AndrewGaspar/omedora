@@ -10,12 +10,17 @@
 # rpmbuild (build) phase has NO network — only SRPM generation does. So cargo
 # must never reach crates.io at build time. Because the build is meson-driven
 # (meson's custom_target shells out to `cargo build`) rather than a bare
-# %%cargo_build, we vendor by hand: %%prep unpacks a committed `cargo vendor`
-# tarball (Source1) and writes a project-root .cargo/config.toml that sets
+# %%cargo_build, we vendor by hand: %%prep unpacks the `cargo vendor` tarball
+# (Source1) and writes a project-root .cargo/config.toml that sets
 # `[net] offline = true` + `[source.vendored-sources]` (absolute vendor path).
 # Cargo discovers that config from meson's CARGO_MANIFEST_PATH (the source root)
 # and builds fully offline against vendor/. We keep %%meson_build; a successful
 # offline build proves every needed crate was vendored.
+#
+# The vendor tarball is NOT committed: build-local.sh generates it at SRPM-gen
+# time from upstream's committed Cargo.lock (Source0 is a version-pinned tag
+# tarball + an immutable crate set, so it's deterministic). A future COPR
+# .copr/Makefile (#60) must run the same `cargo vendor` in its SRPM step.
 #
 # SwayOSD has two halves:
 #   - swayosd-server / swayosd-client: the per-user OSD daemon + the CLI that
@@ -44,9 +49,10 @@ URL:            https://github.com/ErikReider/SwayOSD
 # fetches this into SOURCES/. GitHub's archive for tag vX.Y.Z unpacks to
 # SwayOSD-X.Y.Z/.
 Source0:        %{url}/archive/refs/tags/v%{version}/SwayOSD-%{version}.tar.gz
-# Source1: committed `cargo vendor` tarball of upstream's pinned Cargo.lock
-# (tracked under vendor/ next to this spec; copied into SOURCES/ by
-# build-local.sh / supplied by the SRPM on COPR). Unpacks to vendor/.
+# Source1: `cargo vendor` tarball of upstream's pinned Cargo.lock. NOT committed:
+# build-local.sh generates it deterministically into SOURCES/ at SRPM-gen time
+# (a COPR .copr/Makefile, #60, must do the same in its SRPM step). Unpacks to
+# vendor/.
 Source1:        %{name}-%{version}-vendor.tar.zst
 
 # Compiled for x86_64 (the only arch omedora targets right now).
@@ -103,7 +109,8 @@ brightness/backlight keys can be handled without root.
 %prep
 # GitHub tag archive unpacks to SwayOSD-%{version}/.
 %autosetup -n SwayOSD-%{version}
-# Unpack the committed vendor tarball (creates ./vendor/ in the source root).
+# Unpack the (build-time-generated) vendor tarball (creates ./vendor/ in the
+# source root).
 %setup -q -T -D -a 1 -n SwayOSD-%{version}
 # Hermetic seal for the meson-driven cargo build: write a project-root
 # .cargo/config.toml that points cargo at the vendored sources and forbids any
@@ -165,4 +172,5 @@ cargo2rpm write-vendor-manifest
 - Ships swayosd-server/-client + the libinput backend and its polkit/udev/dbus/
   systemd-system glue so brightness keys work without root.
 - Hermetic vendored/offline build: meson's cargo custom_target builds against a
-  committed cargo-vendor tarball via a project-root .cargo/config.toml (COPR-ready).
+  cargo-vendor tarball (generated at SRPM-gen time from upstream's Cargo.lock)
+  via a project-root .cargo/config.toml (COPR-ready).
