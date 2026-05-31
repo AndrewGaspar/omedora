@@ -75,9 +75,9 @@ EOF
     grep -iE "^Source[0-9]*:" /copr/'"$spec"' | sed -E "s/^[^:]+:[[:space:]]*//" | while read -r src; do
       case "$src" in
         *://*) : ;;                                  # URL — spectool fetches it
-        *) [[ -f "/copr/$src" ]] && cp "/copr/$src" ~/rpmbuild/SOURCES/ ;;
+        *) if [[ -f "/copr/$src" ]]; then cp "/copr/$src" ~/rpmbuild/SOURCES/; fi ;;
       esac
-    done
+    done || true   # the loop must never trip set -e (a URL-only spec is normal)
 
     # Install the spec'\''s BuildRequires (e.g. systemd-rpm-macros for
     # %%{_userunitdir}, or just-built sibling -devel packages). A COPR does this
