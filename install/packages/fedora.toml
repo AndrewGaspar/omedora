@@ -294,6 +294,15 @@ source = "dnf"
 names = ["xdg-desktop-portal-hyprland"]
 reason = "Vendored as omedora/packaging/copr/xdg-desktop-portal-hyprland.spec (1.3.12); served from the omedora repo. Replaces lionheartp/Hyprland."
 
+[uwsm]
+source = "dnf"
+names = ["uwsm"]
+reason = "Universal Wayland Session Manager — omedora's session launches through `uwsm start`. Not in Fedora main/RPM Fusion; it was implicitly provided by the dropped lionheartp/Hyprland COPR. Vendored as omedora/packaging/copr/uwsm.spec (0.23.3, noarch, adapted from solopasha/hyprlandRPM); served from the omedora repo. Without an entry it falls through to plain dnf and aborts the base install (No match for argument: uwsm)."
+
+[gpu-screen-recorder]
+source = "skip"
+reason = "GPU screen recorder (NVENC/VAAPI); was implicitly provided by the dropped lionheartp/Hyprland COPR, not Fedora main or RPM Fusion. Not session-critical, and building it needs RPM Fusion ffmpeg BuildRequires the build container doesn't enable. Skipped for now; TODO: vendor it (needs RPM Fusion build deps) or document a manual install for screen recording."
+
 # --- Flathub (proprietary or unpackaged GUI apps) ------------------------
 
 [obsidian]
