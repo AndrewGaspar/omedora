@@ -87,6 +87,15 @@ EXCLUSIONS=(
 # a PERMANENT miss, not a startup transient).
 wait_for_layer waybar 10 || true
 wait_for_layer wallpaper 10 || true
+
+# Clear the first-run welcome notifications ("Setup Wi-Fi", "Update System",
+# "Learn Keybindings") before capturing. They fire once at session start and
+# linger as a mako stack over the RIGHT side of the wallpaper — which this test
+# diffs — pushing an otherwise-perfect session to ~16% and a false `not ok`.
+# The committed reference is captured after `makoctl dismiss --all` (see the
+# regenerate procedure above), so the candidate must match: dismiss, then let
+# the notification layer tear down before grim.
+command -v makoctl >/dev/null && makoctl dismiss --all >/dev/null 2>&1 || true
 sleep 1
 
 assert_screenshot_matches "$REFERENCE" 1.0 \
