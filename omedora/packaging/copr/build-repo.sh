@@ -28,7 +28,7 @@ SPECS=(
   walker.spec elephant.spec omedora-nerd-fonts.spec swayosd.spec terminaltexteffects.spec
   # task #59 back-fill (all build-tested):
   lazygit.spec lazydocker.spec mise.spec starship.spec usage.spec
-  satty.spec bluetui.spec hyprland-preview-share-picker.spec omarchy-nvim.spec
+  satty.spec bluetui.spec gazelle-tui.spec hyprland-preview-share-picker.spec omarchy-nvim.spec
   # task #66: the vendored Hyprland stack, IN BUILD ORDER (deep intra-stack
   # BuildRequires — each -devel must be in the local repo before the next
   # builds). Replaces the dropped third-party lionheartp/Hyprland COPR.

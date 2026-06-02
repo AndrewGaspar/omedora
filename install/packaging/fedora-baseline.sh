@@ -18,3 +18,9 @@
 #   pipewire-alsa        ALSA compat — expected on a desktop.
 
 omarchy-pkg-add xdg-utils pipewire pipewire-pulseaudio pipewire-alsa
+
+# Fedora wifi TUI: impala (omarchy's Super+Ctrl+W panel) needs iwd, which Fedora
+# Workstation doesn't run — it rides NetworkManager. gazelle-tui is a
+# NetworkManager wifi TUI that fills the same slot (and adds 802.1X enterprise
+# support); omarchy-launch-wifi launches it in impala's place on Fedora.
+omarchy-pkg-add gazelle-tui

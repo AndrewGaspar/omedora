@@ -172,6 +172,15 @@ source = "dnf"
 names = ["bluetui"]
 reason = "Bluetooth TUI (Rust). Not in Fedora repos/RPM Fusion; a TUI is not a Flathub fit. Built from source by omedora/packaging/copr/bluetui.spec (Requires bluez)."
 
+[gazelle-tui]
+source = "dnf"
+names = ["gazelle-tui"]
+reason = "NetworkManager wifi TUI; omedora's Fedora stand-in for impala (whose iwd backend Fedora doesn't use — see [impala]). Not in Fedora repos/RPM Fusion. Packaged from source by omedora/packaging/copr/gazelle-tui.spec (pure Python; Requires python3-textual/python3-dbus/NetworkManager) and served from the omedora repo (local now, COPR later). Installed by install/packaging/fedora-baseline.sh; launched by omarchy-launch-wifi on Fedora."
+
+[impala]
+source = "skip"
+reason = "Open-source iwd wifi TUI (pythops/impala) — NOT a 37signals tool. Skipped on Fedora because it requires iwd, and Fedora Workstation rides NetworkManager (no iwd; install/config/hardware/network.sh that enables iwd.service is Arch-gated). omedora installs gazelle-tui instead (see [gazelle-tui]) and omarchy-launch-wifi launches that on Fedora. Listed in omarchy-base.packages, so it reaches omarchy-pkg-add on Fedora as a harmless skip."
+
 [hyprland-preview-share-picker]
 source = "dnf"
 names = ["hyprland-preview-share-picker"]
@@ -204,10 +213,6 @@ reason = "37signals internal tool; not on Fedora (and likely Arch-AUR-only upstr
 [tobi-try]
 source = "skip"
 reason = "37signals internal tool; not on Fedora. Out of omedora's portable scope."
-
-[impala]
-source = "skip"
-reason = "37signals internal tool / TUI; not on Fedora."
 
 [cliamp]
 source = "skip"
