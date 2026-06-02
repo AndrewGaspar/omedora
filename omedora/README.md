@@ -270,6 +270,22 @@ Read these in roughly this order:
 
 The `dev` branch has the install pipeline gating (Fedora arm of `install.sh`, `preflight/guard.sh`, `preflight/fedora-repos.sh`) and the full RPM packaging set shipped. The Wayland session entry install step is planned (step 11 in [`testing.md` §10](testing.md#10-implementation-roadmap)). The L4-nested test path (boot a full Omedora session in a Fedora container under real `systemd --user`) is shipped and verified.
 
+## Known Issues
+
+**First-run `install.sh` fails at the node step with a gnupg lock error.** The installer aborts during `mise use -g node@latest` (in `install/config/mise-work.sh`) with `gpg: error writing keyring '[keyboxd]': SQL library used incorrectly` and `gpg: ... waiting for lock (held by <pid>) ...`, and node is never installed. The tell is that re-running `install.sh` reports the *same* PID every time.
+
+Cause: mise verifies the node download with GPG, which takes a gnupg dotlock under `~/.gnupg/public-keys.d/`. If the machine's hostname changes after that lock is created — e.g. the Fedora installer's default `fedora` later becomes your real hostname — gnupg will not auto-break the now-stale lock, because it only clears stale locks whose recorded hostname matches the current host. So every retry re-reads the same dead PID and wedges. (Confirmed via `cat ~/.gnupg/public-keys.d/*.lock` printing the PID and the old hostname, with `ps -p <pid>` showing no such process.)
+
+Workaround — remove the stale lock and retry. This is safe: the recorded PID is dead and the keybox (`pubring.db`) itself is intact, only locked.
+
+```bash
+gpgconf --kill all
+rm -f ~/.gnupg/public-keys.d/pubring.db.lock ~/.gnupg/public-keys.d/.#lk*
+mise use -g node@latest
+```
+
+A durable fix — Fedora-gated `mise settings set node.gpg_verify false`, which keeps SHA256 verification but skips the gnupg lock entirely — is under consideration but not yet shipped.
+
 ## License
 
 Same as upstream Omarchy. See [`../LICENSE`](../LICENSE).
