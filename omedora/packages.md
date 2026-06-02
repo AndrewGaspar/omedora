@@ -126,6 +126,10 @@ reason = "Proprietary; Flathub is the canonical install path on Fedora."
 
 # --- Explicitly skipped packages ----------------------------------------
 
+# Skipping ufw also means the post-login firewall step is Arch-gated:
+# install/first-run/firewall.sh (pure `ufw`) carries a top-of-file
+# `[[ … == "arch" ]] || exit 0`, since Fedora's default firewalld is already
+# active and `ufw` is never installed. See architecture.md §6.
 [ufw]
 source = "skip"
 reason = "Fedora ships firewalld; omedora does not replace the firewall."

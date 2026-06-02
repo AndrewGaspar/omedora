@@ -162,6 +162,8 @@ Two stages drop off on Fedora because they are entirely about owning the boot st
 **Stage-internal gating.** Inside the surviving stages, individual scripts may still be Arch-only:
 
 - `install/preflight/all.sh` invokes `pacman.sh`, `migrations.sh`, `first-run-mode.sh`, `disable-mkinitcpio.sh`. On Fedora: insert `fedora-repos.sh` after `show-env.sh`, and gate `pacman.sh` and `disable-mkinitcpio.sh` behind `[[ $(omarchy-distro) == "arch" ]]` (or skip them via the `all.sh` dispatcher).
+- `install/preflight/first-run-mode.sh` keeps the unprivileged first-run marker on both distros, but its `sudo tee /etc/sudoers.d/first-run` NOPASSWD grant is **Arch-gated**. That grant exists only so Arch's privileged *post-login* finalizers (ufw firewall, resolv.conf symlink) can run in a TTY-less GUI session; on Fedora those finalizers are gated off (below), so first-run needs no sudo — and writing the drop-in would otherwise *crash the install* on a managed box with no `/etc/sudoers.d/` (the whole installer runs under `set -eEo pipefail`).
+- **Post-login first-run** (`bin/omarchy-first-run`, autostarted from `default/hypr/autostart.lua`) runs a chain of `install/first-run/*.sh` finalizers. On Fedora it is reduced to its *unprivileged, user-session* steps (swayosd/elephant/battery/gdk-scale/gtk-primary-paste/gnome-theme `gsettings`/welcome/wifi — all `systemctl --user`/`gsettings`, **zero sudo**). The Arch system-policy finalizers carry a top-of-file `[[ … == "arch" ]] || exit 0` guard: `dns-resolver.sh` (clobbers `/etc/resolv.conf` — redundant on Fedora, breaks corporate VPN/split-DNS), `firewall.sh` (pure `ufw`; firewalld is Fedora's default and `ufw` is `source=skip`), `cleanup-reboot-sudoers.sh` (removes an Arch-`post-install`-only grant), plus `gnome-theme.sh`'s `sudo gtk-update-icon-cache` line and the trailing `sudo rm /etc/sudoers.d/first-run` in `omarchy-first-run` itself. A handful of shared `config/*.sh` scripts likewise gate just their Arch-only privileged lines: `walker-elephant.sh` (the `/etc/pacman.d/hooks` restart hook) and `theme.sh` (the Yaru system-icon symlinks). The browser theme-follow policy dirs (`/etc/{chromium,brave}/policies/managed`) are still created on Fedora — they back a real feature — but **user-owned `755`** instead of world-writable `a+rw`.
 - `install/packaging/all.sh` invokes `base.sh`, `fonts.sh`, `nvim.sh`, `icons.sh`, `webapps.sh`, `tuis.sh`, `npm.sh`, hardware-conditional installers, and the `omarchy-base.packages` glob-and-install. All of these route through `omarchy-pkg-add` and therefore work as-is once helpers are dispatching — the only adjustment is that some packages will be skipped via the map (e.g., `linux-firmware-marvell`).
 - `install/config/hardware/all.sh` invokes the long list of hardware fixes. Each script that touches `/etc/mkinitcpio.conf*` or builds Arch-specific drivers gets a one-line top-of-file guard: `[[ $(omarchy-distro) == "arch" ]] || return 0`. A few are partially portable (see [§7](#7-hardware-detection)).
 - `install/login/all.sh` and `install/post-install/all.sh` — gated off entirely at the orchestrator level. No internal changes needed.
@@ -448,6 +450,12 @@ Packages with no Fedora / RPM Fusion / vetted-COPR / Flathub home are built as *
 | `install/preflight/fedora-repos.sh` | New | RPM Fusion + Flathub remote (Hyprland COPR removed in task #66 — stack vendored) |
 | `install/preflight/pacman.sh` | 1-line gate | Arch-only |
 | `install/preflight/disable-mkinitcpio.sh` | 1-line gate | Arch-only |
+| `install/preflight/first-run-mode.sh` | Arch-gate block | Keep the unprivileged marker on both; gate the `/etc/sudoers.d/first-run` NOPASSWD grant Arch-only (writing it crashes a managed box with no `/etc/sudoers.d`; Fedora first-run needs no sudo) |
+| `bin/omarchy-first-run` | Arch-gate line | Gate the trailing `sudo rm /etc/sudoers.d/first-run` Arch-only (nothing to remove on Fedora; bare `sudo` would hang in a TTY-less GUI session) |
+| `install/first-run/{dns-resolver,firewall,cleanup-reboot-sudoers}.sh` | 1-line gate | Arch-only privileged post-login finalizers (resolv.conf clobber / ufw / Arch reboot-grant cleanup); `… == "arch" || exit 0` at top |
+| `install/first-run/gnome-theme.sh` | Arch-gate line | Keep `gsettings` on both; gate only `sudo gtk-update-icon-cache` Arch-only |
+| `install/config/walker-elephant.sh` | Arch-gate block | Keep walker autostart + elephant menus on both; gate the `/etc/pacman.d/hooks` restart hook Arch-only |
+| `install/config/theme.sh` | Arch-gate + Fedora branch | Gate Yaru system-icon symlinks Arch-only; create `/etc/chromium/policies/managed` user-owned `755` on Fedora (vs world-writable `a+rw` on Arch) so browser theme-follow still works |
 | `install/config/all.sh` | Stage dispatch only if needed | Most config scripts work as-is via dispatched helpers |
 | `install/config/fix-powerprofilesctl-shebang.sh` | 1-line gate | Early-return when `/usr/bin/powerprofilesctl` is absent (Fedora keeps tuned-ppd + a bash shim, so there's no python shebang to patch) |
 | `install/config/powerprofilesctl-shim-fedora.sh` | New | Fedora-gated installer: copies the shim to `~/.local/bin/powerprofilesctl`, only when `/usr/bin/powerprofilesctl` is absent (tuned-ppd systems). Wired into `install/config/all.sh`'s Fedora-only user block, ahead of the power-profile features |
@@ -467,7 +475,7 @@ Packages with no Fedora / RPM Fusion / vetted-COPR / Flathub home are built as *
 | File | Type | Notes |
 | --- | --- | --- |
 | `bin/omarchy-migrate` | 1-line edit | Set `OMARCHY_DISTRO` before each `bash $file` |
-| `migrations/*` | Unchanged | Historical migrations stay as-is; failures are skip-prompted as today |
+| `migrations/*` | Unchanged (one exception) | Historical migrations stay as-is; failures are skip-prompted as today. Exception: `migrations/1757147211.sh` gets a Fedora branch so the chromium/brave policy dirs are created user-owned `755`, not world-writable `a+rw` (matches `config/theme.sh`) |
 
 ### CLI rebrand ([§10](#10-cli-rebrand-tactical))
 

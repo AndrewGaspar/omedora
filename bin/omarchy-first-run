@@ -20,7 +20,14 @@ if [[ -f $FIRST_RUN_MODE ]]; then
   bash "$OMARCHY_PATH/install/first-run/gtk-primary-paste.sh"
   bash "$OMARCHY_PATH/install/first-run/elephant.sh"
   omarchy-hook-install post-update "$OMARCHY_PATH/install/first-run/install-voxtype.hook"
-  sudo rm -f /etc/sudoers.d/first-run
+  # Arch-only: the NOPASSWD grant is only written on Arch (see
+  # install/preflight/first-run-mode.sh). On Fedora there is nothing to remove,
+  # and a bare `sudo` here would hang on a password prompt in this TTY-less GUI
+  # session. Gate by distro (not `[[ -f ]]` — /etc/sudoers.d is mode 750 so the
+  # user cannot stat the file even on Arch where it exists).
+  if [[ $(omarchy-distro 2>/dev/null || echo arch) == "arch" ]]; then
+    sudo rm -f /etc/sudoers.d/first-run
+  fi
 
   bash "$OMARCHY_PATH/install/first-run/welcome.sh"
   bash "$OMARCHY_PATH/install/first-run/wifi.sh"

@@ -305,5 +305,19 @@ else
   fail "config/all.sh hardware block is not gated; would run on Fedora and likely fail"
 fi
 
+# ============================================================================
+echo "=== Managed-sudo (no /etc/sudoers.d) install path ==="
+# ============================================================================
+
+# Run as a subprocess so its own EXIT trap (restores /etc/sudoers.d) fires and a
+# failing assertion there propagates here.
+if bash "$REPO/omedora/test/fedora/managed-sudo-test.sh" >/tmp/managed-sudo.out 2>&1; then
+  sed 's/^/  /' /tmp/managed-sudo.out
+  pass "managed-sudo-test.sh: no /etc/sudoers.d crash; first-run needs no sudo"
+else
+  cat /tmp/managed-sudo.out >&2
+  fail "managed-sudo-test.sh failed"
+fi
+
 echo ""
 echo "=== All L2 integration tests passed ==="

@@ -8,7 +8,10 @@ cp $OMARCHY_PATH/default/walker/walker.desktop ~/.config/autostart/
 mkdir -p ~/.config/systemd/user/app-walker@autostart.service.d/
 cp $OMARCHY_PATH/default/walker/restart.conf ~/.config/systemd/user/app-walker@autostart.service.d/restart.conf
 
-# Create pacman hook to restart walker after updates
+# Create pacman hook to restart walker after updates (Arch-only on omedora:
+# pacman hooks don't exist on Fedora — dnf has no equivalent here, so this is a
+# dead privileged write to /etc. See omedora/architecture.md).
+if [[ $(omarchy-distro 2>/dev/null || echo arch) == "arch" ]]; then
 sudo mkdir -p /etc/pacman.d/hooks
 sudo tee /etc/pacman.d/hooks/walker-restart.hook > /dev/null << EOF
 [Trigger]
@@ -23,6 +26,7 @@ Description = Restarting Walker services after system update
 When = PostTransaction
 Exec = $OMARCHY_PATH/bin/omarchy-restart-walker
 EOF
+fi
 
 # Link the visual theme menu config
 mkdir -p ~/.config/elephant/menus

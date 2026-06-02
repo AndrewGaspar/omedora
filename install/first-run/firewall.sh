@@ -1,3 +1,9 @@
+# Arch-only on omedora: this is pure ufw, which Fedora does not use (firewalld
+# is the default and already active; ufw is source=skip). Running it on Fedora
+# would also abort first-run with `ufw: command not found`. See
+# omedora/architecture.md and install/packages/fedora.toml ([ufw]).
+[[ $(omarchy-distro 2>/dev/null || echo arch) == "arch" ]] || exit 0
+
 # Allow nothing in, everything out
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
