@@ -38,19 +38,39 @@ mapfile -t ALL_SPECS < <(sed -n '/^SPECS=(/,/^)/p' "$COPR_DIR/build-repo.sh" \
   | sed 's/#.*//' | grep -oE '[a-zA-Z0-9._-]+\.spec')
 (( ${#ALL_SPECS[@]} )) || { echo "no specs parsed from build-repo.sh" >&2; exit 1; }
 
+# Optional exclusions, space-separated spec names — e.g. to skip an already-built
+# package or one whose build policy is still open:
+#   SKIP="walker.spec omarchy-nvim.spec" copr-submit.sh all
+if [[ -n "${SKIP:-}" ]]; then
+  declare -A _skip=(); for s in $SKIP; do _skip["$s"]=1; done
+  _kept=(); for s in "${ALL_SPECS[@]}"; do [[ -z "${_skip[$s]:-}" ]] && _kept+=("$s"); done
+  echo "skipping: $SKIP  (building ${#_kept[@]} of ${#ALL_SPECS[@]})"
+  ALL_SPECS=("${_kept[@]}")
+fi
+
 register_one() {
   local spec="$1" name="${1%.spec}"
-  copr-cli edit-package-scm "$PROJECT" \
-    --name "$name" \
-    --clone-url "$CLONE_URL" \
-    --commit "$BRANCH" \
-    --subdir "$SUBDIR" \
-    --spec "$spec" \
-    --type git \
-    --method make_srpm \
-    --timeout 18000 \
-    --webhook-rebuild off >/dev/null
-  echo "  registered: $name"
+  # Upsert: add-package-scm creates (errors if it exists); edit-package-scm edits
+  # (errors if it doesn't). Try add, fall back to edit — idempotent either way.
+  local args=(
+    --name "$name"
+    --clone-url "$CLONE_URL"
+    --commit "$BRANCH"
+    --subdir "$SUBDIR"
+    --spec "$spec"
+    --type git
+    --method make_srpm
+    --timeout 18000
+    --webhook-rebuild off
+  )
+  if copr-cli add-package-scm "$PROJECT" "${args[@]}" >/dev/null 2>&1; then
+    echo "  added:  $name"
+  elif copr-cli edit-package-scm "$PROJECT" "${args[@]}" >/dev/null 2>&1; then
+    echo "  edited: $name"
+  else
+    echo "  FAILED to register: $name" >&2
+    return 1
+  fi
 }
 
 # Build one package and BLOCK until it reaches a terminal state, so the next
