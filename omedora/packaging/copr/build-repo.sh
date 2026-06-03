@@ -28,7 +28,13 @@ SPECS=(
   walker.spec elephant.spec omedora-nerd-fonts.spec swayosd.spec terminaltexteffects.spec
   # task #59 back-fill (all build-tested):
   lazygit.spec lazydocker.spec mise.spec starship.spec usage.spec
-  satty.spec bluetui.spec gazelle-tui.spec hyprland-preview-share-picker.spec omarchy-nvim.spec
+  satty.spec bluetui.spec gazelle-tui.spec hyprland-preview-share-picker.spec
+  # omarchy-nvim.spec is intentionally NOT built: its %build bakes the plugin
+  # cache via a headless `:Lazy! sync` that fetches ~50 plugins from GitHub,
+  # which fails in COPR's offline mock build. Nothing Requires it, so instead
+  # the omedora installer (install/packaging/nvim.sh) bootstraps the same
+  # commit-pinned config + Lazy sync directly on the user's networked machine.
+  # The spec + .sources are retired in place (see their header) for reference.
   # task #66: the vendored Hyprland stack, IN BUILD ORDER (deep intra-stack
   # BuildRequires — each -devel must be in the local repo before the next
   # builds). Replaces the dropped third-party lionheartp/Hyprland COPR.

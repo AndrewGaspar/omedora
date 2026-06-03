@@ -133,9 +133,8 @@ source = "skip"
 reason = "Anthropic's CLI is a proprietary self-contained Bun binary (downloads.claude.ai), not an npm/distro package. Users install via Anthropic's official installer; enterprises via their own deployment. An omedora RPM exists (omedora/packaging/copr/claude-code.spec, mirrors omarchy) but is deliberately parked — excluded from build-repo.sh — pending a redistribution-licensing decision before any public COPR."
 
 [omarchy-nvim]
-source = "dnf"
-names = ["omarchy-nvim"]
-reason = "omarchy's prebuilt LazyVim distribution (config + baked plugin cache + omarchy-nvim-setup), NOT a plain config clone. Built from source by omedora/packaging/copr/omarchy-nvim.spec (reproduces the omacom-io/omarchy-pkgs PKGBUILD; headless Lazy sync). install/packaging/nvim.sh already invokes omarchy-nvim-setup."
+source = "skip"
+reason = "Not packaged as an RPM on Fedora: the omarchy-nvim build bakes its plugin cache via a headless `:Lazy! sync` that fetches ~50 plugins from GitHub, which fails in COPR's offline mock build. Nothing Requires it (it's just user-level Neovim config + a setup script). Instead install/packaging/nvim.sh bootstraps the same commit-pinned config (omacom-io/omarchy-pkgs) directly on the user's networked machine and runs Lazy sync there. The retired spec/sources remain in omedora/packaging/copr/ (dropped from build-repo.sh) for reference."
 
 [omarchy-walker]
 source = "dnf"

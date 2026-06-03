@@ -1,5 +1,16 @@
 # omarchy-nvim.spec — omarchy's pre-built LazyVim distribution (omedora).
 #
+# RETIRED — not built. Removed from build-repo.sh's SPECS and mapped to
+# source = "skip" in install/packages/fedora.toml. Reason: %build bakes the
+# plugin cache by running a headless `:Lazy! sync` that fetches ~50 plugins from
+# GitHub, which fails in COPR's offline mock build phase. omarchy-nvim is not a
+# dependency of anything, so instead of packaging it the omedora installer
+# (install/packaging/nvim.sh) bootstraps the SAME commit-pinned config from
+# omacom-io/omarchy-pkgs and runs Lazy sync directly on the user's networked
+# machine. This spec is kept for reference/history; do not re-add it to the
+# build set unless the offline-build problem is solved (e.g. by shipping the
+# baked cache as a committed source).
+#
 # omarchy-nvim is NOT upstream LazyVim and NOT a plain config clone: it's a real
 # package (omacom-io/omarchy-pkgs) that ships, under /usr/share/omarchy-nvim/,
 # a LazyVim starter customized with omarchy's lua/ + plugin/ overrides AND a
