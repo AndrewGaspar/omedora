@@ -15,7 +15,7 @@
 # runtime value.
 
 Name:           mise
-Version:        2026.5.16
+Version:        2026.6.0
 Release:        1%{?dist}
 Summary:        Polyglot dev tool and runtime version manager
 
@@ -64,5 +64,8 @@ install -D -m 0644 share/fish/vendor_conf.d/mise-activate.fish \
 %{_datadir}/fish/vendor_conf.d/mise-activate.fish
 
 %changelog
+* Thu Jun 04 2026 omedora <noreply@omedora> - 2026.6.0-1
+- Bump to upstream 2026.6.0.
+
 * Sat May 30 2026 omedora <noreply@omedora> - 2026.5.16-1
 - Initial binary-repackage of upstream mise linux-x64 release.
