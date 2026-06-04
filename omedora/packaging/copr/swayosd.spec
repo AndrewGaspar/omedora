@@ -142,6 +142,24 @@ cargo2rpm write-vendor-manifest
 %install
 %meson_install
 
+# swayosd's data/meson.build derives the systemd unit + udev rule install dirs
+# from `libdir` (Fedora: /usr/lib64), only using systemdsystemunitdir when
+# `dependency('systemd')` resolves. Fedora 44's systemd no longer ships
+# systemd.pc, so meson can't resolve it and falls back to libdir/systemd/system.
+# Both the unit and the udev rule thus land under /usr/lib64 — where systemd and
+# udev never look, and where %files does not expect the unit. Relocate them to
+# the canonical arch-independent /usr/lib dirs.
+if [ -d %{buildroot}%{_libdir}/systemd/system ]; then
+  mkdir -p %{buildroot}%{_unitdir}
+  mv %{buildroot}%{_libdir}/systemd/system/* %{buildroot}%{_unitdir}/
+  rmdir %{buildroot}%{_libdir}/systemd/system %{buildroot}%{_libdir}/systemd 2>/dev/null || true
+fi
+if [ -d %{buildroot}%{_libdir}/udev/rules.d ]; then
+  mkdir -p %{buildroot}%{_udevrulesdir}
+  mv %{buildroot}%{_libdir}/udev/rules.d/* %{buildroot}%{_udevrulesdir}/
+  rmdir %{buildroot}%{_libdir}/udev/rules.d %{buildroot}%{_libdir}/udev 2>/dev/null || true
+fi
+
 %files
 %license LICENSE
 # Aggregated dependency license info from the vendored crate tree.
@@ -154,7 +172,7 @@ cargo2rpm write-vendor-manifest
 # Optional system-level libinput backend + its integration glue.
 %{_bindir}/swayosd-libinput-backend
 %{_unitdir}/swayosd-libinput-backend.service
-%{_libdir}/udev/rules.d/99-swayosd.rules
+%{_udevrulesdir}/99-swayosd.rules
 %{_datadir}/dbus-1/system.d/org.erikreider.swayosd.conf
 %{_datadir}/dbus-1/system-services/org.erikreider.swayosd.service
 %{_datadir}/polkit-1/actions/org.erikreider.swayosd.policy
