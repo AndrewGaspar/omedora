@@ -273,23 +273,25 @@ What this means in practice:
   identity; omedora never copies its own over it. (omedora's
   `git config --global` writes go to `~/.gitconfig` and are additive.)
 
-- **Foreign Hyprland packages are detected and surfaced in that up-front summary.**
-  Omedora pins and installs its own Hyprland desktop stack (hyprland, hyprlock,
-  hypridle, waybar, walker, swayosd, the portal, …). If you already have some of
-  these installed from a *foreign* repo — e.g. a third-party COPR like
-  `solopasha/hyprland` — the up-front plan names the package and the repo, and a
-  detected conflict makes the installer ask for confirmation even if no config
-  files need backing up. This is **detection and warning only** for now — omedora
-  does not yet automatically swap the foreign packages. You can run the same scan
-  any time with:
+- **Foreign Hyprland packages are detected — and you can have omedora replace
+  them.** Omedora pins and installs its own Hyprland desktop stack (hyprland,
+  hyprlock, hypridle, waybar, walker, swayosd, the portal, …). If you already
+  have some of these installed from a *foreign* repo — e.g. a third-party COPR
+  like `solopasha/hyprland` — the up-front plan names the package and the repo,
+  and offers a three-way choice: **Replace** them with omedora's pinned builds,
+  **Keep** them and install anyway, or **Abort**. Choosing Replace shows the
+  exact package transaction and, once omedora's repos are enabled, runs it for
+  you (`dnf swap` for renamed packages like `hyprland`→`hyprland-omedora`,
+  `dnf distro-sync` with the foreign repo disabled for same-name packages). A
+  non-interactive install keeps the foreign packages and just warns.
+
+  You can run the same scan — and fix — any time:
 
   ```bash
-  omedora doctor
+  omedora doctor        # detect: non-zero exit if a foreign-repo conflict exists
+  omedora doctor --fix  # replace foreign packages with omedora's (shows the
+                        # transaction, asks once, then applies)
   ```
-
-  Exit status is non-zero when a foreign-repo conflict is found. If you hit one,
-  the cleanest fix today is to remove the foreign-repo Hyprland packages and let
-  omedora install its own pinned versions.
 
 ### 9. After install: staying up to date
 
