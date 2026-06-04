@@ -3,8 +3,8 @@
 # omarchy:summary=Scan for installed packages omedora wants to own that come from a foreign repo (e.g. another COPR).
 # omarchy:examples=omedora doctor
 
-# omarchy-doctor (exposed as `omedora doctor`) — coexistence MVP: conflict
-# DETECTION + WARNING only.
+# omarchy-doctor (exposed as `omedora doctor`) — coexistence: foreign-repo
+# conflict DETECTION, and (via --fix) guided REPLACEMENT.
 #
 # omedora installs and pins a Hyprland desktop stack (hyprland, hyprlock,
 # hypridle, waybar, walker, elephant, swayosd, xdg-desktop-portal-hyprland, …).
@@ -15,12 +15,19 @@
 #
 # This tool resolves the set of packages omedora wants to own (from
 # install/omarchy-base.packages via install/packages/fedora.toml), inspects each
-# installed package's source repo, and warns about any that come from a repo
-# omedora does NOT control. It does NOT swap or distro-sync anything — the
-# omedora COPR is not install-enabled yet, so automated swap isn't possible.
-# Detection + warning only.
+# installed package's source repo, and reports any that come from a repo omedora
+# does NOT control.
 #
-# Exit status:
+# Modes:
+#   (default)  human-readable warnings to stderr; exit 1 if any conflict.
+#   --list     machine-readable conflicts to stdout, one `name<TAB>repo` per
+#              line; exit 1 if any. Consumed by omedora-replace-foreign and the
+#              install gate.
+#   --fix      delegate to `omedora-replace-foreign` (the replacement engine),
+#              passing through any further flags (e.g. --dry-run, --yes). It
+#              shows the exact dnf transaction and applies it after one yes.
+#
+# Exit status (default/--list):
 #   0  no foreign-repo conflicts found
 #   1  one or more owned packages are installed from a foreign repo
 #
@@ -30,6 +37,19 @@
 # ). The default queries the live system via dnf.
 
 set -uo pipefail
+
+# --fix delegates to the replacement engine (single source of the swap/sync UX).
+if [[ ${1:-} == "--fix" ]]; then
+  shift
+  exec omedora-replace-foreign "$@"
+fi
+
+# --list emits machine-readable conflict records instead of human warnings.
+DOCTOR_MODE="warn"
+if [[ ${1:-} == "--list" ]]; then
+  DOCTOR_MODE="list"
+  shift
+fi
 
 # Fedora-only — foreign-repo Hyprland coexistence is a Fedora concept (Arch has
 # no dnf/COPR provenance to inspect). On Arch this is a clean no-op so `omarchy
@@ -118,19 +138,27 @@ run_scan() {
       continue
     fi
     conflicts=$((conflicts + 1))
+    if [[ $DOCTOR_MODE == "list" ]]; then
+      # Machine-readable: name<TAB>repo (for the replacement engine / gate).
+      printf '%s\t%s\n' "$name" "$repo"
+      continue
+    fi
     printf '\033[33mWARNING:\033[0m %s %s is installed from %s.\n' \
       "$name" "$evr" "$repo" >&2
     printf '  omedora installs and pins its own %s and expects to own the Hyprland desktop stack.\n' "$name" >&2
     printf '  Installing over a foreign-repo build may leave a mismatched compositor/session.\n' >&2
-    printf '  See README "Installing onto a machine you already use".\n' >&2
+    printf '  Fix it with: omedora doctor --fix\n' >&2
   done < <(repoquery_installed)
 
   if [[ $conflicts -gt 0 ]]; then
-    printf '\033[33momedora doctor: %d package(s) come from a foreign repo (see warnings above).\033[0m\n' \
+    [[ $DOCTOR_MODE == "list" ]] && return 1
+    printf '\033[33momedora doctor: %d package(s) come from a foreign repo (see warnings above). Run `omedora doctor --fix` to replace them with omedora'\''s pinned builds.\033[0m\n' \
       "$conflicts" >&2
     return 1
   fi
 
+  # In --list mode stdout is machine-only: stay silent when clean.
+  [[ $DOCTOR_MODE == "list" ]] && return 0
   echo -e "\033[32momedora doctor: no foreign-repo conflicts found.\033[0m"
   return 0
 }

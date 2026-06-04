@@ -76,6 +76,33 @@ def resolve_owned(base: list[str], pkg_map: dict[str, dict]) -> list[str]:
     return owned
 
 
+def resolve_map(base: list[str], pkg_map: dict[str, dict]) -> list[tuple[str, list[str]]]:
+    """Base/upstream name -> omedora's install target name(s).
+
+    Emitted as `<base>\t<comma-joined targets>` per dnf/copr entry. The
+    replacement engine uses this to decide the mechanism for a detected
+    foreign-repo package: if the targets are just [base] (same name), it
+    distro-syncs that name from the omedora repo; if the targets differ
+    (e.g. hyprland -> hyprland-omedora), it `dnf swap`s base for the targets.
+    """
+    out: list[tuple[str, list[str]]] = []
+    seen: set[str] = set()
+    for pkg in base:
+        raw = pkg_map.get(pkg)
+        if raw is None:
+            source, names = "dnf", [pkg]
+        else:
+            source = str(raw.get("source", "dnf"))
+            names = [str(n) for n in raw.get("names", [pkg])]
+        if source not in ("dnf", "copr"):
+            continue
+        if pkg in seen:
+            continue
+        seen.add(pkg)
+        out.append((pkg, names))
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     map_path = Path(os.environ.get("OMARCHY_FEDORA_MAP", DEFAULT_MAP))
     base_path = Path(os.environ.get("OMARCHY_BASE_PKGS", DEFAULT_BASE))
@@ -89,6 +116,13 @@ def main(argv: list[str] | None = None) -> int:
 
     base = read_base_packages(base_path)
     pkg_map = load_map(map_path)
+
+    argv = sys.argv[1:] if argv is None else argv
+    if "--map" in argv:
+        for pkg, names in resolve_map(base, pkg_map):
+            print(f"{pkg}\t{','.join(names)}")
+        return 0
+
     for name in resolve_owned(base, pkg_map):
         print(name)
     return 0
