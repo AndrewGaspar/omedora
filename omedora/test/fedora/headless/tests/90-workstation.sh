@@ -8,7 +8,7 @@
 #   * Login-layer coexistence (the GNOME fallback): Omedora's Fedora session
 #     install is additive (it keeps the existing DM and only adds its own
 #     wayland-session entry — now shipped by the hyprland-omedora package, was a
-#     sudo-cp), so GDM offers BOTH "GNOME" and "Omedora (Hyprland uwsm)" and the
+#     sudo-cp), so GDM offers BOTH "GNOME" and "Omedora" and the
 #     user can log out of Hyprland into GNOME.
 #   * Power coexistence: Omedora skips power-profiles-daemon and ships a
 #     powerprofilesctl shim driving the Workstation ppd-service provider

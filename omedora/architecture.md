@@ -350,7 +350,7 @@ Contents:
 
 ```ini
 [Desktop Entry]
-Name=Omedora (Hyprland uwsm)
+Name=Omedora
 Comment=Omedora Hyprland session managed by uwsm
 Exec=uwsm start -g -1 -e -N Hyprland -D Hyprland -- start-hyprland
 TryExec=uwsm
