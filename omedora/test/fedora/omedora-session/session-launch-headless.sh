@@ -188,7 +188,7 @@ fi
 # systemd-managed and persist independently of this monitor process.
 log "starting nested Hyprland via uwsm start (-> $HOST_WL)"
 # Drive Hyprland directly via uwsm (no resolver .desktop) — matches
-# default/wayland-sessions/omedora.desktop. We run `start-hyprland` (the upstream
+# omedora/packaging/copr/omedora.desktop. We run `start-hyprland` (the upstream
 # watchdog launcher; running bare `Hyprland` triggers its "started without
 # start-hyprland" warning). The uwsm unit instance is derived from the command
 # basename "start-hyprland" -> wayland-wm@start\x2dhyprland.service (was

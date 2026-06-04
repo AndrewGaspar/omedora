@@ -14,7 +14,7 @@ For the technical mechanism that makes the rebrand work, see [`architecture.md` 
 
 | Surface | Source | Notes |
 | --- | --- | --- |
-| **Display manager session entry** | `default/wayland-sessions/omedora.desktop` → installed to `/usr/share/wayland-sessions/` | The `Name=Omedora` field is the entire user touchpoint here. |
+| **Display manager session entry** | `omedora/packaging/copr/omedora.desktop` → installed to `/usr/share/wayland-sessions/` | The `Name=Omedora` field is the entire user touchpoint here. |
 | **Dispatcher help text** | `bin/omarchy` `show_main_help`, `show_commands_help`, `show_command_help`, error/suggestion paths — substituted via `${BRAND_NAME}` when brand=omedora | Including the literal "Omedora command center" header. |
 | **Command examples in `--help` output** | `bin/omarchy` `examples_as_lines` rendering — `omarchy` literal substituted to `omedora` | Each subcommand metadata stays unchanged on disk. |
 | **Suggestion lines** ("Did you mean: omedora …?") | `bin/omarchy` `suggest_command` rendering | Same substitution. |

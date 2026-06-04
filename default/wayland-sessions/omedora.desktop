@@ -1,6 +1,0 @@
-[Desktop Entry]
-Name=Omedora
-Comment=Omedora Hyprland session managed by uwsm
-Exec=uwsm start -g -1 -e -N Hyprland -D Hyprland -- start-hyprland
-TryExec=uwsm
-Type=Application

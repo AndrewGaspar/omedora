@@ -31,7 +31,7 @@ echo "Starting Omedora via uwsm (nested into host compositor; session=${XDG_SESS
 echo "  Close the host window to end the session."
 
 # Drive Hyprland directly via uwsm (no resolver .desktop) — matches
-# default/wayland-sessions/omedora.desktop. We run `start-hyprland` (the upstream
+# omedora/packaging/copr/omedora.desktop. We run `start-hyprland` (the upstream
 # watchdog launcher that supervises Hyprland and passes --watchdog-fd; running
 # the bare `Hyprland` binary triggers its "started without start-hyprland"
 # warning). -N/-D supply the session metadata a .desktop would otherwise provide;

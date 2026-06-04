@@ -21,9 +21,10 @@
 # puts ~/.local/share/omarchy/bin on PATH. Without it omarchy-* commands
 # (autostart, keybinds) and walker launches fail with "command not found".
 #
-# Source0 is a LOCAL file (omedora.desktop, staged alongside this spec — a copy
-# of the repo's default/wayland-sessions/omedora.desktop, the source of truth),
-# handled exactly like hyprland.spec's local macros.hyprland Source:
+# Source0 is a LOCAL file (omedora.desktop, staged alongside this spec — this is
+# the SOURCE OF TRUTH for omedora's session entry; omedora packages it rather
+# than sudo-cp'ing it, so it lives next to the spec that ships it), handled
+# exactly like hyprland.spec's local macros.hyprland Source:
 # build-local.sh / .copr/srpm.sh copy bare-filename Sources in by hand (spectool
 # only fetches URLs), and a COPR uploads them alongside the spec.
 
@@ -35,9 +36,9 @@ Summary:        Omedora Hyprland wayland-session entry (uwsm-launched)
 # The shipped omedora.desktop is omedora's own trivial session entry.
 License:        MIT
 URL:            https://github.com/omedora/omedora
-# Local Source: omedora's wayland-session entry (copy of the repo's
-# default/wayland-sessions/omedora.desktop). Bare filename — not a URL — so
-# build-local.sh/.copr stage it from the sibling file (like macros.hyprland).
+# Local Source: omedora's wayland-session entry (the source-of-truth file lives
+# here alongside the spec). Bare filename — not a URL — so build-local.sh/.copr
+# stage it from the sibling file (like macros.hyprland).
 Source0:        omedora.desktop
 
 BuildArch:      noarch
