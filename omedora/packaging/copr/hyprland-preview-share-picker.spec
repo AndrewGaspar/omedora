@@ -17,9 +17,12 @@
 # place in %prep. The submodule is pinned at hyprwm/hyprland-protocols commit
 # 3a5c2bd (the commit lib/hyprland-protocols points at for the v0.2.1 tag).
 #
-# Crates are fetched from the network at build time (the fedora:44 build
-# container has network; a COPR build host does too), matching swayosd.spec.
-# A fully hermetic/offline build would `cargo vendor` — tracked as a follow-up.
+# Hermetic/offline crate build (like satty/swayosd): we build fully offline
+# against a `cargo vendor` tarball (Source2) of upstream's pinned Cargo.lock,
+# generated at SRPM-gen time by build-local.sh / .copr/srpm.sh. `%%cargo_prep -v
+# vendor` writes .cargo/config.toml with offline mode on, so cargo never touches
+# crates.io — a successful build proves every crate (image, gtk4-rs, …) was
+# vendored. (COPR's mock build phase has no network, which is why this matters.)
 #
 # Runtime dep note: `Requires: xdg-desktop-portal-hyprland` now resolves from
 # the omedora repo (vendored as omedora/packaging/copr/xdg-desktop-portal-
@@ -43,6 +46,9 @@ Source0:        %{url}/archive/refs/tags/v%{version}/%{name}-%{version}.tar.gz
 # pinned commit. GitHub's archive for a commit unpacks to
 # hyprland-protocols-<commit>/.
 Source1:        https://github.com/hyprwm/hyprland-protocols/archive/%{protocols_commit}/hyprland-protocols-%{protocols_commit}.tar.gz
+# Source2: `cargo vendor` tarball of upstream's pinned Cargo.lock. NOT committed;
+# regenerated deterministically at SRPM-gen time. Unpacked to ./vendor/ in %%prep.
+Source2:        %{name}-%{version}-vendor.tar.zst
 
 # Compiled for x86_64 (the only arch omedora targets right now).
 ExclusiveArch:  x86_64
@@ -51,6 +57,9 @@ ExclusiveArch:  x86_64
 # Rust + cargo build the binary; the gtk4 / wayland crates link C libs.
 BuildRequires:  cargo
 BuildRequires:  rust
+# cargo-rpm-macros provides %%cargo_prep / %%cargo_build + the offline
+# .cargo/config.toml seal and the license macros. >= 24 has the -v vendor flag.
+BuildRequires:  cargo-rpm-macros >= 24
 BuildRequires:  gcc
 BuildRequires:  pkgconfig
 # C libraries the gtk4-rs / gtk4-layer-shell / wayland crates link against.
@@ -81,12 +90,20 @@ binary for the portal's screencopy backend.
 tar -xf %{SOURCE1}
 rmdir lib/hyprland-protocols 2>/dev/null || true
 mv hyprland-protocols-%{protocols_commit} lib/hyprland-protocols
+# Unpack the (build-time-generated) cargo-vendor tarball (creates ./vendor/),
+# then have %%cargo_prep wire .cargo/config.toml to it with offline mode on.
+%setup -q -T -D -a 2 -n %{name}-%{version}
+%cargo_prep -v vendor
 
 %build
 # build.rs shells out to `git describe` for a version banner; with no git repo
-# it just warns and uses "unknown" — harmless. Builds offline-of-git, online
-# for crates.
-cargo build --release --locked
+# it just warns and uses "unknown" — harmless.
+# Offline build against the vendored crates (no crates.io).
+%cargo_build
+# Record the bundled crates' licenses + manifest for the %%license payload.
+%{cargo_license_summary}
+%{cargo_license} > LICENSE.dependencies
+%{cargo_vendor_manifest}
 
 %install
 install -Dm0755 -t %{buildroot}%{_bindir} target/release/%{name}
@@ -97,6 +114,9 @@ install -Dm0644 -t %{buildroot}%{_datadir}/%{name} schema.json
 
 %files
 %license LICENSE
+# Aggregated dependency license info from the vendored crate tree.
+%license LICENSE.dependencies
+%license cargo-vendor.txt
 %doc README.md
 %{_bindir}/%{name}
 %dir %{_datadir}/%{name}
@@ -107,4 +127,5 @@ install -Dm0644 -t %{buildroot}%{_datadir}/%{name} schema.json
 - Initial from-source build of hyprland-preview-share-picker (cargo build).
 - hyprland-protocols submodule fetched as Source1 (pinned commit 3a5c2bd) and
   staged into lib/hyprland-protocols for the build-time wayland-scanner step.
-- Crates fetched from network at build time; vendoring is a COPR follow-up.
+- Hermetic vendored/offline crate build (cargo-vendor tarball generated at
+  SRPM-gen time), matching satty/swayosd; no crates.io access at build time.
