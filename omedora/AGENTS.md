@@ -136,6 +136,12 @@ Before any PR is merged into omedora's `dev`:
 
 If you can't run the Fedora VM yourself (because of tool limitations), say so explicitly in the PR — don't claim verification you didn't do.
 
+### Commit & worktree hygiene
+
+Land work as **logical, self-contained commits, pushed as you go** — one coherent change per commit (a packaging fix, a gating change, a doc update), with the rationale in the body. Don't let a worktree accumulate a large dirty pile a reviewer has to untangle. When committing in a worktree that also holds unrelated in-progress changes, use a **targeted `git add <path>`** so you commit only your change, never a blanket `git add -A`.
+
+**Parallel / delegated work gets its own worktree + branch, not a shared dirty tree.** Isolate a long-running task with `git worktree add -b <branch> ../omedora-<topic> <base>` so it can't collide with concurrent work. A background agent is told to leave its changes **uncommitted** in its worktree so the parent can review the diff before committing it as a clean logical commit — so an uncommitted/dirty worktree is frequently *expected in-progress work*, not a failure. Check whose work it is (`git status` / `git log`) before assuming a worktree is dirty by mistake.
+
 ---
 
 ## 8. Memory
