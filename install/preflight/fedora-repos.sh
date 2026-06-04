@@ -27,10 +27,22 @@ if ! rpm -q rpmfusion-nonfree-release >/dev/null 2>&1; then
     "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-${FEDORA_VERSION}.noarch.rpm"
 fi
 
-# --- Hyprland ---------------------------------------------------------------
-# Hyprland and the rest of the hyprwm stack are vendored as omedora RPMs and
-# resolved from the omedora repo (see install/packages/fedora.toml). No COPR is
-# enabled here anymore — the lionheartp/Hyprland COPR was retired in task #66.
+# --- The omedora COPR -------------------------------------------------------
+# omedora's vendored RPMs — the Hyprland stack (hyprland-no-session + libs),
+# hyprland-omedora (the session entry), walker/elephant/swayosd, the nerd-fonts,
+# the TUIs, uwsm — are served from the agaspar/omedora-3.8.2 COPR. Enable it so
+# the `source = "dnf"` entries in install/packages/fedora.toml resolve from it.
+# (The old third-party lionheartp/Hyprland COPR was retired in task #66; this is
+# omedora's own repo.)
+#
+# The L4 test harness instead injects a LOCAL repo at
+# /etc/yum.repos.d/omedora-local.repo (build-session.sh) for fast, hermetic,
+# network-free CI. When that's present, use it and skip the COPR enable.
+if [[ ! -f /etc/yum.repos.d/omedora-local.repo ]]; then
+  # dnf-plugins-core provides the `copr` subcommand. `copr enable` is idempotent.
+  sudo dnf install -y dnf-plugins-core >/dev/null 2>&1 || true
+  sudo dnf -y copr enable agaspar/omedora-3.8.2
+fi
 
 # --- Flathub remote --------------------------------------------------------
 
