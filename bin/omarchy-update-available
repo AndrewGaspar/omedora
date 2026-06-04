@@ -2,6 +2,16 @@
 
 # omarchy:summary=Get remote tag
 
+# Brand-aware wording: on omedora (Fedora, or OMARCHY_BRAND=omedora) the release
+# tags are omedora's own (vX.Y.Z). The tag-compare logic is identical for both —
+# omedora cuts annotated tags with omedora-release, so this Just Works once an
+# install tracks a tag.
+brand="Omarchy"
+if [[ ${OMARCHY_BRAND:-} == "omedora" ]] || \
+   [[ "$(omarchy-distro 2>/dev/null || echo arch)" == "fedora" ]]; then
+  brand="Omedora"
+fi
+
 latest_tag=$(git -C "$OMARCHY_PATH" ls-remote --tags origin | grep -v "{}" | awk '{print $2}' | sed 's#refs/tags/##' | sort -V | tail -n 1)
 if [[ -z $latest_tag ]]; then
   echo "Error: Could not retrieve latest tag."
@@ -16,9 +26,9 @@ if [[ -z $current_tag ]]; then
 fi
 
 if [[ $current_tag != $latest_tag ]]; then
-  echo "Omarchy update available ($latest_tag)"
+  echo "$brand update available ($latest_tag)"
   exit 0
 else
-  echo "Omarchy is up to date ($current_tag)"
+  echo "$brand is up to date ($current_tag)"
   exit 1
 fi

@@ -17,7 +17,12 @@ fi
 trap 'echo ""; echo -e "\033[0;31mSomething went wrong during the update!\n\nPlease review the output above carefully, correct the error, and retry the update.\n\nIf you need assistance, get help from the community at https://omarchy.org/discord\033[0m"' ERR
 
 if [[ $1 == "-y" ]] || omarchy-update-confirm; then
-  omarchy-snapshot create || (($? == 127))
+  # omarchy-snapshot is Arch/btrfs+snapper — omedora doesn't own the Fedora boot
+  # stack, so skip it there. omarchy-update-perform itself dispatches to the
+  # Fedora pipeline (dnf instead of pacman/AUR).
+  if [[ "$(omarchy-distro 2>/dev/null || echo arch)" != "fedora" ]]; then
+    omarchy-snapshot create || (($? == 127))
+  fi
   omarchy-update-git
   omarchy-update-perform
 fi
