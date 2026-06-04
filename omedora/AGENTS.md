@@ -142,6 +142,8 @@ Land work as **logical, self-contained commits, pushed as you go** — one coher
 
 **Parallel / delegated work gets its own worktree + branch, not a shared dirty tree.** Isolate a long-running task with `git worktree add -b <branch> ../omedora-<topic> <base>` so it can't collide with concurrent work. A background agent is told to leave its changes **uncommitted** in its worktree so the parent can review the diff before committing it as a clean logical commit — so an uncommitted/dirty worktree is frequently *expected in-progress work*, not a failure. Check whose work it is (`git status` / `git log`) before assuming a worktree is dirty by mistake.
 
+**Clean up podman before you exit.** The L4 harness spins up build containers (and large session/`-pkgs` images) under podman. Before finishing a task, **remove any containers you created** (`podman rm -f <name>`) — a left-running build container holds a multi-GB image layer and its storage, and they pile up fast (a single abandoned launch-gate run left ~10 GB + a wedged commit). Remove throwaway containers, prune dangling images you produced (`podman image prune -f`), and never leave an orphaned build container `Up` after your turn. Do NOT remove containers/images another concurrent task is using, and keep the `*-dnf-cache` volumes (they speed rebuilds). If a `podman commit`/build fails with `disk quota exceeded` under `/tmp`, set `TMPDIR=/var/tmp` (the storage there isn't quota-capped) — see the `l4-podman-systemd` memory.
+
 ---
 
 ## 8. Memory
