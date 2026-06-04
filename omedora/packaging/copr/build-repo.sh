@@ -46,6 +46,10 @@ SPECS=(
   # uwsm (the session manager omedora launches through) was ALSO provided by
   # the dropped lionheartp/Hyprland COPR, not Fedora — so it's vendored too.
   uwsm.spec
+  # omedora's own wayland-session entry (noarch). Runtime-Requires
+  # hyprland-no-session + uwsm (both built above); no build-time deps. Ships
+  # /usr/share/wayland-sessions/omedora.desktop (was a Fedora-gated sudo-cp).
+  hyprland-omedora.spec
   # claude-code.spec is intentionally NOT built here — parked pending a
   # redistribution-licensing decision before any public COPR (proprietary binary).
 )

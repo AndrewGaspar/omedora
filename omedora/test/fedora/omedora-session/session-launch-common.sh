@@ -3,7 +3,7 @@
 # Shared uwsm-launch setup for the L4 session launchers (session-launch.sh =
 # host-nested, session-launch-headless.sh = self-contained headless). Source
 # this, then call `omedora_uwsm_prepare <host-wayland-socket>` and run
-# `uwsm start -- hyprland.desktop`.
+# `uwsm start -g -1 -e -N Hyprland -D Hyprland -- start-hyprland`.
 #
 # Both launchers nest Omedora's Hyprland into some host Wayland compositor (the
 # developer's desktop, or a container-local labwc) and want a *properly
@@ -17,7 +17,7 @@
 # omedora_uwsm_prepare <host-wayland-socket>
 #   Configure the environment + a compositor drop-in so `uwsm start` works in a
 #   container nesting into <host-wayland-socket>, then leave the caller to run
-#   `uwsm start -- hyprland.desktop`.
+#   `uwsm start -g -1 -e -N Hyprland -D Hyprland -- start-hyprland`.
 omedora_uwsm_prepare() {
   local host_wl="$1"
 

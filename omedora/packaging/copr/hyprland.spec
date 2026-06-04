@@ -22,7 +22,7 @@
 
 Name:           hyprland
 Version:        0.55.2
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Dynamic tiling Wayland compositor that doesn't sacrifice on its looks
 
 # hyprland: BSD-3-Clause
@@ -109,33 +109,74 @@ Provides:       bundled(udis86)
 # Lua 5.5 is statically linked from a bundled upstream release (Fedora has 5.4).
 Provides:       bundled(lua) = %{lua_version}
 
-Requires:       xorg-x11-server-Xwayland%{?_isa}
-Requires:       aquamarine%{?_isa} >= 0.9.3
-Requires:       hyprcursor%{?_isa} >= 0.1.7
-Requires:       hyprgraphics%{?_isa} >= 0.5.1
-Requires:       hyprlang%{?_isa} >= 0.6.7
-Requires:       hyprutils%{?_isa} >= 0.13.1
+# NOTE on the subpackage split (omedora task: split session entry out of the
+# binaries). Hyprland is built ONCE here, but the artifacts are divided so the
+# compositor binaries and the *visible* wayland-sessions/*.desktop entries live
+# in separate packages:
+#
+#   hyprland-no-session  (base) — ALL binaries, the portal config, man pages,
+#                                 shell completions, %{_datadir}/hypr/. Owns
+#                                 NEITHER wayland-sessions .desktop. This is what
+#                                 an omedora install pulls (via hyprland-omedora,
+#                                 which ships omedora's own uwsm session entry).
+#                                 Provides: hyprland-bin (future retargeting).
+#   hyprland             (full) — the natural/discoverable package: owns ONLY
+#                                 wayland-sessions/hyprland.desktop (the plain,
+#                                 visible "Hyprland" session). Requires the base.
+#                                 `dnf install hyprland` yields the classic
+#                                 binaries+session experience.
+#   hyprland-uwsm               — owns wayland-sessions/hyprland-uwsm.desktop;
+#                                 Requires the base.
+#   hyprland-devel             — headers/protocols/macros; Requires the base.
+#
+# The base does NOT Recommends hyprland-uwsm: an omedora install must not pull
+# the visible uwsm session entry (omedora ships its own via hyprland-omedora).
 
-# Used in the default configuration / for a working graphical session.
-Recommends:     mesa-dri-drivers
-Recommends:     polkit
-Recommends:     %{name}-uwsm
+# The natural / discoverable top-level package pulls the binaries (base) and
+# owns the plain, visible wayland-sessions/hyprland.desktop entry.
+Requires:       hyprland-no-session%{?_isa} = %{version}-%{release}
 
 %description
 Hyprland is a dynamic tiling Wayland compositor that doesn't sacrifice on its
 looks. It supports multiple layouts, fancy effects, a very flexible IPC model
 allowing for a lot of customization, a powerful plugin system and more.
 
+This package is the full / discoverable Hyprland: it pulls in the compositor
+(hyprland-no-session) and ships the plain visible "Hyprland" session entry.
+
+%package        no-session
+Summary:        Hyprland compositor binaries (no wayland-session entry)
+# Future retargeting hook: anything that just needs the compositor binary can
+# Requires: hyprland-bin instead of a specific package name.
+Provides:       hyprland-bin = %{version}-%{release}
+Requires:       xorg-x11-server-Xwayland%{?_isa}
+Requires:       aquamarine%{?_isa} >= 0.9.3
+Requires:       hyprcursor%{?_isa} >= 0.1.7
+Requires:       hyprgraphics%{?_isa} >= 0.5.1
+Requires:       hyprlang%{?_isa} >= 0.6.7
+Requires:       hyprutils%{?_isa} >= 0.13.1
+# Used in the default configuration / for a working graphical session.
+# NOTE: deliberately NO `Recommends: hyprland-uwsm` here — the base must not
+# pull the visible uwsm session entry (omedora ships hyprland-omedora instead).
+Recommends:     mesa-dri-drivers
+Recommends:     polkit
+%description    no-session
+The Hyprland dynamic tiling Wayland compositor binaries (Hyprland, hyprctl,
+hyprpm, start-hyprland), the xdg-desktop-portal config, man pages and shell
+completions — everything EXCEPT a wayland-sessions/*.desktop session entry.
+Install the `hyprland` package for the plain visible session entry, or
+`hyprland-uwsm` for the uwsm-managed one.
+
 %package        uwsm
 Summary:        Files for a uwsm-managed Hyprland session
-Requires:       %{name}%{?_isa} = %{version}-%{release}
+Requires:       hyprland-no-session%{?_isa} = %{version}-%{release}
 Requires:       uwsm
 %description    uwsm
 Files for a uwsm-managed Hyprland session.
 
 %package        devel
 Summary:        Header and protocol files for %{name}
-Requires:       %{name}%{?_isa} = %{version}-%{release}
+Requires:       hyprland-no-session%{?_isa} = %{version}-%{release}
 Requires:       git-core
 Requires:       cpio
 Requires:       pkgconfig(xkbcommon)
@@ -189,7 +230,12 @@ export GIT_DIRTY=""
 %cmake_install
 install -Dpm644 %{SOURCE1} -t %{buildroot}%{macrosdir}
 
+# The full / discoverable package: ONLY the plain visible session entry. The
+# compositor itself comes via Requires: hyprland-no-session.
 %files
+%{_datadir}/wayland-sessions/hyprland.desktop
+
+%files no-session
 %license LICENSE
 %{_bindir}/[Hh]yprland
 # Hyprland 0.55.x ships a start-hyprland launcher wrapper alongside the binary
@@ -198,7 +244,6 @@ install -Dpm644 %{SOURCE1} -t %{buildroot}%{macrosdir}
 %{_bindir}/hyprctl
 %{_bindir}/hyprpm
 %{_datadir}/hypr/
-%{_datadir}/wayland-sessions/hyprland.desktop
 %{_datadir}/xdg-desktop-portal/hyprland-portals.conf
 %{_mandir}/man1/hyprctl.1*
 %{_mandir}/man1/Hyprland.1*
@@ -215,6 +260,15 @@ install -Dpm644 %{SOURCE1} -t %{buildroot}%{macrosdir}
 %{macrosdir}/macros.hyprland
 
 %changelog
+* Tue Jun 03 2026 omedora <noreply@omedora> - 0.55.2-2
+- Split the wayland-session entries out of the compositor binaries. Hyprland is
+  still built once, but: hyprland-no-session (new base) owns all binaries +
+  portal config + man/completions and NO .desktop; hyprland (full) owns only
+  wayland-sessions/hyprland.desktop and Requires the base; hyprland-uwsm and
+  hyprland-devel retargeted to Require hyprland-no-session.
+- Base Provides: hyprland-bin. Base no longer Recommends hyprland-uwsm (so an
+  omedora install does not pull the visible uwsm session entry).
+
 * Sat May 30 2026 omedora <noreply@omedora> - 0.55.2-1
 - Initial omedora build of Hyprland 0.55.2 from the release source tarball.
 - Adapted from solopasha/hyprlandRPM; replaces the dropped lionheartp/Hyprland COPR.

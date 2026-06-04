@@ -6,9 +6,10 @@
 # install onto, and the one the minimal fedora:44 test base can't represent:
 #
 #   * Login-layer coexistence (the GNOME fallback): Omedora's Fedora session
-#     install is additive (install/config/wayland-session-fedora.sh keeps the DM
-#     and only drops its own wayland-session entry), so GDM offers BOTH "GNOME" and
-#     "Omedora (Hyprland uwsm)" and the user can log out of Hyprland into GNOME.
+#     install is additive (it keeps the existing DM and only adds its own
+#     wayland-session entry — now shipped by the hyprland-omedora package, was a
+#     sudo-cp), so GDM offers BOTH "GNOME" and "Omedora (Hyprland uwsm)" and the
+#     user can log out of Hyprland into GNOME.
 #   * Power coexistence: Omedora skips power-profiles-daemon and ships a
 #     powerprofilesctl shim driving the Workstation ppd-service provider
 #     (tuned-ppd). See install/packages/fedora.toml [power-profiles-daemon].
@@ -52,7 +53,8 @@ fi
 
 # --- 2. login-layer coexistence: GNOME stays a selectable session ------------
 # Both wayland-session entries must be registered so a real GDM greeter lists
-# both. Omedora's entry is the ONE /usr write the Fedora install makes.
+# both. Omedora's entry is now shipped by the hyprland-omedora package (pulled in
+# when `hyprland` remaps to hyprland-omedora on Fedora), not a sudo-cp.
 if [[ -f /usr/share/wayland-sessions/omedora.desktop ]]; then
   pass "Omedora session entry registered (/usr/share/wayland-sessions/omedora.desktop)"
 else

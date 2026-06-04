@@ -187,16 +187,29 @@ fi
 # then either block or return. The wayland-wm@ units it starts are
 # systemd-managed and persist independently of this monitor process.
 log "starting nested Hyprland via uwsm start (-> $HOST_WL)"
-setsid uwsm start -- hyprland.desktop >"$XDG_RUNTIME_DIR/uwsm-start.log" 2>&1 &
+# Drive Hyprland directly via uwsm (no resolver .desktop) — matches
+# default/wayland-sessions/omedora.desktop. We run `start-hyprland` (the upstream
+# watchdog launcher; running bare `Hyprland` triggers its "started without
+# start-hyprland" warning). The uwsm unit instance is derived from the command
+# basename "start-hyprland" -> wayland-wm@start\x2dhyprland.service (was
+# hyprland.desktop). $WM_UNIT below tracks that name.
+setsid uwsm start -g -1 -e -N Hyprland -D Hyprland -- start-hyprland >"$XDG_RUNTIME_DIR/uwsm-start.log" 2>&1 &
+
+# The compositor systemd unit uwsm generates. uwsm escapes the command basename
+# ("start-hyprland") the systemd way ("-" -> "\x2d"), so the instance is
+# start\x2dhyprland. systemd-escape resolves it robustly regardless of uwsm's
+# escaping rules; fall back to the known literal if systemd-escape is absent.
+WM_UNIT=$(systemd-escape --template=wayland-wm@.service "start-hyprland" 2>/dev/null) \
+  || WM_UNIT='wayland-wm@start\x2dhyprland.service'
 
 # Wait for Hyprland's IPC socket.
 SIG=""
 for _ in $(seq 1 60); do
   SIG=$(ls -t "$XDG_RUNTIME_DIR/hypr" 2>/dev/null | head -1)
   [[ -n $SIG && -S "$XDG_RUNTIME_DIR/hypr/$SIG/.socket.sock" ]] && break
-  [[ "$(systemctl --user is-active wayland-wm@hyprland.desktop.service 2>/dev/null)" == "failed" ]] && {
-    echo "Hyprland (wayland-wm@hyprland.desktop) failed to start:" >&2
-    journalctl --user -u wayland-wm@hyprland.desktop.service --no-pager | tail -20 >&2
+  [[ "$(systemctl --user is-active "$WM_UNIT" 2>/dev/null)" == "failed" ]] && {
+    echo "Hyprland ($WM_UNIT) failed to start:" >&2
+    journalctl --user -u "$WM_UNIT" --no-pager | tail -20 >&2
     exit 1
   }
   sleep 0.5
@@ -239,7 +252,7 @@ cat <<EOF
     foot                          # open a terminal into the session
 
   Stop it:
-    systemctl --user stop wayland-wm@hyprland.desktop.service omedora-labwc
+    systemctl --user stop $WM_UNIT omedora-labwc
 ================================================================
 EOF
 
@@ -250,7 +263,7 @@ if [[ -n "${OMEDORA_HEADLESS_KEEP:-}" ]]; then
 fi
 
 log "blocking until the session ends (Ctrl-C to stop)..."
-while [[ "$(systemctl --user is-active wayland-wm@hyprland.desktop.service 2>/dev/null)" == "active" ]]; do
+while [[ "$(systemctl --user is-active "$WM_UNIT" 2>/dev/null)" == "active" ]]; do
   sleep 2
 done
 log "session ended."

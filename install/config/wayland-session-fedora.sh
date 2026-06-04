@@ -1,18 +1,16 @@
-# Fedora-only: install the Omedora Hyprland session entry into the display
-# manager's session list (GDM/SDDM). On Arch this is handled by
-# install/login/sddm.sh (Arch-only on omedora). On Fedora we keep the existing
-# DM and only drop the .desktop — the wayland-sessions install is the ONE /usr
-# write omedora makes (the explicit exception in AGENTS.md §6).
+# Fedora-only: NO-OP (retained for history; no longer wired into install/config/all.sh).
 #
-# Why it matters: the session MUST launch via uwsm (Exec=uwsm start ...), which
-# sources ~/.config/uwsm/env and puts ~/.local/share/omarchy/bin on PATH.
-# Without it, omarchy-* commands (autostart, keybinds) and walker launches fail
-# with "command not found". The lionheartp/Hyprland COPR also ships a plain
-# `hyprland.desktop` (Exec=Hyprland, NO uwsm) that appears as a bare "Hyprland"
-# session — picking that one bypasses uwsm and breaks PATH. Users should pick
-# "Omedora".
-
-sudo mkdir -p /usr/share/wayland-sessions
-sudo cp "$OMARCHY_PATH/default/wayland-sessions/omedora.desktop" \
-  /usr/share/wayland-sessions/omedora.desktop
-echo "Installed Omedora session entry -> /usr/share/wayland-sessions/omedora.desktop"
+# Previously this dropped omedora's wayland-session entry into /usr with a
+# `sudo cp` of default/wayland-sessions/omedora.desktop — the ONE /usr write the
+# omedora installer made. That entry is now SHIPPED BY A PACKAGE:
+# hyprland-omedora (omedora/packaging/copr/hyprland-omedora.spec) owns
+# /usr/share/wayland-sessions/omedora.desktop. On Fedora, installing `hyprland`
+# remaps to hyprland-omedora (install/packages/fedora.toml), so the session
+# entry arrives via dnf, no sudo-cp needed.
+#
+# The session still launches Hyprland through uwsm (Exec=uwsm start ... --
+# Hyprland), which sources ~/.config/uwsm/env -> PATH incl. omarchy/bin.
+#
+# On Arch the session entry is handled by install/login/sddm.sh (Arch-only),
+# which is untouched. This file is intentionally a no-op and is no longer called.
+:

@@ -151,7 +151,7 @@ OMARCHY_NONINTERACTIVE=1 bash ~/.local/share/omarchy/install.sh
 
 1. **Preflight:** The Fedora guard checks that you are not root and are on x86\_64. Then `fedora-repos.sh` enables RPM Fusion (free + nonfree) and the `lionheartp/Hyprland` COPR (Hyprland is not in Fedora 44 main repos). Flathub is also enabled as a Flatpak remote.
 2. **Packaging:** All packages are installed via `dnf` or `flatpak`. The omedora-local repo satisfies `walker`, `elephant`, `omedora-nerd-fonts`, `swayosd`, and `python3-terminaltexteffects`. Hyprland and related tools (`hypridle`, `hyprlock`, `hyprpaper`, `hyprsunset`, `xdg-desktop-portal-hyprland`) come from the `lionheartp/Hyprland` COPR. GUI apps (Signal, Obsidian, Spotify, Typora, localsend) install as Flatpaks from Flathub — these require an active user session bus (you're running in a real GNOME session, so this is fine).
-3. **Config:** Omedora's `~/.config/` payload (Hyprland, waybar, walker, mako, etc.) is written to your home directory. Themes are installed. The Wayland session entry is installed to `/usr/share/wayland-sessions/omedora.desktop` by `install/config/wayland-session-fedora.sh`. **At the login screen, pick "Omedora" — not the bare "Hyprland" entry** (that one comes from the Hyprland COPR and launches without uwsm, which breaks PATH so `omarchy-*` commands and Walker can't launch anything).
+3. **Config:** Omedora's `~/.config/` payload (Hyprland, waybar, walker, mako, etc.) is written to your home directory. Themes are installed. The Wayland session entry `/usr/share/wayland-sessions/omedora.desktop` is shipped by the `hyprland-omedora` package (pulled in when `hyprland` installs on Fedora) — no longer a sudo-cp. **At the login screen, pick "Omedora" — not the bare "Hyprland" entry** (the plain entry launches without uwsm, which breaks PATH so `omarchy-*` commands and Walker can't launch anything).
 4. The install takes **20–40 minutes** on a fresh VM, dominated by Flatpak runtime downloads.
 
 ---
@@ -166,13 +166,12 @@ sudo systemctl reboot
 
 At the GDM login screen, click the session icon (the gear / cog next to the Sign In button) and select **"Omedora"** from the list. Log in with your regular user password.
 
-> **Pick "Omedora", not "Hyprland".** The Hyprland COPR installs its own bare `hyprland.desktop` session (`Exec=Hyprland`) that launches Hyprland **without uwsm** — selecting it leaves `~/.local/share/omarchy/bin` off your PATH, so `omarchy-*` commands and Walker silently fail to launch anything. The "Omedora" entry (installed by `install/config/wayland-session-fedora.sh`) launches via uwsm and is the correct one.
+> **Pick "Omedora", not "Hyprland".** A bare `hyprland.desktop` session (`Exec=Hyprland`) launches Hyprland **without uwsm** — selecting it leaves `~/.local/share/omarchy/bin` off your PATH, so `omarchy-*` commands and Walker silently fail to launch anything. (On Fedora, omedora pulls only the `hyprland-no-session` binaries + the `hyprland-omedora` session entry, so the plain entry isn't even installed.) The "Omedora" entry (shipped by the `hyprland-omedora` package) launches via uwsm and is the correct one.
 >
-> If the "Omedora" entry is missing (e.g. that install step didn't run), install it by hand — use the uwsm `Exec`, not a bare `Hyprland`:
+> If the "Omedora" entry is missing, reinstall the session package — it owns the entry:
 >
 > ```bash
-> sudo cp ~/.local/share/omarchy/default/wayland-sessions/omedora.desktop \
->   /usr/share/wayland-sessions/omedora.desktop
+> sudo dnf reinstall hyprland-omedora
 > ```
 >
 > Then log out and pick **Omedora** at the login screen.
@@ -197,7 +196,7 @@ After the session is running, confirm the key omedora surfaces work:
 ### 8. Troubleshooting and known gaps
 
 **Only "Hyprland" (no "Omedora") in the session picker — and `omarchy-*`/Walker don't work**
-The bare "Hyprland" entry is the Hyprland COPR's own `hyprland.desktop` (`Exec=Hyprland`, no uwsm). Launching it skips `~/.config/uwsm/env`, so `~/.local/share/omarchy/bin` is missing from PATH and every `omarchy-*` command (autostart, keybinds, Walker launches) fails with "command not found". Select **"Omedora"** instead. If that entry is missing, install it with the `cp` in §6. (`install/config/wayland-session-fedora.sh` now installs it automatically.)
+A bare "Hyprland" entry (the plain `hyprland.desktop`, `Exec=Hyprland`, no uwsm) launches without `~/.config/uwsm/env`, so `~/.local/share/omarchy/bin` is missing from PATH and every `omarchy-*` command (autostart, keybinds, Walker launches) fails with "command not found". Select **"Omedora"** instead. The "Omedora" entry is shipped by the `hyprland-omedora` package; if it's missing, `sudo dnf reinstall hyprland-omedora` (see §6).
 
 **`flatpak install` failed during install**
 Flatpak installs (Signal, Obsidian, Spotify, Typora, localsend) require a live user D-Bus session. If you ran `install.sh` from a tty without a graphical session, these will fail. Re-run from a GNOME terminal, or install the Flatpaks manually afterward:

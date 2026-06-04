@@ -105,8 +105,8 @@ reason = "Not in Fedora repos and ships no prebuilt binaries, so omedora/packagi
 
 [hyprland]
 source = "dnf"
-names = ["hyprland"]
-reason = "Hyprland not in Fedora main repos as of F44. Vendored as omedora/packaging/copr/hyprland.spec and served from the omedora repo."
+names = ["hyprland-omedora"]
+reason = "Hyprland not in Fedora main repos as of F44. Vendored as omedora/packaging/copr/hyprland.spec (split into hyprland-no-session = binaries, hyprland = plain session entry, hyprland-uwsm). On Fedora we install hyprland-omedora (omedora/packaging/copr/hyprland-omedora.spec), which ships omedora's own uwsm wayland-session entry (omedora.desktop, formerly a sudo-cp) and Requires hyprland-no-session + uwsm — so the compositor binaries arrive transitively WITHOUT the visible plain/uwsm session entries."
 
 [hyprlock]
 source = "dnf"

@@ -342,22 +342,22 @@ See [`branding.md`](branding.md) for the full surface-by-surface rules. Quick su
 
 ## 13. Wayland session entry
 
-A single new file: `default/wayland-sessions/omedora.desktop`. Installed by a Fedora-side config script into one of:
+`default/wayland-sessions/omedora.desktop` is the source of truth for omedora's session entry. On Fedora it is now **shipped by a package** — `hyprland-omedora` (`omedora/packaging/copr/hyprland-omedora.spec`, noarch) owns `/usr/share/wayland-sessions/omedora.desktop` — rather than dropped into `/usr` by a `sudo cp`. Installing `hyprland` on Fedora remaps (`install/packages/fedora.toml`) to `hyprland-omedora`, which `Requires: hyprland-no-session` + `uwsm`, so the compositor binaries and the session entry arrive together via dnf. There is no longer a session-related `/usr` write in the installer; the old `install/config/wayland-session-fedora.sh` sudo-cp is retired (now a no-op, unwired from `install/config/all.sh`).
 
-- `/usr/share/wayland-sessions/omedora.desktop` (system-wide, requires sudo) — preferred so it shows up for any user on the machine.
-- `~/.local/share/wayland-sessions/omedora.desktop` (user-only) — fallback if the user doesn't want to grant sudo for this step.
+The Hyprland package set is split so the binaries and the visible session entries are separable: `hyprland-no-session` (the compositor binaries + portal config, NO `.desktop`), `hyprland` (the plain visible "Hyprland" session entry, Requires the base), `hyprland-uwsm` (the uwsm session entry), and `hyprland-omedora` (omedora's own uwsm entry). On Fedora omedora pulls only the base + `hyprland-omedora`, so the plain/uwsm visible entries are NOT installed.
 
-Contents (roughly):
+Contents:
 
 ```ini
 [Desktop Entry]
-Name=Omedora
-Comment=Hyprland session preconfigured by Omedora
-Exec=uwsm start -- hyprland.desktop
+Name=Omedora (Hyprland uwsm)
+Comment=Omedora Hyprland session managed by uwsm
+Exec=uwsm start -g -1 -e -N Hyprland -D Hyprland -- start-hyprland
+TryExec=uwsm
 Type=Application
 ```
 
-The session uses UWSM exactly as upstream Omarchy does on Arch. The `Name` field is the entire user-facing brand surface on the display-manager picker.
+The `Exec` drives Hyprland directly through uwsm (no resolver `.desktop`): `-N`/`-D` supply the Name/DesktopNames that a `.desktop` would otherwise provide. We run `start-hyprland` — the upstream watchdog launcher that supervises Hyprland and passes `--watchdog-fd` — rather than the bare `Hyprland` binary, which would emit a "started without start-hyprland" warning (this matches what upstream's plain `hyprland.desktop`, `Exec=/usr/bin/start-hyprland`, does). The session uses UWSM exactly as upstream Omarchy does on Arch. The `Name` field is the user-facing brand surface on the display-manager picker. (Note: the systemd unit instance uwsm derives from the command basename is `wayland-wm@start\x2dhyprland.service`.)
 
 ---
 
@@ -521,8 +521,9 @@ Packages with no Fedora / RPM Fusion / vetted-COPR / Flathub home are built as *
 
 | File | Type | Notes |
 | --- | --- | --- |
-| `default/wayland-sessions/omedora.desktop` | New | ✅ shipped. `Exec=uwsm start -g -1 -e -D Hyprland hyprland.desktop` — launching via uwsm is what sources `~/.config/uwsm/env` and puts `omarchy/bin` on PATH. |
-| `install/config/wayland-session-fedora.sh` | New | ✅ shipped. Fedora-gated; copies the entry to `/usr/share/wayland-sessions/` (the one sanctioned /usr write, AGENTS.md §6). Without it the only session is the COPR's bare `hyprland.desktop` (no uwsm → broken PATH). |
+| `default/wayland-sessions/omedora.desktop` | New | ✅ shipped. `Exec=uwsm start -g -1 -e -N Hyprland -D Hyprland -- start-hyprland` — drives Hyprland directly via uwsm (no resolver `.desktop`; `start-hyprland` is the watchdog launcher, avoids the bare-`Hyprland` warning); launching via uwsm sources `~/.config/uwsm/env` and puts `omarchy/bin` on PATH. Now **shipped by the `hyprland-omedora` package** (`omedora/packaging/copr/hyprland-omedora.spec`), not a sudo-cp. |
+| `omedora/packaging/copr/hyprland-omedora.spec` | New | ✅ shipped. Noarch package owning `/usr/share/wayland-sessions/omedora.desktop`; `Requires: hyprland-no-session` + `uwsm`. The `[hyprland]` fedora.toml remap target. |
+| `install/config/wayland-session-fedora.sh` | Retired | No-op now (unwired from `install/config/all.sh`). The session entry is owned by the `hyprland-omedora` package; no installer `/usr` write remains. |
 
 ### Documentation (this folder)
 
@@ -569,8 +570,8 @@ Per-file status as of the current tip of `dev`. The roadmap in `testing.md` §10
 | `install/config/hardware/all.sh` | Edit | planned (step 9) | Stage dispatch — source `-fedora.sh` siblings if present; gate Arch-only entries on Fedora |
 | `install/config/hardware/{nvidia,vulkan,intel/*,apple/*,asus/*,framework/*,lenovo/*,fix-*}.sh` | Edit | planned (step 9) | 1-line distro guards |
 | `install/config/hardware/nvidia-fedora.sh` | New | planned (step 9) | Hyprland NVIDIA env vars only (no dracut writes — Fedora's akmod-nvidia handles drivers) |
-| `default/wayland-sessions/omedora.desktop` | New | planned (step 11) | The session entry GDM/SDDM displays as "Omedora" |
-| `install/config/wayland-session-fedora.sh` | New | planned (step 11) | Installs `omedora.desktop` to `/usr/share/wayland-sessions/` (or user fallback) |
+| `default/wayland-sessions/omedora.desktop` | New | shipped | The session entry GDM/SDDM displays as "Omedora"; now owned by the `hyprland-omedora` package (was a sudo-cp) |
+| `install/config/wayland-session-fedora.sh` | Retired | shipped | No-op; the session entry is shipped by `hyprland-omedora` (no installer `/usr` write) |
 | `omedora/test/fedora/omedora-session/Dockerfile.base` | New | shipped | `FROM fedora:44`; systemd + `systemd-container`/`systemd-pam` + dbus-broker + polkit + install toolchain + the omedora tree; `CMD /sbin/init`. Built/run under **podman** (`--systemd=always`) |
 | `omedora/test/fedora/build-session.sh` | New | shipped | Boots the base under systemd, runs `install.sh` as omedora via `machinectl shell` (real logind session — Flatpaks install), `podman commit`s to `omedora-test:fedora44-session` |
 | `omedora/test/fedora/omedora-session/session-launch.sh` | New | shipped | In-container launcher: nests Hyprland under the host compositor (`AQ_BACKENDS=wayland`). Launches `Hyprland` directly (uwsm start needs a seat/VT a container lacks); autostart's `uwsm-app` calls still hit the real `systemd --user` |

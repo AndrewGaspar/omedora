@@ -265,8 +265,13 @@ reason = "AUR helper; AUR doesn't exist on Fedora. omedora-pkg-aur-add on Fedora
 
 [hyprland]
 source = "dnf"
-names = ["hyprland"]
-reason = "Hyprland not in Fedora 44 main repos. Vendored as omedora/packaging/copr/hyprland.spec (0.55.2, from the release source tarball) and served from the omedora repo, replacing the dropped lionheartp/Hyprland COPR (task #66). Pulls the vendored aquamarine/hyprutils/hyprlang/hyprcursor/hyprgraphics/hyprwire libs transitively."
+names = ["hyprland-omedora"]
+reason = "Hyprland not in Fedora 44 main repos. Vendored as omedora/packaging/copr/hyprland.spec (0.55.2, from the release source tarball), replacing the dropped lionheartp/Hyprland COPR (task #66). On Fedora we install hyprland-omedora (omedora/packaging/copr/hyprland-omedora.spec), which ships omedora's own uwsm wayland-session entry and Requires hyprland-no-session + uwsm — so the compositor binaries (hyprland-no-session, formerly the visible-session bundle) plus the vendored aquamarine/hyprutils/hyprlang/hyprcursor/hyprgraphics/hyprwire libs come in transitively, WITHOUT the visible plain/uwsm session entries. (Arch still installs the real `hyprland` — see install/omarchy-base.packages; this remap is Fedora-only.)"
+
+[hyprland-no-session]
+source = "dnf"
+names = ["hyprland-no-session"]
+reason = "The Hyprland compositor binaries without any wayland-sessions/*.desktop entry (omedora/packaging/copr/hyprland.spec subpackage). Not referenced by name in install/omarchy-base.packages — listed here for the validator + clarity, since it is what hyprland-omedora (the [hyprland] remap target) pulls in to provide the compositor. Served from the omedora repo."
 
 [hypridle]
 source = "dnf"
