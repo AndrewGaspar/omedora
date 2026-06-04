@@ -47,6 +47,9 @@ jobs:
       - name: Run coexistence plan-then-confirm test
         run: bash test/coexistence-plan-test.sh
 
+      - name: Run coexistence replacement test
+        run: bash test/coexistence-replace-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 

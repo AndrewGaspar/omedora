@@ -51,11 +51,15 @@ make_shim() {
   mkdir -p "$SHIM"
   cat >"$SHIM/gum" <<'EOF'
 #!/bin/bash
-if [[ "$1" == confirm ]]; then
-  [[ -n ${GUM_CALLED:-} ]] && touch "$GUM_CALLED"
-  exit ${FAKE_GUM_CONFIRM:-0}
-fi
-exit 0
+case "$1" in
+  confirm)
+    [[ -n ${GUM_CALLED:-} ]] && touch "$GUM_CALLED"
+    exit ${FAKE_GUM_CONFIRM:-0} ;;
+  choose)
+    [[ -n ${GUM_CALLED:-} ]] && touch "$GUM_CALLED"
+    printf '%s\n' "${FAKE_GUM_CHOOSE:-Abort}" ;;
+  *) exit 0 ;;
+esac
 EOF
   chmod +x "$SHIM/gum"
 }
@@ -174,15 +178,17 @@ assert_output_contains "D: clean machine says nothing to back up" \
   "$PLAN_OUT" "no existing config files conflict"
 
 # --- E: foreign-repo package present, but NO config backups -> still prompts -
-#        empty source => no create/backup; doctor flags a foreign hyprland.
+#        empty source => no create/backup; doctor flags a foreign hyprland, so
+#        the gate shows the 3-way Replace/Keep/Abort choose (the Replace/Keep
+#        paths are covered in coexistence-replace-test.sh). Here: Abort -> exit 1.
 gate_home E
 export OMEDORA_PLAN_SOURCE="$SCRATCH/E/empty"; mkdir -p "$OMEDORA_PLAN_SOURCE"
 export OMEDORA_REPOQUERY_CMD="printf '%s\n' 'hyprland 0.56.0 copr:copr.fedorainfracloud.org:solopasha:hyprland'"
 export OMEDORA_PLAN_FORCE_INTERACTIVE=1
 export GUM_CALLED="$SCRATCH/E.gum"; rm -f "$GUM_CALLED"
-FAKE_GUM_CONFIRM=1 run_gate                  # abort
-assert_equals "E: foreign-repo conflict forces a prompt -> abort exits 1" "$PLAN_RC" "1"
-assert_file_exists "E: gum confirm was invoked despite zero config backups" "$GUM_CALLED"
+FAKE_GUM_CHOOSE=Abort run_gate
+assert_equals "E: foreign-repo conflict forces a choice -> Abort exits 1" "$PLAN_RC" "1"
+assert_file_exists "E: gum choose was invoked despite zero config backups" "$GUM_CALLED"
 assert_output_contains "E: plan surfaces the foreign-repo package" "$PLAN_OUT" "solopasha"
 unset OMEDORA_PLAN_FORCE_INTERACTIVE OMEDORA_REPOQUERY_CMD
 
