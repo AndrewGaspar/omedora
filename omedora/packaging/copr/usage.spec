@@ -14,7 +14,7 @@
 # %setup -c -T -a 0 creates one and unpacks into it.
 
 Name:           usage
-Version:        3.3.0
+Version:        3.4.0
 Release:        1%{?dist}
 Summary:        Spec for defining CLIs, with autocompletion and more (mise companion)
 
@@ -54,5 +54,8 @@ install -D -m 0644 usage.1 %{buildroot}%{_mandir}/man1/usage.1
 %{_mandir}/man1/usage.1*
 
 %changelog
+* Thu Jun 04 2026 omedora <noreply@omedora> - 3.4.0-1
+- Bump to upstream 3.4.0.
+
 * Sat May 30 2026 omedora <noreply@omedora> - 3.3.0-1
 - Initial binary-repackage of upstream usage release.

@@ -4,8 +4,8 @@
 # it was implicitly provided by that COPR, so vendoring the Hyprland stack
 # (task #66) means owning uwsm too. All BuildRequires are in Fedora main.
 Name:           uwsm
-Version:        0.23.3
-Release:        2%{?dist}
+Version:        0.26.4
+Release:        1%{?dist}
 Summary:        Universal Wayland Session Manager
 
 License:        MIT
@@ -14,7 +14,9 @@ Source:         %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
 BuildArch:      noarch
 
 BuildRequires:  desktop-file-utils
-BuildRequires:  meson
+# uwsm 0.26 raised its meson floor to >=1.3.0 (meson.build); Fedora 44 ships a
+# newer meson, but pin the floor so an older build host fails loudly.
+BuildRequires:  meson >= 1.3.0
 BuildRequires:  python-rpm-macros
 BuildRequires:  python3
 BuildRequires:  python3-dbus
@@ -42,6 +44,8 @@ session/XDG autostart management in Systemd-managed environments.
 %autosetup -p1
 
 %build
+# uuctl/fumon/uwsm-app default to disabled in 0.26's meson.options; enable the
+# ones omedora ships (the session uses uwsm-app's app-daemon dispatch).
 %meson -Duuctl=enabled -Dfumon=enabled -Duwsm-app=enabled
 %meson_build
 
@@ -49,40 +53,16 @@ session/XDG autostart management in Systemd-managed environments.
 %meson_install
 %py_byte_compile %{python3} %{buildroot}%{_datadir}/%{name}/modules
 
-# omedora: serialize uwsm-app's app-daemon FIFO round-trip to fix a concurrent-
-# autostart RACE. The uwsm-app client writes "\0app\0<args>" into the single
-# shared $XDG_RUNTIME_DIR/uwsm-app-daemon-in FIFO with NO locking, and the
-# daemon reads it with fifo.read() (until ALL writers close) then splits on NUL.
-# When a compositor's autostart spawns several uwsm-app processes at once (e.g.
-# Omarchy launches waybar/swaybg/mako/hypridle together), their writes interleave
-# into one daemon read -> [app, waybar, app, swaybg, ...] -> it runs the first
-# and treats the rest as ARGUMENTS, so the other apps are silently dropped
-# (no wallpaper / no waybar, non-deterministic per boot). Wrap the whole
-# write+read transaction in an flock so clients negotiate one at a time; the lock
-# is released BEFORE the app is exec'd, so app lifetimes are NOT serialized.
-# Verified: 6 concurrent launches -> 6 clean separate dispatches (was 1 merged).
-# The asserts fail the build if upstream changes the client, signalling review.
-%{__python3} - %{buildroot}%{_bindir}/uwsm-app <<'PYEOF'
-import sys
-p = sys.argv[1]
-s = open(p).read()
-A1 = '# write args to input pipe'
-A2 = 'done < "$PIPE_OUT"'
-assert A1 in s and A2 in s, "uwsm-app flock anchors missing - review omedora patch"
-assert 'omedora:' not in s, "uwsm-app already patched?"
-acq = ('if command -v flock >/dev/null 2>&1; then\n'
-       '  exec 9>"${XDG_RUNTIME_DIR}/uwsm-app-daemon.lock"  # omedora: serialize daemon round-trip\n'
-       '  flock 9 2>/dev/null || true\n'
-       'fi\n')
-rel = ('\nif command -v flock >/dev/null 2>&1; then flock -u 9 2>/dev/null || true; fi'
-       '  # omedora: release before app exec\n')
-s = s.replace(A1, acq + A1, 1).replace(A2, A2 + rel, 1)
-open(p, 'w').write(s)
-PYEOF
+# NOTE (omedora): 0.23.x carried an omedora patch that flock-serialized
+# uwsm-app's app-daemon FIFO round-trip to fix a concurrent-autostart race
+# (simultaneous uwsm-app launches interleaving in the daemon's read-until-EOF,
+# silently dropping waybar/swaybg/etc.). As of upstream commit "fix: add mutex
+# to uwsm-app.sh" (in 0.24+), uwsm-app.sh now acquires an flock mutex around the
+# whole write+read transaction itself (get_lock/release_lock), which is exactly
+# what our patch did. The patch is therefore DROPPED here as redundant — the
+# upstream mutex supersedes it.
 
 %check
-# Confirm the flock serialization landed in the installed client.
-grep -q 'omedora: serialize daemon round-trip' %{buildroot}%{_bindir}/uwsm-app
 desktop-file-validate %{buildroot}%{_datadir}/applications/*.desktop
 
 %post
@@ -104,6 +84,11 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/*.desktop
 %{_bindir}/%{name}-terminal-service
 %{_bindir}/fumon
 %{_bindir}/uuctl
+# 0.26 splits the env/signal helpers into a libexec dir (prepare-env.sh,
+# signal-handler.sh) sourced by the wayland-wm-env@/session units.
+%dir %{_libexecdir}/%{name}
+%{_libexecdir}/%{name}/prepare-env.sh
+%{_libexecdir}/%{name}/signal-handler.sh
 %{_datadir}/%{name}/
 %{_datadir}/applications/uuctl.desktop
 %{_mandir}/man1/%{name}.1.*
@@ -111,12 +96,25 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/*.desktop
 %{_mandir}/man1/uuctl.1.*
 %{_mandir}/man1/uwsm-app.1.*
 %{_mandir}/man3/%{name}-plugins.3.*
+# 0.26 systemd preset for fumon.service (enabled by the fumon feature).
+%{_userpresetdir}/80-fumon.preset
 %{_userunitdir}/fumon.service
 %{_userunitdir}/*-graphical.slice
 %{_userunitdir}/wayland-*.service
 %{_userunitdir}/wayland-*.target
 
 %changelog
+* Thu Jun 04 2026 Andrew Gaspar <andrew.gaspar@outlook.com> - 0.26.4-1
+- Bump to upstream 0.26.4 (from 0.23.3).
+- Drop the omedora uwsm-app flock patch: upstream's "fix: add mutex to
+  uwsm-app.sh" now serializes the app-daemon round-trip natively
+  (get_lock/release_lock), making our patch redundant.
+- %%files: add the new 0.26 %%{_libexecdir}/uwsm helpers (prepare-env.sh,
+  signal-handler.sh) and the 80-fumon.preset systemd user preset; the new
+  session-envelope/pre/waitenv/bindpid units and graphical slices are picked
+  up by the existing wayland-*.{service,target} / *-graphical.slice globs.
+- BuildRequires: pin meson >= 1.3.0 (0.26's meson_version floor).
+
 * Sat May 30 2026 Andrew Gaspar <andrew.gaspar@outlook.com> - 0.23.3-2
 - Patch uwsm-app to flock its app-daemon FIFO round-trip, fixing a concurrent-
   autostart race where simultaneous uwsm-app launches interleaved in the
