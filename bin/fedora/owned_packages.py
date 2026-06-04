@@ -8,8 +8,17 @@ through install/packages/fedora.toml. Emits, one per line, the Fedora package
 names for entries whose source is dnf or copr (these become real RPMs on the
 system). flathub / source / skip entries are not "owned RPMs" and are omitted.
 
-Used by install/preflight/fedora-conflicts.sh and bin/omedora-doctor to decide
-which installed RPMs to inspect for foreign-repo provenance.
+For each such entry the emitted set includes BOTH the upstream/base name (the
+map key, e.g. `hyprland`) AND omedora's mapped name(s) (e.g. `hyprland-omedora`).
+The upstream name matters for conflict detection: a foreign Hyprland repo (e.g.
+solopasha/hyprland) ships the compositor as plain `hyprland`, even though omedora
+installs it renamed as `hyprland-omedora` — so we must inspect both. Including
+the base name never causes a false positive, because omedora installs the mapped
+name (so plain `hyprland` is only ever present from a foreign/manual source), and
+a base name installed from a friendly repo is never flagged.
+
+Used by bin/omarchy-doctor to decide which installed RPMs to inspect for
+foreign-repo provenance.
 
 Env:
   OMARCHY_FEDORA_MAP   Path to fedora.toml (default: derived from script).
@@ -57,7 +66,10 @@ def resolve_owned(base: list[str], pkg_map: dict[str, dict]) -> list[str]:
             names = [str(n) for n in raw.get("names", [pkg])]
         if source not in ("dnf", "copr"):
             continue
-        for n in names:
+        # Include the upstream/base name (the map key) alongside omedora's
+        # possibly-renamed package(s), so conflict detection catches a foreign
+        # `hyprland` even though omedora installs it as `hyprland-omedora`.
+        for n in (pkg, *names):
             if n not in seen:
                 seen.add(n)
                 owned.append(n)
