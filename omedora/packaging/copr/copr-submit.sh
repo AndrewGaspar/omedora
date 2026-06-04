@@ -25,7 +25,11 @@
 set -euo pipefail
 
 COPR_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-PROJECT="${PROJECT:-omedora-3.8.2}"
+REPO_ROOT=$(cd -- "$COPR_DIR/../../.." && pwd)
+# Default the project from the single source of truth (omedora-copr derives it
+# from the Omarchy base version), stripping the owner/ prefix; override with
+# PROJECT=... for a one-off (e.g. a new base line before `version` is bumped).
+PROJECT="${PROJECT:-$(OMARCHY_PATH="$REPO_ROOT" "$REPO_ROOT/bin/omedora-copr" | cut -d/ -f2)}"
 BRANCH="${BRANCH:-3.8.2-omedora}"
 CLONE_URL="${CLONE_URL:-https://github.com/AndrewGaspar/omedora.git}"
 SUBDIR="omedora/packaging/copr"

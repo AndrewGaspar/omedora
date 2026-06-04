@@ -30,10 +30,11 @@ fi
 # --- The omedora COPR -------------------------------------------------------
 # omedora's vendored RPMs — the Hyprland stack (hyprland-no-session + libs),
 # hyprland-omedora (the session entry), walker/elephant/swayosd, the nerd-fonts,
-# the TUIs, uwsm — are served from the agaspar/omedora-3.8.2 COPR. Enable it so
-# the `source = "dnf"` entries in install/packages/fedora.toml resolve from it.
-# (The old third-party lionheartp/Hyprland COPR was retired in task #66; this is
-# omedora's own repo.)
+# the TUIs, uwsm — are served from omedora's COPR. Enable it so the
+# `source = "dnf"` entries in install/packages/fedora.toml resolve from it. The
+# project name is resolved by `omedora-copr` (single source of truth,
+# version-scoped per Omarchy base — see bin/omedora-copr). The old third-party
+# lionheartp/Hyprland COPR was retired in task #66; this is omedora's own repo.
 #
 # The L4 test harness instead injects a LOCAL repo at
 # /etc/yum.repos.d/omedora-local.repo (build-session.sh) for fast, hermetic,
@@ -41,7 +42,7 @@ fi
 if [[ ! -f /etc/yum.repos.d/omedora-local.repo ]]; then
   # dnf-plugins-core provides the `copr` subcommand. `copr enable` is idempotent.
   sudo dnf install -y dnf-plugins-core >/dev/null 2>&1 || true
-  sudo dnf -y copr enable agaspar/omedora-3.8.2
+  sudo dnf -y copr enable "$(omedora-copr)"
 fi
 
 # --- Flathub remote --------------------------------------------------------

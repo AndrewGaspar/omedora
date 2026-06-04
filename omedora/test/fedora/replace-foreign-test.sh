@@ -36,8 +36,9 @@ set -uo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
 FOREIGN_COPR="${REPLACE_FOREIGN_COPR:-lionheartp/Hyprland}"
-OMEDORA_COPR="${REPLACE_OMEDORA_COPR:-agaspar/omedora-3.8.2}"
+OMEDORA_COPR="${REPLACE_OMEDORA_COPR:-$(OMARCHY_PATH="$REPO" "$REPO/bin/omedora-copr")}"
 FOREIGN_REPO_ID="copr:copr.fedorainfracloud.org:${FOREIGN_COPR/\//:}"
+OMEDORA_REPO_ID="copr:copr.fedorainfracloud.org:${OMEDORA_COPR/\//:}"
 CTR="${REPLACE_FOREIGN_CTR:-omedora-replace-foreign-$$}"
 
 export TMPDIR="${TMPDIR:-/var/tmp/podman-tmp}"
@@ -86,7 +87,7 @@ dnf -y copr enable '"$FOREIGN_COPR"' >/dev/null 2>&1
 # Force foreign provenance: disable the omedora COPR for this install so plain
 # `hyprland` resolves from the foreign COPR (both ship hyprland 0.55.2).
 dnf install -y --setopt=install_weak_deps=False \
-  --disablerepo=copr:copr.fedorainfracloud.org:agaspar:omedora-3.8.2 \
+  --disablerepo='"$OMEDORA_REPO_ID"' \
   hyprland >/dev/null 2>&1
 ' || { echo "Bail out! foreign hyprland install failed"; exit 1; }
 
@@ -116,7 +117,7 @@ in_ctr 'rpm -q hyprland >/dev/null 2>&1' \
 # 5) omedora's packages are installed FROM the omedora COPR.
 for p in hyprland-omedora hyprland-no-session; do
   pr="$(in_ctr "dnf -q repoquery --installed $p --qf '%{from_repo}' 2>/dev/null")"
-  [[ "$pr" == "copr:copr.fedorainfracloud.org:agaspar:omedora-3.8.2" ]] \
+  [[ "$pr" == "$OMEDORA_REPO_ID" ]] \
     && ok "$p installed from the omedora COPR" \
     || nok "$p installed from the omedora COPR" "got: ${pr:-<not installed>}"
 done
