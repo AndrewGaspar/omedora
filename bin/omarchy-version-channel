@@ -2,6 +2,17 @@
 
 # omarchy:summary=Print the active Omarchy mirror and package channel
 
+# Fedora arm — there is no pacman mirrorlist. The omedora "channel" is the git
+# ref the install tracks (a release tag on a normal install) plus the COPR that
+# serves the RPMs. The pacman logic below is Arch-only and unchanged.
+if [[ "$(omarchy-distro 2>/dev/null || echo arch)" == "fedora" ]]; then
+  OMARCHY_PATH="${OMARCHY_PATH:-$HOME/.local/share/omarchy}"
+  ref="$(git -C "$OMARCHY_PATH" describe --tags --always --dirty 2>/dev/null || echo unknown)"
+  copr="$(omedora-copr 2>/dev/null || echo unknown)"
+  echo "$ref (COPR: $copr)"
+  exit 0
+fi
+
 if grep -q "https://stable-mirror.omarchy.org/" /etc/pacman.d/mirrorlist; then
   mirror="stable"
 elif grep -q "https://rc-mirror.omarchy.org/" /etc/pacman.d/mirrorlist; then
