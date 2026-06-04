@@ -41,6 +41,15 @@ jobs:
       - name: Run pkg map test
         run: bash test/pkg-map-test.sh
 
+      - name: Run coexistence seeding test
+        run: bash test/coexistence-test.sh
+
+      - name: Run coexistence plan-then-confirm test
+        run: bash test/coexistence-plan-test.sh
+
+      - name: Run coexistence replacement test
+        run: bash test/coexistence-replace-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 

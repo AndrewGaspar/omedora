@@ -236,6 +236,63 @@ sudo dnf copr enable -y lionheartp/Hyprland
 
 ---
 
+### Installing onto a machine you already use
+
+Omedora installs **on top of an existing Fedora Workstation**, so on Fedora the
+installer is deliberately non-destructive — it never silently overwrites config
+you already have. (The Arch path keeps upstream Omarchy's behavior unchanged.)
+
+- **You confirm before anything changes.** Right at the start — before the
+  installer touches a single file — it shows one summary of everything it intends
+  to do on your machine: the exact list of existing config files it will back up
+  and replace, any foreign-repo Hyprland packages it found, and whether it will
+  append the `~/.bashrc` block. You then choose **Proceed** or **Abort**; aborting
+  leaves the machine completely untouched. If there's nothing to back up and no
+  foreign-repo packages, it says so and proceeds without nagging. A non-interactive
+  install (no TTY) prints the same summary and continues, since the backup-then-write
+  below never deletes anything.
+
+What this means in practice:
+
+- **Your configs are backed up before being replaced.** When omedora seeds its
+  `config/*` into `~/.config`, each destination file is handled individually: if
+  it doesn't exist it's written; if it's byte-identical it's left alone; if it
+  exists and differs, your version is first copied to
+  `<file>.pre-omedora-<timestamp>` and *then* omedora's is written. So after an
+  install you can always recover your original (e.g.
+  `~/.config/hypr/hyprland.conf.pre-omedora-1717430400`). Re-running the install
+  or `omedora update` is idempotent: files that already match are skipped, so no
+  new backups pile up.
+
+- **`~/.bashrc` is appended to, not replaced.** Omedora adds a small
+  sentinel-guarded block (between `# >>> omedora >>>` and `# <<< omedora <<<`)
+  that sources the omarchy default shell configuration. Everything else in your
+  `~/.bashrc` is preserved, and re-running never double-appends the block.
+
+- **`~/.config/git/config` is left completely alone.** That file is your git
+  identity; omedora never copies its own over it. (omedora's
+  `git config --global` writes go to `~/.gitconfig` and are additive.)
+
+- **Foreign Hyprland packages are detected — and you can have omedora replace
+  them.** Omedora pins and installs its own Hyprland desktop stack (hyprland,
+  hyprlock, hypridle, waybar, walker, swayosd, the portal, …). If you already
+  have some of these installed from a *foreign* repo — e.g. a third-party COPR
+  like `solopasha/hyprland` — the up-front plan names the package and the repo,
+  and offers a three-way choice: **Replace** them with omedora's pinned builds,
+  **Keep** them and install anyway, or **Abort**. Choosing Replace shows the
+  exact package transaction and, once omedora's repos are enabled, runs it for
+  you (`dnf swap` for renamed packages like `hyprland`→`hyprland-omedora`,
+  `dnf distro-sync` with the foreign repo disabled for same-name packages). A
+  non-interactive install keeps the foreign packages and just warns.
+
+  You can run the same scan — and fix — any time:
+
+  ```bash
+  omedora doctor        # detect: non-zero exit if a foreign-repo conflict exists
+  omedora doctor --fix  # replace foreign packages with omedora's (shows the
+                        # transaction, asks once, then applies)
+  ```
+
 ### 9. After install: staying up to date
 
 When a public COPR is published, the local `.repo` file and the build step (§3–§4) go away. The only change will be swapping the `source = "dnf"` entries in `install/packages/fedora.toml` to reference the COPR, and dropping the `omedora-local.repo` file.
