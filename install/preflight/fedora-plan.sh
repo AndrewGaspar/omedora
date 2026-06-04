@@ -120,27 +120,65 @@ elif [[ $interactive -eq 0 ]]; then
   # Non-interactive: show the plan as a warning and proceed. Backup-then-write
   # preserves every original (saved as <file>.pre-omedora-<ts>, never deleted).
   omedora_plan_summary >&2
-  echo -e "\033[33mOmedora: proceeding non-interactively. Existing files are backed up (never deleted) before being replaced; run 'omedora doctor' afterward to review any foreign-repo packages.\033[0m" >&2
+  echo -e "\033[33mOmedora: proceeding non-interactively. Existing files are backed up (never deleted) before being replaced; foreign-repo packages are kept as-is — run 'omedora doctor --fix' afterward to replace them with omedora's builds.\033[0m" >&2
   # fall through -> proceed
 else
-  # Interactive: show the plan and require an explicit yes.
+  # Interactive: show the plan and require an explicit choice.
   omedora_plan_summary
-  proceed=0
-  if command -v gum >/dev/null 2>&1; then
-    if gum confirm "Proceed with the omedora install (back up & replace the files listed above)?"; then
-      proceed=1
-    fi
-  else
-    read -r -p "Proceed with the omedora install (back up & replace the files listed above)? [y/N] " reply
-    case "$reply" in [yY] | [yY][eE][sS]) proceed=1 ;; esac
-  fi
 
-  if [[ $proceed -eq 1 ]]; then
-    echo -e "\033[32mOmedora: proceeding. Existing files will be backed up before they are replaced.\033[0m"
-    # fall through -> proceed
+  if [[ $doctor_rc -ne 0 ]]; then
+    # Foreign-repo packages present: offer to replace them with omedora's
+    # builds. Show the concrete package transaction (the engine's dry run),
+    # then a 3-way choice. "Replace" is the single yes — the swap itself is
+    # deferred to fedora-swap.sh, which runs once the omedora repos are
+    # enabled (the COPR isn't enabled yet at this point).
+    echo "  If you replace them, this is the package transaction that will run:"
+    omedora-replace-foreign --dry-run 2>/dev/null | sed 's/^/    /'
+    echo
+    choice=""
+    if command -v gum >/dev/null 2>&1; then
+      choice="$(gum choose --header \
+        "Foreign-repo Hyprland packages detected. What would you like to do?" \
+        "Replace" "Keep" "Abort")"
+    else
+      read -r -p "  [R]eplace foreign packages, [K]eep them, or [A]bort? [R/k/a] " reply
+      case "$reply" in [kK]*) choice="Keep" ;; [aA]*) choice="Abort" ;; *) choice="Replace" ;; esac
+    fi
+
+    case "$choice" in
+      Replace)
+        # The swap needs the omedora repos enabled, which happens after this
+        # gate (fedora-repos.sh). Record consent; fedora-swap.sh applies it.
+        export OMEDORA_REPLACE_FOREIGN=1
+        echo -e "\033[32mOmedora: will replace the foreign-repo packages after enabling the omedora repos, then continue.\033[0m"
+        # fall through -> proceed
+        ;;
+      Keep)
+        echo -e "\033[33mOmedora: keeping your foreign-repo packages. If the session misbehaves, run 'omedora doctor --fix' later to swap them for omedora's builds.\033[0m"
+        # fall through -> proceed
+        ;;
+      *)  # Abort, or empty (gum Esc)
+        echo -e "\033[31mOmedora: install aborted at your request. Nothing was changed.\033[0m" >&2
+        exit 1
+        ;;
+    esac
   else
-    echo -e "\033[31mOmedora: install aborted at your request. Nothing was changed.\033[0m" >&2
-    exit 1
+    # Only config backups to confirm: a simple proceed / abort.
+    proceed=0
+    if command -v gum >/dev/null 2>&1; then
+      gum confirm "Proceed with the omedora install (back up & replace the files listed above)?" && proceed=1
+    else
+      read -r -p "Proceed with the omedora install (back up & replace the files listed above)? [y/N] " reply
+      case "$reply" in [yY] | [yY][eE][sS]) proceed=1 ;; esac
+    fi
+
+    if [[ $proceed -eq 1 ]]; then
+      echo -e "\033[32mOmedora: proceeding. Existing files will be backed up before they are replaced.\033[0m"
+      # fall through -> proceed
+    else
+      echo -e "\033[31mOmedora: install aborted at your request. Nothing was changed.\033[0m" >&2
+      exit 1
+    fi
   fi
 fi
 

@@ -18,6 +18,10 @@ run_logged $OMARCHY_INSTALL/preflight/show-env.sh
 # enough that subsequent packaging stages can pull from the new repos.
 if [[ $(omarchy-distro 2>/dev/null || echo arch) == "fedora" ]]; then
   run_logged $OMARCHY_INSTALL/preflight/fedora-repos.sh
+  # If the gate recorded a "Replace" choice, swap the foreign-repo Hyprland
+  # packages for omedora's now that the omedora repos are enabled. No-op
+  # otherwise. Must run AFTER fedora-repos.sh (needs the omedora COPR).
+  run_logged $OMARCHY_INSTALL/preflight/fedora-swap.sh
 fi
 
 run_logged $OMARCHY_INSTALL/preflight/pacman.sh
