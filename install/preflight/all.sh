@@ -7,6 +7,9 @@ run_logged $OMARCHY_INSTALL/preflight/show-env.sh
 # enough that subsequent packaging stages can pull from the new repos.
 if [[ $(omarchy-distro 2>/dev/null || echo arch) == "fedora" ]]; then
   run_logged $OMARCHY_INSTALL/preflight/fedora-repos.sh
+  # Detect (and warn about) pre-existing foreign-repo Hyprland packages on a
+  # lived-in Fedora machine before omedora installs its pinned stack over them.
+  run_logged $OMARCHY_INSTALL/preflight/fedora-conflicts.sh
 fi
 
 run_logged $OMARCHY_INSTALL/preflight/pacman.sh
