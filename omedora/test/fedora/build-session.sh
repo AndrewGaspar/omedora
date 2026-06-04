@@ -43,6 +43,13 @@
 #                                            #   (standard base + workstation-product-environment);
 #                                            #   produces a separate omedora-test:fedora44-session-workstation*
 #                                            #   image lineage. Combine with --fast/--rebuild/etc. as usual.
+#   omedora/test/fedora/build-session.sh --copr  # LAUNCH-GATE mode: do NOT inject the local RPM
+#                                            #   repo. With no /etc/yum.repos.d/omedora-local.repo
+#                                            #   present, the staged install's preflight
+#                                            #   (install/preflight/fedora-repos.sh) enables the
+#                                            #   live agaspar/omedora-3.8.2 COPR and resolves
+#                                            #   omedora's packages from it over the network — the
+#                                            #   real from-COPR install path. (env: OMEDORA_USE_COPR=1)
 #
 # The local omedora RPM repo (walker/elephant/fonts/…) is rebuilt only when a
 # *.spec or build-repo.sh/build-local.sh is newer than the built repomd.xml, so
@@ -90,6 +97,10 @@ rebuild_repo=false
 fast=false
 packages_only=false
 workstation=false
+# --copr / OMEDORA_USE_COPR=1: launch-gate mode — skip inject_local_repo so the
+# staged install's fedora-repos.sh enables the live COPR and pulls from it.
+use_copr=false
+[[ "${OMEDORA_USE_COPR:-}" == "1" ]] && use_copr=true
 for arg in "$@"; do
   case "$arg" in
     --rebuild)                 rebuild=true ;;
@@ -97,6 +108,7 @@ for arg in "$@"; do
     --fast|--config-only)      fast=true ;;
     --packages-only)           packages_only=true ;;
     --workstation)             workstation=true ;;
+    --copr)                    use_copr=true ;;
     --help|-h) grep '^# ' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown arg: $arg" >&2; exit 2 ;;
   esac
@@ -113,13 +125,18 @@ fi
 # image lineage + build container so it never collides with the standard build.
 # Explicit OMEDORA_SYSTEMD_* env overrides still win.
 variant=""; $workstation && variant="-workstation"
+# COPR mode reuses the SAME repo-agnostic base (Fedora + systemd; no omedora
+# packages yet), but its pkgs/session images differ (packages come from the live
+# COPR, not the local repo), so they get a "-copr" infix to avoid clobbering the
+# local-repo lineage. The base keeps no infix.
+copr_variant=""; $use_copr && copr_variant="-copr"
 BASE_IMAGE="${OMEDORA_SYSTEMD_BASE_IMAGE:-omedora-test:fedora44-session${variant}-base}"
-SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session${variant}}"
+SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session${variant}${copr_variant}}"
 # Intermediate "packages installed" image; derived from SESSION_IMAGE's name so a
 # custom OMEDORA_SYSTEMD_SESSION_IMAGE gets a matching pkgs image, but can be
 # overridden directly.
 PKGS_IMAGE="${OMEDORA_SYSTEMD_PKGS_IMAGE:-${SESSION_IMAGE%%:*}:${SESSION_IMAGE##*:}-pkgs}"
-BUILD_CTR="${OMEDORA_BUILD_CTR:-omedora-session${variant}-build}"
+BUILD_CTR="${OMEDORA_BUILD_CTR:-omedora-session${variant}${copr_variant}-build}"
 
 log() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 
@@ -218,13 +235,15 @@ repo_is_stale() {
   done
   return 1
 }
-if ! $fast; then
+if ! $fast && ! $use_copr; then
   if $rebuild_repo || repo_is_stale; then
     log "Building local omedora RPM repo (spec changed or repo missing)"
     "$COPR_DIR/build-repo.sh"
   else
     log "Local omedora RPM repo up to date (no spec newer than repomd.xml; --rebuild-repo to force)"
   fi
+elif $use_copr; then
+  log "COPR mode (--copr): NOT building/injecting the local RPM repo — the staged install's preflight will enable the live agaspar/omedora-3.8.2 COPR and pull from it"
 fi
 
 # =============================================================================
@@ -308,7 +327,11 @@ if $build_packages; then
     -v "$SESSION_DIR/staged-install.sh:$STAGED_IN_IMAGE:ro" \
     "$BASE_IMAGE" >/dev/null
   wait_for_systemd "$BUILD_CTR"
-  inject_local_repo "$BUILD_CTR"
+  if $use_copr; then
+    log "COPR mode: skipping inject_local_repo — fedora-repos.sh will enable agaspar/omedora-3.8.2 (live COPR)"
+  else
+    inject_local_repo "$BUILD_CTR"
+  fi
   run_phase "$BUILD_CTR" packages "this takes a while"
   commit_systemd "$BUILD_CTR" "$PKGS_IMAGE"
   podman rm -f "$BUILD_CTR" >/dev/null
