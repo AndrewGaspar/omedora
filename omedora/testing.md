@@ -467,6 +467,27 @@ The default L4 base (`Dockerfile.base`) is a *minimal* `fedora:44` (systemd + a 
 
 **Cost.** The Workstation base is ~1.5–2 GB; it's cached as an image layer and shares the dnf5 cache volume with the standard base, so it's a one-time cost. The variant is **opt-in** — never built or run unless you pass `--workstation`.
 
+### Vanilla / piggyback Hyprland path (`raw-hyprland-test.sh`)
+
+The Hyprland packaging split ships four packages from COPR `agaspar/omedora-3.8.2`: `hyprland-no-session` (all binaries, no session entry), `hyprland` (the natural/discoverable full package — owns the plain `wayland-sessions/hyprland.desktop`, `Requires hyprland-no-session`), `hyprland-uwsm`, and `hyprland-devel`. Omedora itself installs `hyprland-omedora` (its own uwsm session). But a **piggybacker** — someone on plain Fedora who just wants Hyprland — runs `dnf install hyprland` and expects a working *vanilla* session with Hyprland's built-in defaults, no omedora config and no uwsm. **`omedora/test/fedora/raw-hyprland-test.sh`** is a standalone L4 test that proves exactly that.
+
+It is self-contained (does **not** use the omedora session image): it builds its own minimal `fedora:44` systemd image whose only desktop bit is **labwc** (the headless nesting host, same role as in the omedora headless launcher) plus a login user, then **inside** that container:
+
+1. `dnf copr enable agaspar/omedora-3.8.2` + `dnf install -y hyprland`, and asserts the resolution held: `rpm -q hyprland hyprland-no-session` both present, `/usr/share/wayland-sessions/hyprland.desktop` owned by the **full** `hyprland` package (not the binaries one), and `/usr/bin/{Hyprland,start-hyprland,hyprctl}` owned by `hyprland-no-session`.
+2. Launches **raw Hyprland** — `start-hyprland` directly via plain `systemd-run --user` (so it survives the `machinectl shell` returning), nested into labwc's socket via Aquamarine's `wayland` backend (`AQ_BACKENDS=wayland`). Crucially **no uwsm, no `~/.config/hypr`, no seeded config**: `HYPRLAND_CONFIG` points at an empty file so Hyprland uses its compiled-in defaults. (uwsm isn't even installed.)
+3. Asserts it reasonably started: `hyprctl version` answers, `hyprctl monitors -j` shows ≥1 monitor (an explicit headless output, same promotion technique as the omedora launcher), **no `Safe Mode` in the log**, and the `Hyprland` process is alive.
+
+Run it (host is Arch → podman `fedora:44`; needs a DRM render node like the headless suite):
+
+```bash
+export TMPDIR=/var/tmp/podman-tmp
+omedora/test/fedora/raw-hyprland-test.sh            # build vanilla image if missing, then run
+omedora/test/fedora/raw-hyprland-test.sh --keep     # leave the container up to poke at
+omedora/test/fedora/raw-hyprland-test.sh --rebuild  # rebuild the vanilla image first
+```
+
+It validates `hyprland-no-session` is self-sufficient as the binaries package **and** that `dnf install hyprland` yields a working default session — the piggybacker contract — independently of anything omedora installs. (On GPU-less CI, `modprobe vkms` + `OMEDORA_RENDER_NODE=/dev/dri/renderD<n>` as for the headless suite.)
+
 ### Why this *can now* be in CI
 
 The original blocker was "GitHub Actions runners are headless — no compositor to nest under." `--headless` removes that: the container brings its own compositor. The remaining requirement is a **DRM render node**, satisfied on GPU-less runners by loading **`vkms`** (`sudo modprobe vkms` in a CI step, then `OMEDORA_RENDER_NODE=/dev/dri/renderD128`). The systemd image build (~15–30 min) is still at the upper edge of practical CI runtime, so the pragmatic plan is a **scheduled / on-demand** CI job (not every push) that builds once, caches the image, and runs the `--headless` smoke. The earlier Xvfb + `x11`-backend idea is unnecessary.
@@ -489,6 +510,7 @@ omedora/test/fedora/
 │   ├── lib.sh                        # in-container: session env + headless assertions
 │   ├── tests/                        # NN-name.sh assertion scripts (00-session, 10-walker, …, 90-workstation [SKIP-gated])
 │   └── .gitignore                    # ignores artifacts/
+├── raw-hyprland-test.sh    # standalone L4: vanilla `dnf install hyprland` (COPR) boots a DEFAULT Hyprland session (no omedora/uwsm)
 ├── build-session.sh        # boot base under systemd, install via machinectl shell, commit (--workstation for the WS base)
 ├── run-integration.sh      # L2 host-side runner
 ├── run-smoke.sh            # L3 host-side runner
