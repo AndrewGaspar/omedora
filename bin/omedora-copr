@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# omarchy:summary=Print the omedora COPR project (owner/project) or its dnf repo id.
+# omarchy:args=[--repo-id]
+# omarchy:examples=omedora copr | omedora copr --repo-id
+
+# Single source of truth for the omedora COPR name.
+#
+# The COPR is VERSION-SCOPED PER OMARCHY BASE: its project name is derived from
+# the Omarchy base version this omedora is rebased on (the `version` file), so a
+# rebase onto a new Omarchy base (3.8.2 -> 4.x) selects a new, isolated COPR and
+# existing installs never get cross-contaminated by an ABI-incompatible rebuild.
+#
+#   owner   : $OMEDORA_COPR_OWNER (default: agaspar)
+#   project : omedora-<base>      (base = contents of the `version` file, e.g. 3.8.2)
+#
+# Modes:
+#   (default)   print "owner/project"                     e.g. agaspar/omedora-3.8.2
+#   --repo-id   print the dnf repo id dnf records as       e.g.
+#               copr:copr.fedorainfracloud.org:agaspar:omedora-3.8.2
+#
+# Everything that needs the COPR name (install/preflight/fedora-repos.sh, the
+# COPR submit script, the L3/L4 tests) MUST go through this — never hard-code it.
+
+set -euo pipefail
+
+owner="${OMEDORA_COPR_OWNER:-agaspar}"
+
+# Resolve the Omarchy base version file: prefer the installed payload, then the
+# repo this script lives in.
+if [[ -n ${OMARCHY_PATH:-} && -f "$OMARCHY_PATH/version" ]]; then
+  base_file="$OMARCHY_PATH/version"
+else
+  base_file="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/version"
+fi
+base="$(cat "$base_file" 2>/dev/null || echo unknown)"
+
+project="omedora-${base}"
+
+case "${1:-}" in
+  --repo-id) printf 'copr:copr.fedorainfracloud.org:%s:%s\n' "$owner" "$project" ;;
+  "")        printf '%s/%s\n' "$owner" "$project" ;;
+  *) echo "omedora-copr: unknown arg: $1" >&2; exit 2 ;;
+esac

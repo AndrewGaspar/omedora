@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# omarchy:summary=Update system + omedora packages with dnf (Fedora).
+# omarchy:requires-sudo=true
+
+# Fedora counterpart of omarchy-update-system-pkgs (pacman -Syyu). A full
+# `dnf upgrade` refreshes metadata and pulls the latest builds — including new
+# omedora RPMs from the COPR (which auto-rebuilds on push), so this is how
+# package-level omedora updates land. Matches omarchy's "update Omarchy AND
+# system packages" model.
+
+set -e
+
+echo -e "\e[32m\nUpdate system + omedora packages\e[0m"
+sudo dnf upgrade -y --refresh

@@ -49,7 +49,7 @@ HELPERS="$REPO/test/helpers.sh"
 # shellcheck source=/dev/null
 . "$HELPERS"
 
-COPR_PROJECT="${RAW_HYPR_COPR:-agaspar/omedora-3.8.2}"
+COPR_PROJECT="${RAW_HYPR_COPR:-$(OMARCHY_PATH="$REPO" "$REPO/bin/omedora-copr")}"
 IMAGE="${RAW_HYPR_IMAGE:-omedora-test:fedora44-raw-hyprland}"
 CTR="${RAW_HYPR_CTR:-omedora-raw-hyprland-$$}"
 RES="${OMEDORA_HEADLESS_RES:-1920x1080}"

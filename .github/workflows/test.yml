@@ -50,6 +50,9 @@ jobs:
       - name: Run coexistence replacement test
         run: bash test/coexistence-replace-test.sh
 
+      - name: Run versioning / release test
+        run: bash test/versioning-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 

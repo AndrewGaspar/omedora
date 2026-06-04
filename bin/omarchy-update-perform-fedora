@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# omarchy:summary=Run the omedora (Fedora) update pipeline.
+# omarchy:requires-sudo=true
+
+# The Fedora pipeline behind `omarchy update` / omarchy-update-perform. Replaces
+# the Arch keyring/pacman/AUR/orphan steps with a single dnf upgrade (which pulls
+# new omedora COPR builds + system updates). The git pull of the omedora source
+# already happened in omarchy-update-git before this runs; like omarchy, this
+# does NOT re-copy config/* over the user's ~/.config (those are the user's to
+# edit — migrations handle any required config changes).
+#
+# Non-dnf steps are best-effort (|| true) so a single Arch-leaning helper can't
+# abort the update after packages are already upgraded.
+
+set -e
+
+# Keep the screensaver/sleep from kicking in mid-update (no-op off-session).
+hyprctl dispatch tagwindow +noidle &>/dev/null || true
+
+omarchy-update-available-reset || true   # clear the cached "update available" flag
+omedora-update-pkgs                      # the essential step: dnf upgrade
+omarchy-migrate || true                  # run any pending migrations
+omarchy-hook post-update 2>/dev/null || true
+
+hyprctl dispatch tagwindow -- -noidle &>/dev/null || true
+omarchy-update-restart || true

@@ -5,6 +5,12 @@
 
 set -e
 
+# Fedora dispatch — the pipeline below is pacman/AUR/keyring (Arch). On Fedora,
+# omedora runs a dnf-based pipeline instead. The Arch body is unchanged.
+if [[ "$(omarchy-distro 2>/dev/null || echo arch)" == "fedora" ]]; then
+  exec omarchy-update-perform-fedora
+fi
+
 # Ensure screensaver/sleep doesn't set in during updates
 hyprctl dispatch tagwindow +noidle &>/dev/null || true
 
