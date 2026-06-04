@@ -242,6 +242,16 @@ Omedora installs **on top of an existing Fedora Workstation**, so on Fedora the
 installer is deliberately non-destructive — it never silently overwrites config
 you already have. (The Arch path keeps upstream Omarchy's behavior unchanged.)
 
+- **You confirm before anything changes.** Right at the start — before the
+  installer touches a single file — it shows one summary of everything it intends
+  to do on your machine: the exact list of existing config files it will back up
+  and replace, any foreign-repo Hyprland packages it found, and whether it will
+  append the `~/.bashrc` block. You then choose **Proceed** or **Abort**; aborting
+  leaves the machine completely untouched. If there's nothing to back up and no
+  foreign-repo packages, it says so and proceeds without nagging. A non-interactive
+  install (no TTY) prints the same summary and continues, since the backup-then-write
+  below never deletes anything.
+
 What this means in practice:
 
 - **Your configs are backed up before being replaced.** When omedora seeds its
@@ -263,15 +273,15 @@ What this means in practice:
   identity; omedora never copies its own over it. (omedora's
   `git config --global` writes go to `~/.gitconfig` and are additive.)
 
-- **Foreign Hyprland packages are detected and you're warned.** Omedora pins and
-  installs its own Hyprland desktop stack (hyprland, hyprlock, hypridle, waybar,
-  walker, swayosd, the portal, …). If you already have some of these installed
-  from a *foreign* repo — e.g. a third-party COPR like `solopasha/hyprland` — the
-  installer prints a specific warning (naming the package and the repo) before it
-  installs its pinned builds, and lets you proceed or abort. In a non-interactive
-  install it warns loudly and continues. This is **detection and warning only**
-  for now — omedora does not yet automatically swap the foreign packages. You can
-  run the same scan any time with:
+- **Foreign Hyprland packages are detected and surfaced in that up-front summary.**
+  Omedora pins and installs its own Hyprland desktop stack (hyprland, hyprlock,
+  hypridle, waybar, walker, swayosd, the portal, …). If you already have some of
+  these installed from a *foreign* repo — e.g. a third-party COPR like
+  `solopasha/hyprland` — the up-front plan names the package and the repo, and a
+  detected conflict makes the installer ask for confirmation even if no config
+  files need backing up. This is **detection and warning only** for now — omedora
+  does not yet automatically swap the foreign packages. You can run the same scan
+  any time with:
 
   ```bash
   omedora doctor
