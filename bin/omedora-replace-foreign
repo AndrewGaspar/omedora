@@ -84,8 +84,22 @@ while IFS=$'\t' read -r name repo; do
   fi
 done <<<"$conflicts"
 
+# Build --disablerepo args ONLY for repos that are actually enabled. A package's
+# recorded from_repo can be a historical id that is not a currently-enabled repo
+# (e.g. base packages baked into a container image carry a hash id) — and dnf5
+# hard-errors on --disablerepo for an unknown id. For a same-name distro-sync the
+# disable is what moves provenance off a foreign COPR; when the source repo isn't
+# even enabled there's nothing to disable and the sync simply moves the package
+# to whatever enabled repo provides it.
+declare -A enabled_repos=()
+while read -r rid _; do
+  [[ -n $rid ]] && enabled_repos["$rid"]=1
+done < <($DNF -q repolist --enabled 2>/dev/null)
+
 disable_args=()
-for r in "${!disable_repos[@]}"; do disable_args+=("--disablerepo=$r"); done
+for r in "${!disable_repos[@]}"; do
+  [[ -n ${enabled_repos[$r]:-} ]] && disable_args+=("--disablerepo=$r")
+done
 
 # --- show the plan -----------------------------------------------------------
 echo

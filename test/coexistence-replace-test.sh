@@ -38,10 +38,19 @@ SCRATCH="$(mktemp -d)"
 cleanup() { [[ -n $SCRATCH && -d $SCRATCH ]] && rm -rf "$SCRATCH"; }
 trap cleanup EXIT
 
-# A fake dnf that appends its args to $DNF_LOG and exits 0 (or $FAKE_DNF_RC).
+# A fake dnf that logs transactions to $DNF_LOG and exits 0 (or $FAKE_DNF_RC).
+# `repolist` is a query, not a transaction: it answers with $FAKE_ENABLED_REPOS
+# (so the engine knows which foreign repos are enabled and may be --disablerepo'd)
+# and is NOT logged.
 FAKE_BIN="$SCRATCH/bin"; mkdir -p "$FAKE_BIN"
 cat >"$FAKE_BIN/dnf" <<'EOF'
 #!/bin/bash
+for a in "$@"; do
+  if [[ $a == repolist ]]; then
+    printf '%s\n' ${FAKE_ENABLED_REPOS:-}
+    exit 0
+  fi
+done
 printf '%s\n' "$*" >>"$DNF_LOG"
 exit ${FAKE_DNF_RC:-0}
 EOF
@@ -49,6 +58,9 @@ chmod +x "$FAKE_BIN/dnf"
 export OMEDORA_DNF_CMD="$FAKE_BIN/dnf"
 
 FOREIGN_REPO="copr:copr.fedorainfracloud.org:solopasha:hyprland"
+# The engine only --disablerepo's repos that are actually enabled; in these
+# scenarios the foreign COPR is enabled.
+export FAKE_ENABLED_REPOS="$FOREIGN_REPO"
 # Detection mock: a renamed conflict (hyprland) + a same-name conflict (waybar).
 both_conflicts() {
   export OMEDORA_REPOQUERY_CMD="printf '%s\n' 'hyprland 0.56.0 $FOREIGN_REPO' 'waybar 0.11 $FOREIGN_REPO'"
