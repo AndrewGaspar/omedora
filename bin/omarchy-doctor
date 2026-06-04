@@ -85,11 +85,17 @@ owned_pkgs() {
 }
 
 # Query installed packages' provenance. Mockable via OMEDORA_REPOQUERY_CMD.
+# NOTE: the trailing '\n' is REQUIRED — dnf5's --qf does not append a newline,
+# so without it the whole installed list comes back as one newline-less blob and
+# the `while read` scan loop sees a single unterminated line (read returns
+# non-zero at EOF, so the body never runs) and reports zero conflicts. A real
+# foreign-repo package would then go undetected. (Caught by the live-dnf test;
+# the mocked unit tests supplied their own newlines and masked it.)
 repoquery_installed() {
   if [[ -n ${OMEDORA_REPOQUERY_CMD:-} ]]; then
     eval "$OMEDORA_REPOQUERY_CMD"
   else
-    dnf repoquery --installed --qf '%{name} %{evr} %{from_repo}' 2>/dev/null
+    dnf repoquery --installed --qf '%{name} %{evr} %{from_repo}\n' 2>/dev/null
   fi
 }
 
