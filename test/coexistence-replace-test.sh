@@ -105,17 +105,21 @@ assert_output_contains "dry-run plans distro-sync for same-name"    "$out" "dist
 assert_output_contains "dry-run names the omedora target"           "$out" "hyprland-omedora"
 assert_equals "dry-run runs no dnf" "$(wc -l <"$DNF_LOG")" "0"
 
-# 3b) --yes: applies the real transaction (captured by the fake dnf).
+# 3b) --yes: applies the real transaction (captured by the fake dnf). The rename
+# is a `dnf swap` (removes the foreign hyprland — the file-conflict source); the
+# same-name target is then `install`ed (re-adds any the swap cascade-removed) and
+# distro-synced (moves provenance) — all with the foreign repo disabled.
 fresh_log apply
 omedora-replace-foreign --yes >/dev/null 2>&1
 swap_line="$(grep -E '(^| )swap hyprland hyprland-omedora( |$)' "$DNF_LOG" || true)"
+inst_line="$(grep -E '(^| )install waybar( |$)' "$DNF_LOG" || true)"
 sync_line="$(grep -E 'distro-sync waybar' "$DNF_LOG" || true)"
-assert_output_contains "apply runs: dnf swap hyprland hyprland-omedora" "$swap_line" "swap hyprland hyprland-omedora"
-assert_output_contains "apply runs: dnf distro-sync waybar"             "$sync_line" "distro-sync waybar"
-assert_output_contains "apply disables the foreign repo (swap)"  "$swap_line" "--disablerepo=$FOREIGN_REPO"
-assert_output_contains "apply disables the foreign repo (sync)"  "$sync_line" "--disablerepo=$FOREIGN_REPO"
-# After a successful swap the foreign COPR is disabled persistently (so the rest
-# of the install doesn't keep pulling a foreign/omedora mix).
+assert_output_contains "apply swaps the renamed package"             "$swap_line" "swap hyprland hyprland-omedora"
+assert_output_contains "apply re-installs the same-name target"      "$inst_line" "install waybar"
+assert_output_contains "apply distro-syncs the same-name target"     "$sync_line" "distro-sync waybar"
+assert_output_contains "apply disables the foreign repo (swap)" "$swap_line" "--disablerepo=$FOREIGN_REPO"
+# After a successful replacement the foreign COPR is disabled persistently (so
+# the rest of the install doesn't keep pulling a foreign/omedora mix).
 disable_line="$(grep -E 'copr disable solopasha/hyprland' "$DNF_LOG" || true)"
 assert_output_contains "apply disables the replaced foreign COPR" "$disable_line" "copr disable solopasha/hyprland"
 
@@ -215,6 +219,7 @@ assert_equals "fedora-swap.sh is a no-op without consent" "$(wc -l <"$DNF_LOG")"
 
 fresh_log swapstep_on
 OMEDORA_REPLACE_FOREIGN=1 bash "$ROOT/install/preflight/fedora-swap.sh" >/dev/null 2>&1 || true
-assert_output_contains "fedora-swap.sh applies the swap with consent" "$(cat "$DNF_LOG")" "swap hyprland hyprland-omedora"
+assert_output_contains "fedora-swap.sh applies the replacement with consent" \
+  "$(cat "$DNF_LOG")" "swap hyprland hyprland-omedora"
 
 echo "# All coexistence replacement tests passed."

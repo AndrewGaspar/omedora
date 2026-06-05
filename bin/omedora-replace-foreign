@@ -157,6 +157,14 @@ if [[ -n $ensure_copr ]]; then
 fi
 
 rc=0
+
+# 1. RENAMES via `dnf swap` (atomic remove-foreign + install-omedora). This is
+#    what actually removes the foreign `hyprland` — it owns the same
+#    /usr/bin/Hyprland as omedora's hyprland-no-session, and a plain
+#    `install --allowerasing` will NOT erase a package over a *file* conflict.
+#    The swap can CASCADE-REMOVE same-name packages that depend on the foreign
+#    one (e.g. xdg-desktop-portal-hyprland needs the foreign hyprland); step 2
+#    puts those back. Foreign repo disabled so deps resolve from omedora.
 for s in "${swaps[@]}"; do
   read -ra parts <<<"$s"
   foreign="${parts[0]}"
@@ -164,13 +172,24 @@ for s in "${swaps[@]}"; do
   if [[ ${#targets[@]} -eq 1 ]]; then
     $DNF -y "${disable_args[@]}" swap "$foreign" "${targets[0]}" || rc=$?
   else
-    # Multiple targets: remove the foreign package, then install omedora's set.
     $DNF -y "${disable_args[@]}" remove "$foreign" || rc=$?
-    $DNF -y install "${targets[@]}" || rc=$?
+    $DNF -y "${disable_args[@]}" install "${targets[@]}" || rc=$?
   fi
 done
 
-if [[ ${#syncs[@]} -gt 0 ]]; then
+# 2. Ensure the same-name targets are INSTALLED from omedora. A swap above may
+#    have cascade-removed some; `install` re-adds those and no-ops the rest. We
+#    use install (not distro-sync) here precisely because distro-sync ERRORS on a
+#    package that the swap removed ("available, but not installed") — the bug
+#    this fixes.
+if [[ $rc -eq 0 && ${#syncs[@]} -gt 0 ]]; then
+  $DNF -y "${disable_args[@]}" install "${syncs[@]}" || rc=$?
+fi
+
+# 3. Move the same-name packages' provenance onto omedora's repo. Safe now — all
+#    are installed by step 2, and the foreign repo is disabled, so this just
+#    re-pulls them from omedora.
+if [[ $rc -eq 0 && ${#syncs[@]} -gt 0 ]]; then
   $DNF -y "${disable_args[@]}" distro-sync "${syncs[@]}" || rc=$?
 fi
 
