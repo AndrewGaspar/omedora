@@ -1,3 +1,8 @@
+## v0.1.3 — 2026-06-05 (Omarchy 3.8.2)
+
+- fix(bootstrap): default boot-omedora.sh ref to 3.8.2-omedora, not dev
+- fix(fedora): brand the update flow as Omedora; drop upstream community links
+
 ## v0.1.2 — 2026-06-05 (Omarchy 3.8.2)
 
 - docs(update): correct util-linux-script reference to fedora-baseline.sh
