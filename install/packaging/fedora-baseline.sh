@@ -16,8 +16,15 @@
 #   pipewire-pulseaudio  PulseAudio compat (pactl + the pulse socket) that
 #                        waybar's audio module and swayosd talk to.
 #   pipewire-alsa        ALSA compat — expected on a desktop.
+#   util-linux-script    the `script` PTY logger. On Arch it ships in util-linux
+#                        (base); Fedora 44 split it out of util-linux-core, so a
+#                        minimal base lacks it. omarchy-update re-execs itself
+#                        under `script` to log the session to
+#                        /tmp/omarchy-update.log — without it the update runs
+#                        unlogged (bin/omarchy-update guards on `command -v
+#                        script`). Installing it here restores the logged path.
 
-omarchy-pkg-add xdg-utils pipewire pipewire-pulseaudio pipewire-alsa
+omarchy-pkg-add xdg-utils pipewire pipewire-pulseaudio pipewire-alsa util-linux-script
 
 # Fedora wifi TUI: impala (omarchy's Super+Ctrl+W panel) needs iwd, which Fedora
 # Workstation doesn't run — it rides NetworkManager. gazelle-tui is a
