@@ -1,3 +1,14 @@
+## v0.1.1 — 2026-06-05 (Omarchy 3.8.2)
+
+- fix(replace): keep the atomic swap critical, make reconciliation non-fatal
+- fix(replace): swap + install + distro-sync so a foreign Hyprland replace works
+- feat(replace): disable the foreign COPR after replacing its packages
+- fix(fedora): coexistence gate is interactive under `curl | bash`
+- fix(install): stop the error handler from choking on dash-prefixed output
+- fix(test): L2 integration installs the nerd-fonts from the COPR
+- fix(test): give pkg-helper-test a session bus for the flatpak routing asserts
+- fix(ci): point L2/L3 COPR assertions at omedora-3 + run Test on the launch branch
+
 ## v0.1.0 — 2026-06-05 (Omarchy 3.8.2)
 
 Initial public release — **Omarchy for stable Fedora Workstation**.
