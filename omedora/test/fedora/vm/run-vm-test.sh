@@ -302,7 +302,10 @@ do_install() {
   # Prefer the in-VM sentinel rc over ssh's (ssh -tt rc can reflect the PTY).
   local vm_rc; vm_rc=$(vmssh 'sed -n "s/^INSTALL_RC=//p" /tmp/omedora-install.rc 2>/dev/null' 2>/dev/null | tr -dc 0-9)
   [[ -n "$vm_rc" ]] && rc="$vm_rc"
-  set -e 2>/dev/null || true
+  # NOTE: do not re-enable errexit here — this script runs without `set -e`
+  # on purpose (stages capture $? and continue); a stray `set -e` would abort
+  # the whole run on the first non-zero stage rc (e.g. a failing assert).
+  set +o errexit 2>/dev/null || true
   log "install.sh exit: $rc"
   return $rc
 }
@@ -324,17 +327,32 @@ start_session() {
   vmscp "$HERE/in-vm/select-session.sh" "$VM_USER@127.0.0.1:/tmp/select-session.sh" || die "scp select failed"
   vmssh 'bash /tmp/select-session.sh' || warn "select-session reported issues (continuing)"
 
-  # Give GDM autologin time to start the Hyprland session under the user seat.
+  # select-session.sh reboots the VM (so GDM autologins into the omedora session
+  # on a fresh seat). SSH drops during the reboot; wait for it to come back, then
+  # poll for the Hyprland IPC socket. The SSH login IS the omedora user (uid
+  # 1000), so /run/user/1000/hypr is directly readable — no runuser (which is
+  # root-only and was failing).
+  local i
+  log "waiting for SSH to recover after the session reboot..."
+  for i in $(seq 1 30); do
+    vmssh true 2>/dev/null && break
+    sleep 5
+  done
+
   log "waiting for the Omedora/Hyprland session to come up on the real seat..."
-  local i up=false
+  local up=false
   for i in $(seq 1 40); do
-    if vmssh 'runuser -l '"$VM_USER"' -c "ls /run/user/1000/hypr 2>/dev/null" | grep -q .' 2>/dev/null; then
+    if vmssh 'ls /run/user/1000/hypr 2>/dev/null | grep -q .' 2>/dev/null; then
       up=true; break
     fi
     sleep 5
   done
-  $up && log "Hyprland IPC socket present under /run/user/1000/hypr" \
-       || warn "no Hyprland instance under /run/user/1000/hypr after ~3min (session may not have started)"
+  if $up; then
+    log "Hyprland IPC socket present under /run/user/1000/hypr"
+  else
+    warn "no Hyprland instance under /run/user/1000/hypr after ~3min — capturing diagnostics"
+    vmssh 'loginctl list-sessions --no-legend; echo "--- failed user units ---"; systemctl --user list-units --failed --no-legend 2>/dev/null; echo "--- uwsm log ---"; tail -30 /run/user/1000/uwsm-start.log 2>/dev/null' 2>/dev/null | sed 's/^/  /' >&2 || true
+  fi
 
   # Real-framebuffer screenshot — the artifact no container can produce.
   mkdir -p "$ARTIFACTS"
@@ -371,7 +389,10 @@ run_session_tests() {
   set +e
   vmssh 'bash ~/vm-suite/run-suite-in-session.sh'
   local rc=$?
-  set -e 2>/dev/null || true
+  # NOTE: do not re-enable errexit here — this script runs without `set -e`
+  # on purpose (stages capture $? and continue); a stray `set -e` would abort
+  # the whole run on the first non-zero stage rc (e.g. a failing assert).
+  set +o errexit 2>/dev/null || true
   vmscp -r "$VM_USER@127.0.0.1:vm-suite/artifacts/." "$ARTIFACTS/" 2>/dev/null || true
   return $rc
 }

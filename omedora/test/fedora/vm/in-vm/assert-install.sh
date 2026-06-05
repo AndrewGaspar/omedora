@@ -48,12 +48,18 @@ else
   fail "hyprland-omedora installed from the COPR (got: ${from_repo:-<none>}, expected: ${EXPECT_COPR:-copr:...:agaspar:omedora-*})"
 fi
 
-# Broader: count how many installed packages trace to the COPR. >1 means the
-# whole vendored stack (walker/elephant/uwsm/fonts/...) resolved from it.
-copr_count=$(dnf repoquery --installed --qf '%{from_repo}\n' 2>/dev/null | grep -c 'copr:.*agaspar:omedora' || true)
+# Broader: count how many installed packages trace to the COPR. A healthy
+# install pulls the whole vendored stack (hyprland-no-session, aquamarine,
+# walker/elephant, swayosd, hypr*, the TUIs, fonts, uwsm...) from it — dozens.
+# NOTE: query %{name} %{from_repo} (not bare %{from_repo}): dnf5 DEDUPLICATES
+# identical single-field rows, so a bare %{from_repo} query collapses all COPR
+# packages to one line and undercounts to 1.
+copr_count=$(dnf repoquery --installed --qf '%{name} %{from_repo}\n' 2>/dev/null | grep -c 'agaspar:omedora' || true)
 echo "# installed packages from the omedora COPR: ${copr_count:-0}"
-if [[ "${copr_count:-0}" -ge 1 ]]; then
-  pass "at least one package installed from the omedora COPR (count=$copr_count)"
+if [[ "${copr_count:-0}" -ge 5 ]]; then
+  pass "the vendored stack installed from the omedora COPR (count=$copr_count)"
+elif [[ "${copr_count:-0}" -ge 1 ]]; then
+  pass "at least one package installed from the omedora COPR (count=$copr_count — fewer than expected)"
 else
   fail "packages installed from the omedora COPR (count=${copr_count:-0})"
 fi
@@ -98,10 +104,20 @@ pass "config backup mechanism observable (n=$n_backups — non-gating; a clean b
 # --- 4. no errors in the install log ----------------------------------------
 LOG=/var/log/omarchy-install.log
 if [[ -r "$LOG" ]]; then
-  # Match the error markers the install scaffolding writes, but ignore benign
-  # mentions (lines describing error HANDLING, dnf "Error:" inside a retried-OK
-  # transaction are caught below by the overall install rc the orchestrator has).
-  errs=$(grep -niE 'traceback|FAILED|fatal error|command not found|No match for argument' "$LOG" 2>/dev/null | head -20 || true)
+  # Match the hard error markers, then drop KNOWN-BENIGN lines that a healthy
+  # TTY-less install legitimately prints:
+  #   * "Failed to preset unit: ... display-manager.service already exists" —
+  #     GDM is already the DM on the Workstation base; the preset is a no-op.
+  #   * "Failed to reset failed state of unit <session unit>: ... not loaded" —
+  #     swayosd/hypr* user units aren't loaded during a non-graphical install.
+  #   * "Failed to load `plugins.theme`" — a LazyVim/nvim first-sync transient
+  #     with no graphical session; the plugin loads fine in-session.
+  # A real fatal (a crashed install step, a missing COPR package) still trips
+  # because install.sh's own rc would be non-zero (the orchestrator checks that
+  # separately) and the surviving markers below would fire.
+  errs=$(grep -niE 'traceback|fatal error|command not found|No match for argument|^[0-9]+:.*\bFAILED\b' "$LOG" 2>/dev/null \
+         | grep -viE "display-manager\.service' already exists|reset failed state of unit .*not loaded|Failed to load .?plugins\.theme" \
+         | head -20 || true)
   if [[ -z "$errs" ]]; then
     pass "no error markers in $LOG"
   else
