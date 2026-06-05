@@ -174,6 +174,23 @@ if [[ ${#syncs[@]} -gt 0 ]]; then
   $DNF -y "${disable_args[@]}" distro-sync "${syncs[@]}" || rc=$?
 fi
 
+# Now that the foreign packages are replaced, DISABLE the foreign COPR(s) we
+# pulled them from — otherwise the rest of the install (and future `dnf upgrade`)
+# would keep pulling a foreign/omedora MIX of the Hyprland stack (e.g. hypridle
+# from the foreign COPR), and a foreign `hyprland` could re-appear and re-conflict
+# with omedora's hyprland-no-session. "Replace" means stop using that source.
+# Best-effort; only the enabled COPR repos we actually acted on.
+if [[ $rc -eq 0 ]]; then
+  for r in "${!disable_repos[@]}"; do
+    [[ -n ${enabled_repos[$r]:-} ]] || continue
+    # copr:copr.fedorainfracloud.org:OWNER:PROJECT -> OWNER/PROJECT
+    if [[ $r =~ ^copr:[^:]+:([^:]+):([^:]+)$ ]]; then
+      echo "omedora: disabling the replaced foreign COPR ${BASH_REMATCH[1]}/${BASH_REMATCH[2]} ..."
+      $DNF -y copr disable "${BASH_REMATCH[1]}/${BASH_REMATCH[2]}" >/dev/null 2>&1 || true
+    fi
+  done
+fi
+
 echo
 if [[ $rc -eq 0 ]]; then
   echo -e "\033[32momedora: foreign-repo packages replaced with omedora's builds.\033[0m"

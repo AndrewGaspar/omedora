@@ -114,6 +114,10 @@ assert_output_contains "apply runs: dnf swap hyprland hyprland-omedora" "$swap_l
 assert_output_contains "apply runs: dnf distro-sync waybar"             "$sync_line" "distro-sync waybar"
 assert_output_contains "apply disables the foreign repo (swap)"  "$swap_line" "--disablerepo=$FOREIGN_REPO"
 assert_output_contains "apply disables the foreign repo (sync)"  "$sync_line" "--disablerepo=$FOREIGN_REPO"
+# After a successful swap the foreign COPR is disabled persistently (so the rest
+# of the install doesn't keep pulling a foreign/omedora mix).
+disable_line="$(grep -E 'copr disable solopasha/hyprland' "$DNF_LOG" || true)"
+assert_output_contains "apply disables the replaced foreign COPR" "$disable_line" "copr disable solopasha/hyprland"
 
 # 3c) non-interactive WITHOUT --yes: refuse, change nothing (exit 3).
 fresh_log refuse
