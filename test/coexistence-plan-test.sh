@@ -161,6 +161,19 @@ assert_output_contains "C: warns it is proceeding non-interactively" \
   "$PLAN_OUT" "proceeding non-interactively"
 assert_equals "C: non-interactive did NOT prompt (no gum)" \
   "$([[ -e $GUM_CALLED ]] && echo called || echo not)" "not"
+
+# --- C2: non-interactive + a FOREIGN Hyprland -> ABORT (would file-conflict) --
+# Can't ask whether to replace, and installing over it is a guaranteed conflict,
+# so the gate must abort with guidance rather than proceed into failure.
+gate_home C2
+export OMEDORA_REPOQUERY_CMD="printf '%s\n' 'hyprland 0.55.1 copr:copr.fedorainfracloud.org:lionheartp:Hyprland'"
+run_gate
+assert_equals "C2: non-interactive + foreign Hyprland aborts (exit 1)" "$PLAN_RC" "1"
+assert_output_contains "C2: abort explains the file conflict + the fix" \
+  "$PLAN_OUT" "Aborting"
+assert_output_contains "C2: abort points at omedora doctor --fix" \
+  "$PLAN_OUT" "omedora doctor --fix"
+export OMEDORA_REPOQUERY_CMD="printf ''"   # restore clean doctor for later cases
 unset OMEDORA_PLAN_FORCE_NONINTERACTIVE
 
 # --- D: clean machine (no backups, no foreign pkgs) -> proceed WITHOUT prompt -

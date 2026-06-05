@@ -106,8 +106,17 @@ omedora_plan_summary() {
 }
 
 # --- decide interactivity ----------------------------------------------------
+# Prompt from the CONTROLLING TERMINAL (/dev/tty), not stdin — so the prompt
+# works under `curl ... | bash` (the recommended install one-liner), where the
+# script's stdin is the curl pipe rather than a TTY. Fall back to stdin only
+# when there is no usable terminal at all.
+PROMPT_TTY=/dev/stdin
+if { true >/dev/tty; } 2>/dev/null; then PROMPT_TTY=/dev/tty; fi
+
 interactive=1
-{ [[ -n ${OMARCHY_NONINTERACTIVE:-} ]] || [[ ! -t 0 ]] || [[ ! -t 1 ]]; } && interactive=0
+if [[ -n ${OMARCHY_NONINTERACTIVE:-} ]] || [[ $PROMPT_TTY != /dev/tty ]]; then
+  interactive=0
+fi
 [[ -n ${OMEDORA_PLAN_FORCE_INTERACTIVE:-} ]] && interactive=1
 [[ -n ${OMEDORA_PLAN_FORCE_NONINTERACTIVE:-} ]] && interactive=0
 
@@ -117,10 +126,20 @@ if [[ $have_conflicts -eq 0 ]]; then
   echo -e "\033[32mOmedora: no existing config files conflict and no foreign-repo packages detected; nothing will be backed up. Proceeding.\033[0m"
   # fall through -> proceed
 elif [[ $interactive -eq 0 ]]; then
-  # Non-interactive: show the plan as a warning and proceed. Backup-then-write
-  # preserves every original (saved as <file>.pre-omedora-<ts>, never deleted).
   omedora_plan_summary >&2
-  echo -e "\033[33mOmedora: proceeding non-interactively. Existing files are backed up (never deleted) before being replaced; foreign-repo packages are kept as-is — run 'omedora doctor --fix' afterward to replace them with omedora's builds.\033[0m" >&2
+  # A foreign-repo Hyprland on the machine WILL file-conflict with omedora's
+  # hyprland-no-session during packaging (both own /usr/bin/Hyprland). Without a
+  # terminal we can't offer to replace it, and proceeding is a guaranteed dnf
+  # failure — so abort with a clear path instead of marching into it.
+  if [[ $doctor_rc -ne 0 ]]; then
+    echo -e "\033[31mOmedora: foreign-repo Hyprland packages are installed (see above) and this is a non-interactive install, so omedora can't ask whether to replace them. Installing over them would fail with a /usr/bin/Hyprland file conflict.\033[0m" >&2
+    echo -e "\033[31m  Fix it, then re-run the install, by either:\033[0m" >&2
+    echo -e "\033[31m    • running the installer from a real terminal (not piped through curl) to get the Replace prompt, or\033[0m" >&2
+    echo -e "\033[31m    • running 'omedora doctor --fix' now to swap them for omedora's builds.\033[0m" >&2
+    echo -e "\033[31mAborting; nothing was changed.\033[0m" >&2
+    exit 1
+  fi
+  echo -e "\033[33mOmedora: proceeding non-interactively. Existing files are backed up (never deleted) before being replaced.\033[0m" >&2
   # fall through -> proceed
 else
   # Interactive: show the plan and require an explicit choice.
@@ -139,9 +158,9 @@ else
     if command -v gum >/dev/null 2>&1; then
       choice="$(gum choose --header \
         "Foreign-repo Hyprland packages detected. What would you like to do?" \
-        "Replace" "Keep" "Abort")"
+        "Replace" "Keep" "Abort" <"$PROMPT_TTY")"
     else
-      read -r -p "  [R]eplace foreign packages, [K]eep them, or [A]bort? [R/k/a] " reply
+      read -r -p "  [R]eplace foreign packages, [K]eep them, or [A]bort? [R/k/a] " reply <"$PROMPT_TTY"
       case "$reply" in [kK]*) choice="Keep" ;; [aA]*) choice="Abort" ;; *) choice="Replace" ;; esac
     fi
 
@@ -166,9 +185,9 @@ else
     # Only config backups to confirm: a simple proceed / abort.
     proceed=0
     if command -v gum >/dev/null 2>&1; then
-      gum confirm "Proceed with the omedora install (back up & replace the files listed above)?" && proceed=1
+      gum confirm "Proceed with the omedora install (back up & replace the files listed above)?" <"$PROMPT_TTY" && proceed=1
     else
-      read -r -p "Proceed with the omedora install (back up & replace the files listed above)? [y/N] " reply
+      read -r -p "Proceed with the omedora install (back up & replace the files listed above)? [y/N] " reply <"$PROMPT_TTY"
       case "$reply" in [yY] | [yY][eE][sS]) proceed=1 ;; esac
     fi
 
