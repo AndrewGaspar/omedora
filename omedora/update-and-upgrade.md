@@ -197,9 +197,33 @@ After the script finishes, control returns to `omarchy-update-fedora-version-che
 | Remove orphans | `omarchy-update-orphan-pkgs` | — | Arch-specific. dnf autoremove is a separate user concern; out of scope. |
 | Post-update hook | `omarchy-hook post-update` | same | Unchanged. |
 | Analyze logs | `omarchy-update-analyze-logs` | same | Unchanged. |
-| Prompt restart | `omarchy-update-restart` | same | Already distro-agnostic in shape; detects deleted Hyprland binary, kernel updates (via `/usr/lib/modules/*/vmlinuz` and `pacman -Qo` — note that the kernel-update detection currently uses `pacman -Qo`, which won't work on Fedora; this needs a Fedora arm). |
+| Prompt restart | `omarchy-update-restart` | same | Detects deleted Hyprland binary + kernel updates. The kernel-update detection attributes `/usr/lib/modules/*/vmlinuz` to a package: `pacman -Qo` on Arch, `rpm -qf` on Fedora (distro-dispatched — fixed, see below). |
 
-**Open issue:** `omarchy-update-restart` uses `pacman -Qo "$kernel"` to attribute a kernel file to a package, to detect kernel updates. On Fedora this needs to be `rpm -qf "$kernel"`. Add a distro dispatch inside the kernel-update-detection block or split into a Fedora sibling. This is a known patch-stack entry; see [`architecture.md` patch-stack map](architecture.md#15-patch-stack-map).
+**Resolved:** `omarchy-update-restart` now dispatches the kernel-file→package probe by distro (`rpm -qf` on Fedora, `pacman -Qo` on Arch), so it no longer falsely prompts a reboot on every Fedora update.
+
+---
+
+## 4a. Fedora-update breakages fixed (the `omarchy update` / `omedora update` flow)
+
+Three Arch-only assumptions in the shared update chain aborted (or degraded) the Fedora flow. All are now guarded/distro-gated, keeping the Arch paths byte-identical:
+
+1. **`script` PTY wrapper (the headline bug).** `bin/omarchy-update` re-execs itself under `script` to log the session to `/tmp/omarchy-update.log`. On Fedora 44 `script` lives in the `util-linux-script` package (split out of `util-linux-core`) and is absent on a minimal base, so the unconditional `exec env … script …` died immediately with `env: 'script': No such file or directory` — before *any* Fedora logic ran. Now guarded on `command -v script`: present → logged path (Arch always; Fedora once `util-linux-script` is installed); absent → run unlogged instead of aborting. omedora's Fedora baseline (`install/packaging/fedora-baseline.sh`) now installs `util-linux-script` so fresh installs get the logged path.
+
+2. **`omarchy-update-time` restarted `systemd-timesyncd`.** Fedora rides `chronyd` and does not ship `systemd-timesyncd`, so the restart failed — and because `omarchy-update-git` calls it under `set -e`, it aborted the **whole update right after the git pull**. Now restarts `chronyd` on Fedora (tolerating it being absent/inactive).
+
+3. **`omarchy-update-restart` kernel probe used `pacman -Qo`** (see §4 row above) — now `rpm -qf` on Fedora.
+
+### Recovery for users already on v0.1.0 / v0.1.1 (important)
+
+The guard (#1) and the timesyncd fix (#2) are **going-forward** fixes: they live in the *new* code. A user already on v0.1.0/v0.1.1 is running the *old* `omarchy-update`, which dies at the `script` wrapper (and, on a real Fedora box, at the `systemd-timesyncd` restart) **before** it can `git pull` the fix. So `omarchy update` cannot self-heal those installs — it's chicken-and-egg.
+
+**The one-time recovery is a manual pull (no sudo):**
+
+```
+git -C ~/.local/share/omarchy pull
+```
+
+After that single pull, the on-disk `omarchy-update` is the fixed one, and `omarchy update` works normally from then on. (Re-running omedora's bootstrap installer achieves the same thing.) This is verified end-to-end by `omedora/test/fedora/upgrade-from-release-test.sh`, which checks out each prior release in a fedora:44 container, confirms `omarchy update` stays stuck, then confirms the manual pull + a subsequent `omarchy update` reaches the real `dnf upgrade` dispatch.
 
 ---
 

@@ -510,6 +510,8 @@ omedora/test/fedora/
 │   ├── lib.sh                        # in-container: session env + headless assertions
 │   ├── tests/                        # NN-name.sh assertion scripts (00-session, 10-walker, …, 90-workstation [SKIP-gated])
 │   └── .gitignore                    # ignores artifacts/
+├── upgrade-from-release-test.sh  # standalone L3: upgrade FROM a prior release (v0.1.0/v0.1.1) in fedora:44 — drives the REAL omarchy-update→perform→perform-fedora→omedora-update-pkgs dispatch (dnf stubbed via $OMEDORA_DNF_CMD); proves the `script`-wrapper + timesyncd fixes and the manual-pull recovery for already-installed old releases (podman)
+├── replace-foreign-test.sh # standalone L3: foreign-repo Hyprland REPLACEMENT through real dnf5 (podman)
 ├── raw-hyprland-test.sh    # standalone L4: vanilla `dnf install hyprland` (COPR) boots a DEFAULT Hyprland session (no omedora/uwsm)
 ├── build-session.sh        # boot base under systemd, install via machinectl shell, commit (--workstation for the WS base)
 ├── run-integration.sh      # L2 host-side runner
