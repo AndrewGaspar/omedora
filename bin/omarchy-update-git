@@ -4,7 +4,12 @@
 
 set -e
 
-echo -e "\e[32mUpdate Omarchy\e[0m"
+# Fedora installs are Omedora; keep the Arch path byte-identical to upstream.
+if [[ "$(omarchy-distro 2>/dev/null || echo arch)" == "fedora" ]]; then
+  echo -e "\e[32mUpdate Omedora\e[0m"
+else
+  echo -e "\e[32mUpdate Omarchy\e[0m"
+fi
 
 omarchy-update-time
 

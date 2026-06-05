@@ -2,13 +2,20 @@
 
 # omarchy:summary=Prompt for confirmation before starting an update
 
+# Point "What's new" at the right project's releases: Omedora on Fedora,
+# upstream Omarchy on Arch (keeps the Arch path byte-identical).
+releases_url="https://github.com/basecamp/omarchy/releases"
+if [[ "$(omarchy-distro 2>/dev/null || echo arch)" == "fedora" ]]; then
+  releases_url="https://github.com/AndrewGaspar/omedora/releases"
+fi
+
 gum style --border normal --padding "1 2" \
   "Ready to update?" \
   "" \
   "• You cannot stop the update once you start!" \
   "• Make sure you're connected to power or have a full battery" \
   "" \
-  "What's new: https://github.com/basecamp/omarchy/releases"
+  "What's new: $releases_url"
 
 echo
 

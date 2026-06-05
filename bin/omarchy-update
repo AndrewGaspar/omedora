@@ -24,6 +24,13 @@ fi
 
 trap 'echo ""; echo -e "\033[0;31mSomething went wrong during the update!\n\nPlease review the output above carefully, correct the error, and retry the update.\n\nIf you need assistance, get help from the community at https://omarchy.org/discord\033[0m"' ERR
 
+# Omedora has no community channel yet, so drop the upstream Omarchy community
+# line on Fedora (Arch trap above stays byte-identical to upstream).
+# TODO(omedora): point this at an Omedora community/support channel once one exists.
+if [[ "$(omarchy-distro 2>/dev/null || echo arch)" == "fedora" ]]; then
+  trap 'echo ""; echo -e "\033[0;31mSomething went wrong during the update!\n\nPlease review the output above carefully, correct the error, and retry the update.\033[0m"' ERR
+fi
+
 if [[ $1 == "-y" ]] || omarchy-update-confirm; then
   # omarchy-snapshot is Arch/btrfs+snapper — omedora doesn't own the Fedora boot
   # stack, so skip it there. omarchy-update-perform itself dispatches to the

@@ -6,6 +6,15 @@ set -e
 
 # Reinstall the Omarchy configuration directory from the git source.
 
-git clone --depth=1 --branch master "https://github.com/basecamp/omarchy.git" ~/.local/share/omarchy-new >/dev/null
+# Fedora installs are Omedora — reinstall from the omedora repo, not upstream
+# Omarchy. The Arch path stays byte-identical to upstream.
+reinstall_repo="https://github.com/basecamp/omarchy.git"
+reinstall_branch="master"
+if [[ "$(omarchy-distro 2>/dev/null || echo arch)" == "fedora" ]]; then
+  reinstall_repo="https://github.com/AndrewGaspar/omedora.git"
+  reinstall_branch="${OMARCHY_REF:-3.8.2-omedora}"
+fi
+
+git clone --depth=1 --branch "$reinstall_branch" "$reinstall_repo" ~/.local/share/omarchy-new >/dev/null
 mv $OMARCHY_PATH ~/.local/share/omarchy-old
 mv ~/.local/share/omarchy-new $OMARCHY_PATH

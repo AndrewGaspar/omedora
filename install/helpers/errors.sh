@@ -91,15 +91,23 @@ catch_errors() {
   clear_logo
   show_cursor
 
-  gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Omarchy installation stopped!"
+  if [[ "$(omarchy-distro 2>/dev/null || echo arch)" == "fedora" ]]; then
+    gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Omedora installation stopped!"
+  else
+    gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Omarchy installation stopped!"
+  fi
   show_log_tail
 
   gum style -- "This command halted with exit code $exit_code:"
   show_failed_script_or_command
 
-  gum style -- "$QR_CODE"
-  echo
-  gum style -- "Get help from the community via QR code or at https://discord.gg/tXFUdasqhY"
+  # Omedora has no community channel yet, so omit the upstream Omarchy QR/community
+  # link on Fedora. TODO(omedora): show an Omedora community link once one exists.
+  if [[ "$(omarchy-distro 2>/dev/null || echo arch)" != "fedora" ]]; then
+    gum style -- "$QR_CODE"
+    echo
+    gum style -- "Get help from the community via QR code or at https://discord.gg/tXFUdasqhY"
+  fi
 
   # Non-interactive bypass: in containers / CI / scripted runs there's no
   # human to answer the gum prompt. Exit immediately so the caller (docker
