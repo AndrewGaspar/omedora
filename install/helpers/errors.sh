@@ -35,7 +35,7 @@ show_log_tail() {
         local truncated_line="$line"
       fi
 
-      gum style "$truncated_line"
+      gum style -- "$truncated_line"
     done
 
     echo
@@ -45,7 +45,7 @@ show_log_tail() {
 # Display the failed command or script name
 show_failed_script_or_command() {
   if [[ -n ${CURRENT_SCRIPT:-} ]]; then
-    gum style "Failed script: $CURRENT_SCRIPT"
+    gum style -- "Failed script: $CURRENT_SCRIPT"
   else
     # Truncate long command lines to fit the display
     local cmd="$BASH_COMMAND"
@@ -55,7 +55,7 @@ show_failed_script_or_command() {
       cmd="${cmd:0:$max_cmd_width}..."
     fi
 
-    gum style "$cmd"
+    gum style -- "$cmd"
   fi
 }
 
@@ -94,12 +94,12 @@ catch_errors() {
   gum style --foreground 1 --padding "1 0 1 $PADDING_LEFT" "Omarchy installation stopped!"
   show_log_tail
 
-  gum style "This command halted with exit code $exit_code:"
+  gum style -- "This command halted with exit code $exit_code:"
   show_failed_script_or_command
 
-  gum style "$QR_CODE"
+  gum style -- "$QR_CODE"
   echo
-  gum style "Get help from the community via QR code or at https://discord.gg/tXFUdasqhY"
+  gum style -- "Get help from the community via QR code or at https://discord.gg/tXFUdasqhY"
 
   # Non-interactive bypass: in containers / CI / scripted runs there's no
   # human to answer the gum prompt. Exit immediately so the caller (docker
