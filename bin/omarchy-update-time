@@ -4,4 +4,14 @@
 # omarchy:requires-sudo=true
 
 echo "Updating time..."
-sudo systemctl restart systemd-timesyncd
+
+# Restart the NTP client. Arch (omarchy) ships systemd-timesyncd; Fedora rides
+# chronyd and does NOT install systemd-timesyncd, so restarting it there fails
+# with "Unit systemd-timesyncd.service not found" — which would abort the whole
+# update (omarchy-update-git calls this under `set -e`). Dispatch by distro and
+# tolerate the service being absent/inactive; the Arch line is unchanged.
+if [[ "$(omarchy-distro 2>/dev/null || echo arch)" == "fedora" ]]; then
+  sudo systemctl restart chronyd 2>/dev/null || true
+else
+  sudo systemctl restart systemd-timesyncd
+fi

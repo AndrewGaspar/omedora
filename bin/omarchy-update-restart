@@ -7,8 +7,18 @@ echo
 running_kernel=$(uname -r)
 kernel_updated=true
 
+# Attribute a kernel file to its owning package to detect a kernel update.
+# Arch uses `pacman -Qo`; Fedora has no pacman (it's rpm/dnf), so probing with
+# pacman there always fails → kernel_updated would wrongly stay true and prompt
+# a reboot on every update. Dispatch the ownership probe by distro; the Arch
+# call below is unchanged.
+pkg_owns_file() { pacman -Qo "$1" &>/dev/null; }
+if [[ "$(omarchy-distro 2>/dev/null || echo arch)" == "fedora" ]]; then
+  pkg_owns_file() { rpm -qf "$1" &>/dev/null; }
+fi
+
 for kernel in /usr/lib/modules/*/vmlinuz; do
-  if [[ -f $kernel ]] && pacman -Qo "$kernel" &>/dev/null; then
+  if [[ -f $kernel ]] && pkg_owns_file "$kernel"; then
     installed_kernel=$(basename "$(dirname "$kernel")")
 
     if [[ $installed_kernel == $running_kernel ]]; then
