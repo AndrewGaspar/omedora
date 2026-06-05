@@ -82,9 +82,8 @@ runcmd:
   # Signal completion: the orchestrator greps this file's contents over SSH.
   - [ sh, -c, "echo done > /etc/omedora-vmtest/provision.done" ]
 
-# Reboot into the graphical target once Workstation is laid down, so GDM is the
-# live DM when the orchestrator connects.
-power_state:
-  mode: reboot
-  condition: true
-  message: "Rebooting into Workstation (GDM) after provisioning"
+# NOTE: no power_state reboot here. The orchestrator waits for `cloud-init
+# status: done` over SSH (race-free), and the graphical (GDM) seat is brought up
+# by the session stage (in-vm/select-session.sh isolates graphical.target +
+# restarts gdm into the omedora session) — so a provisioning reboot is
+# unnecessary and only complicates host-side control.

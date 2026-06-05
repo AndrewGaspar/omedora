@@ -226,31 +226,34 @@ provision() {
     --graphics vnc,listen=127.0.0.1 \
     --video virtio \
     --noautoconsole \
-    --noreboot \
     || die "virt-install failed"
 
-  # --noreboot: cloud-init's power_state reboots the guest; with --noreboot the
-  # domain stops on that reboot, so we start it back up to land in the graphical
-  # (GDM) target. Wait for it to power off first, then start.
-  log "waiting for cloud-init provisioning + first power-off (Workstation groupinstall, ~6-12min)..."
+  # Wait for SSH, then for cloud-init to finish its heavy runcmd (the Workstation
+  # comps groupinstall). No guest-reboot dance: cloud-init does NOT power_state
+  # here, so the domain just keeps running; the graphical (GDM) seat is brought
+  # up later by the session stage (select-session.sh isolates graphical.target +
+  # restarts gdm). Polling `cloud-init status` over SSH is race-free, unlike
+  # watching domstate for a transient power-off.
   local i
-  for i in $(seq 1 90); do
-    [[ "$(virsh -c "$URI" domstate "$VM" 2>/dev/null)" == "shut off" ]] && break
-    sleep 10
-  done
-  if [[ "$(virsh -c "$URI" domstate "$VM" 2>/dev/null)" != "shut off" ]]; then
-    warn "VM did not power off within ~15min; starting it anyway (cloud-init may still be running)"
-  else
-    log "provisioning power-off seen; starting VM into the graphical target"
-    virsh -c "$URI" start "$VM" >/dev/null || die "virsh start failed"
-  fi
-
   log "waiting for SSH on 127.0.0.1:$SSH_PORT ..."
   for i in $(seq 1 60); do
-    if vmssh true 2>/dev/null; then log "SSH up"; return 0; fi
+    vmssh true 2>/dev/null && { log "SSH up"; break; }
+    [[ $i -eq 60 ]] && die "SSH never came up (see VNC: virsh -c $URI domdisplay $VM)"
     sleep 10
   done
-  die "SSH never came up (see VNC: virsh -c $URI domdisplay $VM)"
+
+  log "waiting for cloud-init to finish (Workstation groupinstall, ~6-12min)..."
+  for i in $(seq 1 120); do
+    local st; st=$(vmssh 'cloud-init status 2>/dev/null' 2>/dev/null | awk -F': ' '/status/{print $2}')
+    case "$st" in
+      done)  log "cloud-init done"; return 0 ;;
+      error) warn "cloud-init reported error; provisioning may be incomplete:"
+             vmssh 'cloud-init status --long 2>/dev/null' 2>/dev/null | sed 's/^/  /' >&2 || true
+             return 0 ;;  # continue — partial base is often still installable
+    esac
+    [[ $i -eq 120 ]] && { warn "cloud-init did not reach done within ~20min; continuing"; return 0; }
+    sleep 10
+  done
 }
 
 # ---------------------------------------------------------------------------
