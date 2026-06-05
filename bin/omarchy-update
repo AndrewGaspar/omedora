@@ -9,7 +9,15 @@ set -e
 
 # Run the update inside a PTY so pacman/yay keep showing download progress
 # while still logging the full session for later analysis.
-if [[ -z $OMARCHY_UPDATE_LOGGED ]]; then
+#
+# `script` (the PTY logger) lives in util-linux on Arch but is split into the
+# util-linux-script package on Fedora 44, which a minimal base may not have. If
+# it's missing, fall through and run the update UNLOGGED rather than aborting
+# the whole update with `env: 'script': No such file or directory`. omedora
+# installs util-linux-script (see install/packages/fedora.toml) so fresh Fedora
+# installs still get the logged path; Arch always has `script`, so its behavior
+# is unchanged.
+if [[ -z $OMARCHY_UPDATE_LOGGED ]] && command -v script &>/dev/null; then
   script_command=$(printf '%q ' "$0" "$@")
   exec env OMARCHY_UPDATE_LOGGED=1 script -qefc "$script_command" "/tmp/omarchy-update.log"
 fi
