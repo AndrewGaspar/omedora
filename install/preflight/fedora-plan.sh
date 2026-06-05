@@ -120,6 +120,32 @@ fi
 [[ -n ${OMEDORA_PLAN_FORCE_INTERACTIVE:-} ]] && interactive=1
 [[ -n ${OMEDORA_PLAN_FORCE_NONINTERACTIVE:-} ]] && interactive=0
 
+# --- offer a pre-install btrfs snapshot (opt-in) -----------------------------
+# Independent of the config/foreign gate below: a fresh install changes a lot
+# of packages, so on a btrfs root we offer a read-only snapshot of / that the
+# whole install can be rolled back to. Interactive only (a snapshot needs a
+# yes); records consent in OMEDORA_SNAPSHOT, which install/preflight/
+# fedora-snapshot.sh acts on before any change. /home is never touched.
+if [[ $interactive -eq 1 && -z ${OMEDORA_SNAPSHOT:-} ]] \
+   && [[ "$(findmnt -no FSTYPE / 2>/dev/null || true)" == "btrfs" ]]; then
+  echo
+  echo -e "\033[1mPre-install snapshot\033[0m  (your root is btrfs)"
+  echo "  Omedora can snapshot / now so the whole install is reversible later with"
+  echo "  'omedora snapshot rollback <name>' (your /home is a separate subvolume and"
+  echo "  is never touched)."
+  if command -v gum >/dev/null 2>&1; then
+    gum confirm "Take a pre-install snapshot first?" <"$PROMPT_TTY" && export OMEDORA_SNAPSHOT=1
+  else
+    read -r -p "  Take a pre-install snapshot first? [Y/n] " reply <"$PROMPT_TTY"
+    [[ $reply =~ ^[Nn] ]] || export OMEDORA_SNAPSHOT=1
+  fi
+  if [[ -n ${OMEDORA_SNAPSHOT:-} ]]; then
+    echo -e "\033[32m  A snapshot will be taken before any changes.\033[0m"
+  else
+    echo "  Skipping the snapshot."
+  fi
+fi
+
 # --- gate --------------------------------------------------------------------
 if [[ $have_conflicts -eq 0 ]]; then
   # Nothing destructive to confirm. Note it (if there's anything to add) and go.

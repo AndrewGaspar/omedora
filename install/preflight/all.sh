@@ -13,6 +13,13 @@ fi
 source $OMARCHY_INSTALL/preflight/begin.sh
 run_logged $OMARCHY_INSTALL/preflight/show-env.sh
 
+# Pre-install btrfs snapshot, if opted into at the gate (OMEDORA_SNAPSHOT=1).
+# FIRST thing after begin.sh — before the COPR is enabled or any package/config
+# change — so it captures the pristine state. No-op otherwise.
+if [[ $(omarchy-distro 2>/dev/null || echo arch) == "fedora" ]]; then
+  run_logged $OMARCHY_INSTALL/preflight/fedora-snapshot.sh
+fi
+
 # Fedora-only repo enablement (RPM Fusion + omedora COPR + Flathub).
 # Inserted between show-env and the Arch-only pacman setup so it runs early
 # enough that subsequent packaging stages can pull from the new repos.

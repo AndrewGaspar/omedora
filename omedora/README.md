@@ -204,6 +204,19 @@ you already have. (The Arch path keeps upstream Omarchy's behavior unchanged.)
   install (no TTY) prints the same summary and continues, since the backup-then-write
   below never deletes anything.
 
+- **Optional one-button rollback (btrfs).** If your root is btrfs (Fedora
+  Workstation's default), the gate offers to take a **pre-install snapshot** of
+  `/` first. If the install ever goes sideways, you can roll the whole thing back:
+
+  ```bash
+  omedora snapshot list
+  omedora snapshot rollback <name>          # dry run: shows exactly what it'll do
+  omedora snapshot rollback <name> --apply  # do it, then reboot
+  ```
+
+  Your `/home` is a separate subvolume and is never touched, and the previous
+  system is kept as `root.broken-<timestamp>` so the rollback itself is reversible.
+
 What this means in practice:
 
 - **Your configs are backed up before being replaced.** When omedora seeds its

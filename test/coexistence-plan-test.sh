@@ -62,6 +62,13 @@ case "$1" in
 esac
 EOF
   chmod +x "$SHIM/gum"
+  # Fake findmnt: report root fstype as $FAKE_FSTYPE (default ext4 so the btrfs
+  # snapshot offer is OFF unless a test opts in).
+  cat >"$SHIM/findmnt" <<'EOF'
+#!/bin/bash
+case "$*" in *FSTYPE*) printf '%s\n' "${FAKE_FSTYPE:-ext4}" ;; esac
+EOF
+  chmod +x "$SHIM/findmnt"
 }
 
 # Run the gate with the current environment; capture combined output + rc.
@@ -238,5 +245,30 @@ assert_file_exists "P3: apply backed up the user's hyprland.conf" "$backup"
 assert_equals "P3: backup holds the user's original" "$(cat "$backup")" "$custom_before"
 assert_equals "P3: omedora's hyprland.conf is now installed" \
   "$(cat "$APPLY/.config/hypr/hyprland.conf")" "$(cat "$ROOT/config/hypr/hyprland.conf")"
+
+# ===========================================================================
+echo "# --- PART 4: btrfs root -> opt-in pre-install snapshot ---"
+# ===========================================================================
+# Clean config (no backups) so the snapshot offer is the only prompt.
+gate_home S
+cp -f "$OMEDORA_PLAN_SOURCE/hypr/diff.conf" "$HOME/.config/hypr/diff.conf"
+export OMEDORA_PLAN_FORCE_INTERACTIVE=1
+export OMEDORA_REPOQUERY_CMD="printf ''"   # doctor clean
+unset OMEDORA_SNAPSHOT
+
+# ext4 root -> NO snapshot offer at all.
+FAKE_FSTYPE=ext4 run_gate
+assert_output_lacks "non-btrfs root: no snapshot offer" "$PLAN_OUT" "Pre-install snapshot"
+
+# btrfs root + yes -> offered and consented.
+unset OMEDORA_SNAPSHOT
+FAKE_FSTYPE=btrfs FAKE_GUM_CONFIRM=0 run_gate
+assert_output_contains "btrfs root: offers a pre-install snapshot" "$PLAN_OUT" "Pre-install snapshot"
+assert_output_contains "snapshot consented -> announced" "$PLAN_OUT" "A snapshot will be taken"
+
+# btrfs root + no -> declining is honored.
+unset OMEDORA_SNAPSHOT
+FAKE_FSTYPE=btrfs FAKE_GUM_CONFIRM=1 run_gate
+assert_output_contains "declining the snapshot is honored" "$PLAN_OUT" "Skipping the snapshot"
 
 echo "# All coexistence plan-then-confirm tests passed."
