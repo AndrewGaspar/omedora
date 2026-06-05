@@ -12,7 +12,7 @@
 #   2. `omarchy-doctor` must DETECT it as foreign-repo (real `dnf repoquery`).
 #   3. `omedora-replace-foreign --yes` must `dnf swap` it for omedora's
 #      hyprland-omedora (+ hyprland-no-session, which owns the same binary) from
-#      agaspar/omedora-3.8.2, resolving the file conflict atomically.
+#      agaspar/omedora-3, resolving the file conflict atomically.
 #   4. After: the foreign `hyprland` is gone, hyprland-omedora + hyprland-no-session
 #      are installed FROM the omedora COPR, /usr/bin/Hyprland is owned by
 #      hyprland-no-session, and the doctor no longer flags hyprland.

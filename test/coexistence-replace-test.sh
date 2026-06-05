@@ -126,8 +126,8 @@ assert_equals "refused run touches no dnf" "$(wc -l <"$DNF_LOG")" "0"
 
 # 3d) --ensure-copr: enables the COPR before the swap.
 fresh_log copr
-omedora-replace-foreign --yes --ensure-copr agaspar/omedora-3.8.2 >/dev/null 2>&1
-assert_output_contains "ensure-copr runs: dnf copr enable" "$(cat "$DNF_LOG")" "copr enable agaspar/omedora-3.8.2"
+omedora-replace-foreign --yes --ensure-copr agaspar/omedora-3 >/dev/null 2>&1
+assert_output_contains "ensure-copr runs: dnf copr enable" "$(cat "$DNF_LOG")" "copr enable agaspar/omedora-3"
 
 # 3e) clean system: no-op, exit 0, no dnf.
 no_conflicts

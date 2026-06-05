@@ -47,7 +47,7 @@
 #                                            #   repo. With no /etc/yum.repos.d/omedora-local.repo
 #                                            #   present, the staged install's preflight
 #                                            #   (install/preflight/fedora-repos.sh) enables the
-#                                            #   live agaspar/omedora-3.8.2 COPR and resolves
+#                                            #   live agaspar/omedora-3 COPR and resolves
 #                                            #   omedora's packages from it over the network — the
 #                                            #   real from-COPR install path. (env: OMEDORA_USE_COPR=1)
 #
@@ -243,7 +243,7 @@ if ! $fast && ! $use_copr; then
     log "Local omedora RPM repo up to date (no spec newer than repomd.xml; --rebuild-repo to force)"
   fi
 elif $use_copr; then
-  log "COPR mode (--copr): NOT building/injecting the local RPM repo — the staged install's preflight will enable the live agaspar/omedora-3.8.2 COPR and pull from it"
+  log "COPR mode (--copr): NOT building/injecting the local RPM repo — the staged install's preflight will enable the live agaspar/omedora-3 COPR and pull from it"
 fi
 
 # =============================================================================
@@ -328,7 +328,7 @@ if $build_packages; then
     "$BASE_IMAGE" >/dev/null
   wait_for_systemd "$BUILD_CTR"
   if $use_copr; then
-    log "COPR mode: skipping inject_local_repo — fedora-repos.sh will enable agaspar/omedora-3.8.2 (live COPR)"
+    log "COPR mode: skipping inject_local_repo — fedora-repos.sh will enable agaspar/omedora-3 (live COPR)"
   else
     inject_local_repo "$BUILD_CTR"
   fi

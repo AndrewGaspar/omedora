@@ -4,7 +4,7 @@
 #
 # Proves that on a PLAIN Fedora 44 with NO omedora install and NO omedora
 # config, the natural/discoverable full `hyprland` package (from the COPR
-# agaspar/omedora-3.8.2) pulls the binaries package `hyprland-no-session` and
+# agaspar/omedora-3) pulls the binaries package `hyprland-no-session` and
 # boots a DEFAULT Hyprland session using Hyprland's BUILT-IN config — no uwsm,
 # no ~/.config/hypr, no seeded config.
 #
