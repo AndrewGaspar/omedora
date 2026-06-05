@@ -90,6 +90,18 @@ vmssh() {
       -o LogLevel=ERROR -o ConnectTimeout=10 \
       -i "$SSH_KEY" "$VM_USER@127.0.0.1" "$@"
 }
+# Like vmssh but allocates a PTY (-tt). install.sh's presentation.sh reads the
+# terminal via `stty size </dev/tty`, and under `set -eEo pipefail` that
+# command-substitution returns non-zero on a TTY-less SSH login and aborts the
+# whole install with NO output. A real install and the podman tier's
+# `machinectl shell` both run with a PTY; -tt gives the install the same. (-tt
+# merges stderr into the PTY stream; fine here — we tee everything anyway.)
+vmssh_tty() {
+  ssh -tt -p "$SSH_PORT" \
+      -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+      -o LogLevel=ERROR -o ConnectTimeout=10 \
+      -i "$SSH_KEY" "$VM_USER@127.0.0.1" "$@"
+}
 vmscp() {
   scp -P "$SSH_PORT" \
       -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -278,11 +290,18 @@ do_install() {
   # non-destructive). This is the unattended path. The interactive/expect path
   # is exercised separately by run-vm-test.sh's --stage install with a PTY (TODO,
   # see README "Interactive path").
+  # -tt PTY: install.sh aborts silently without a terminal (see vmssh_tty). The
+  # in-VM `tee` keeps the full transcript at /tmp/omedora-install.out so the rc
+  # we read is the install's, not ssh's PTY-forwarding rc.
   set +e
-  vmssh "set -o pipefail; \
+  vmssh_tty "set -o pipefail; \
     export OMARCHY_NONINTERACTIVE=1 OMEDORA_REF='$ref' $fastenv; \
-    bash ~/.local/share/omarchy/install.sh 2>&1 | tee /tmp/omedora-install.out"
+    bash ~/.local/share/omarchy/install.sh 2>&1 | tee /tmp/omedora-install.out; \
+    echo \"INSTALL_RC=\${PIPESTATUS[0]}\" | tee /tmp/omedora-install.rc"
   local rc=$?
+  # Prefer the in-VM sentinel rc over ssh's (ssh -tt rc can reflect the PTY).
+  local vm_rc; vm_rc=$(vmssh 'sed -n "s/^INSTALL_RC=//p" /tmp/omedora-install.rc 2>/dev/null' 2>/dev/null | tr -dc 0-9)
+  [[ -n "$vm_rc" ]] && rc="$vm_rc"
   set -e 2>/dev/null || true
   log "install.sh exit: $rc"
   return $rc
