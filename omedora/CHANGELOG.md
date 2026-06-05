@@ -1,3 +1,16 @@
+## v0.1.2 — 2026-06-05 (Omarchy 3.8.2)
+
+- docs(update): correct util-linux-script reference to fedora-baseline.sh
+- test(fedora): upgrade-from-prior-release integration test + recovery docs
+- test(update): L1 unit coverage for the Fedora update-flow fixes
+- feat(fedora): install util-linux-script so fresh installs log the update
+- refactor(update): honor $OMEDORA_DNF_CMD in omedora-update-pkgs
+- fix(update): Fedora-gate the NTP-restart and kernel-ownership probes in the update chain
+- fix(update): guard the `script` PTY wrapper so a missing util-linux-script doesn't kill the update
+- test(snapshot): L4-VM btrfs rollback test on a real rebooted Fedora VM
+- feat(snapshot): offer a pre-install btrfs snapshot at the gate
+- feat(snapshot): omedora-snapshot — btrfs system snapshots for Fedora
+
 ## v0.1.1 — 2026-06-05 (Omarchy 3.8.2)
 
 - fix(replace): keep the atomic swap critical, make reconciliation non-fatal
