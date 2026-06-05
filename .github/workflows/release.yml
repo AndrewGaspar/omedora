@@ -1,0 +1,49 @@
+name: Release
+
+# On a vX.Y.Z tag (cut by `omedora-release`), publish a GitHub Release whose
+# notes are the matching section of omedora/CHANGELOG.md. Uses the built-in
+# GITHUB_TOKEN — no extra secret. The actual RPMs are built by the COPR-build
+# workflow on push; this is just the human-facing release.
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write   # create the release
+
+jobs:
+  github-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract this tag's CHANGELOG section
+        id: notes
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          cl="omedora/CHANGELOG.md"
+          out=/tmp/release-notes.md
+          if [[ -f "$cl" ]]; then
+            # Print the "## <tag> — ..." section up to (not including) the next "## ".
+            awk -v t="## ${tag} " '
+              index($0, t) == 1 { p = 1; print; next }
+              p && /^## / { p = 0 }
+              p { print }
+            ' "$cl" > "$out" || true
+          fi
+          if [[ ! -s "$out" ]]; then
+            printf '## %s\n\nomedora %s\n' "$tag" "$tag" > "$out"
+          fi
+          echo "Release notes:"; cat "$out"
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "omedora ${GITHUB_REF_NAME}" \
+            --notes-file /tmp/release-notes.md \
+            --verify-tag

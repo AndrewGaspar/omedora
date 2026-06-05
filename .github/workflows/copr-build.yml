@@ -1,0 +1,88 @@
+name: COPR build
+
+# Rebuild the omedora COPR packages whose spec changed, on push to the stable
+# line. The build itself runs on COPR (Fedora's infra), so this job just submits
+# — it costs ~no CI minutes. Precise: only the specs that changed in the push are
+# rebuilt (or an explicit set via workflow_dispatch).
+#
+# SETUP (one-time): add a repo secret named COPR_API_TOKEN containing the FULL
+# contents of your ~/.config/copr token file, e.g.
+#   [copr-cli]
+#   login = ...
+#   username = agaspar
+#   token = ...
+#   copr_url = https://copr.fedorainfracloud.org
+# Without the secret this job no-ops (so forks/PRs don't fail).
+
+on:
+  push:
+    branches: [3.8.2-omedora]
+    paths:
+      - 'omedora/packaging/copr/**.spec'
+      - 'omedora/packaging/copr/**.sources'
+  workflow_dispatch:
+    inputs:
+      packages:
+        description: 'Space-separated package names to build (default: all specs)'
+        required: false
+
+jobs:
+  copr-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2   # need the push's parent to diff changed specs
+
+      - name: Gate on the COPR token secret
+        id: gate
+        env:
+          COPR_API_TOKEN: ${{ secrets.COPR_API_TOKEN }}
+        run: |
+          if [[ -z "$COPR_API_TOKEN" ]]; then
+            echo "COPR_API_TOKEN not configured — skipping COPR build."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install copr-cli + configure token
+        if: steps.gate.outputs.skip == 'false'
+        env:
+          COPR_API_TOKEN: ${{ secrets.COPR_API_TOKEN }}
+        run: |
+          pip install --quiet copr-cli
+          mkdir -p ~/.config
+          printf '%s' "$COPR_API_TOKEN" > ~/.config/copr
+          chmod 600 ~/.config/copr
+
+      - name: Determine which packages to build
+        if: steps.gate.outputs.skip == 'false'
+        id: pkgs
+        run: |
+          set -euo pipefail
+          if [[ -n "${{ github.event.inputs.packages }}" ]]; then
+            list="${{ github.event.inputs.packages }}"
+          else
+            before="${{ github.event.before }}"
+            # New branch / unknown parent → compare against HEAD~1.
+            if [[ -z "$before" || "$before" == "0000000000000000000000000000000000000000" ]]; then
+              before="HEAD~1"
+            fi
+            list="$(git diff --name-only "$before" "${{ github.sha }}" -- 'omedora/packaging/copr/*.spec' \
+                    | xargs -r -n1 basename | sed 's/\.spec$//' | sort -u | tr '\n' ' ')"
+          fi
+          echo "list=$list" >> "$GITHUB_OUTPUT"
+          echo "Packages to build: ${list:-<none>}"
+
+      - name: Submit COPR builds (no-wait)
+        if: steps.gate.outputs.skip == 'false' && steps.pkgs.outputs.list != ''
+        run: |
+          set -euo pipefail
+          project="$(OMARCHY_PATH="$PWD" bin/omedora-copr)"
+          echo "COPR project: $project"
+          for p in ${{ steps.pkgs.outputs.list }}; do
+            echo "==> building $p"
+            copr-cli build-package "$project" --name "$p" --nowait
+          done
