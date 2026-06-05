@@ -4,7 +4,7 @@ This doc is the canonical strategy for testing omedora. It defines a four-layer 
 
 For the higher-level architecture this strategy serves, see [`architecture.md`](architecture.md). For agent-facing rules that reference this doc, see [`AGENTS.md`](AGENTS.md).
 
-> **Status:** L1, L2, L3 (audit-only), the CI workflow, install-pipeline gating, and L4-nested are **shipped** — see roadmap [§10](#10-implementation-roadmap) for the per-step status. L4-nested boots a real Omedora session inside `fedora:44` under **real PID-1 systemd** (`podman --systemd=always`): the install runs end-to-end in a logind session (Flatpaks and all), and launching Hyprland brings up the full autostart chain (waybar, mako, swaybg, hypridle, fcitx5) nested under the host compositor. The **L4-headless automated test suite** (`omedora/test/fedora/headless/`) — a TAP harness with screenshots-on-failure and a CI exit code — is the canonical L4 assertion path (closes #45). Follow-up: bulk-fill the package map (step 10). L4-VM is documented but operates manually.
+> **Status:** L1, L2, L3 (audit-only), the CI workflow, install-pipeline gating, and L4-nested are **shipped** — see roadmap [§10](#10-implementation-roadmap) for the per-step status. L4-nested boots a real Omedora session inside `fedora:44` under **real PID-1 systemd** (`podman --systemd=always`): the install runs end-to-end in a logind session (Flatpaks and all), and launching Hyprland brings up the full autostart chain (waybar, mako, swaybg, hypridle, fcitx5) nested under the host compositor. The **L4-headless automated test suite** (`omedora/test/fedora/headless/`) — a TAP harness with screenshots-on-failure and a CI exit code — is the canonical L4 assertion path (closes #45). Follow-up: bulk-fill the package map (step 10). **L4-VM is now a scripted, unattended pipeline** (`omedora/test/fedora/vm/run-vm-test.sh`, see [§9](#9-l4-vm-real-vm-pipeline)): it provisions a real Fedora Workstation VM (rootless libvirt+KVM, no host sudo), installs Omedora from the live COPR, autologins the Omedora session via GDM, and runs the L4-headless TAP suite over that real session — verified end-to-end (install exit 0; 12/12 install asserts incl. COPR provenance; 8/8 session asserts). It's a local / self-hosted-runner pre-release gate, not a per-PR CI gate (no KVM on GitHub runners).
 
 ---
 
@@ -33,7 +33,7 @@ The testing investment is therefore *larger* than upstream's, but the pyramid be
 | **L2 Arch regression** | `archlinux:latest` container | ~30s | Upstream's `test/omarchy-cli-test.sh` passes unchanged; brand shim defaults to "omarchy" on Arch; helpers' Arch arms behave exactly like upstream | Every PR (CI) — **dual-distro contract enforcement** |
 | **L3 Fedora smoke** | `fedora:44` container | 10–30min | Full install pipeline from a fresh container; all `omarchy-base.packages` resolve; all COPRs enable; source installers complete; configs land in `$HOME` | Nightly + `smoke` label on PR |
 | **L4-nested Omedora session** | `fedora:44`-based image with full omedora install + Hyprland nested via Wayland-on-Wayland (see [§6](#6-l4-nested-container-design)) | ~15–30min one-time build + ~30s per run | **Real running omedora session inside a container** — Hyprland boot from the actual config payload, waybar render, walker open, mako notifications, theme switching with live components, keybindings driven via `hyprctl`, hyprlock invocation, screenshot via `grim`. Drives the actual session a user would see. | Local dev iterations; pre-release smoke |
-| **L4-VM residue** | `fedora44-dev` libvirt VM, revert to `baseline-clean` snapshot | ~10min install + manual checklist | Only the bits L4-nested can't reach: display-manager session pickup (real GDM/SDDM), real hardware enumeration (`/sys/class/dmi/`, real `lspci`), SELinux `user_t` behavior, `systemctl --user` units against a real session bus | Before each omedora release; on hardware/DM/SELinux-specific patches |
+| **L4-VM real-VM pipeline** | Rootless libvirt+KVM (`qemu:///session`) Fedora 44 **Workstation** VM, cloud-init-provisioned, install from the **live COPR** (`omedora/test/fedora/vm/`, see [§9](#9-l4-vm-real-vm-pipeline)) | ~25–45min cold (`--fast` skips Flatpaks) | The bits L4-nested can't reach: display-manager session pickup (real **GDM** autologin into `omedora.desktop`), real seat + DRM master, `systemctl --user` against a real session bus, real-framebuffer screenshot (`virsh screenshot`), and **COPR provenance** (`%{from_repo}` is the COPR, not an injected local repo). Reuses the L4-headless TAP suite over the real session. | Before each omedora release; on hardware/DM/SELinux-specific patches |
 
 **Critical: the L2 Arch regression job is non-negotiable.** Without it, the additive abstraction in [`architecture.md`](architecture.md) leaks silently — a contributor edits a shared helper, the Fedora arm gets tested, the Arch arm rots, and we don't find out until an Arch user files a bug. Run it every PR.
 
@@ -581,9 +581,30 @@ Runtime 10-30 minutes. Not on every PR.
 
 ---
 
-## 9. Manual VM workflow (L4-VM residue)
+## 9. L4-VM real-VM pipeline
 
-L4-nested ([§6](#6-l4-nested-container-design)) now covers most of what used to require booting the VM. The VM workflow that remains is narrower — its job is the residue (display manager session pickup, real hardware enumeration, SELinux `user_t`, `systemctl --user`). No automation ships in this commit; the manual checklist:
+> **Now scripted + unattended.** The L4-VM tier is an automated pipeline at
+> [`omedora/test/fedora/vm/`](../test/fedora/vm/) (see its
+> [`README.md`](../test/fedora/vm/README.md) for the full architecture). One
+> command — `omedora/test/fedora/vm/run-vm-test.sh` — provisions a **real Fedora
+> 44 Workstation VM** (rootless `qemu:///session` libvirt + KVM, cloud-init,
+> passt networking, **no host sudo**), installs Omedora **from the live COPR**
+> (`install.sh`, `OMARCHY_NONINTERACTIVE=1`), boots the Omedora/Hyprland session
+> via **GDM autologin** on a real seat, and runs the **same L4-headless TAP
+> suite** over that real session (session-attach via `XDG_RUNTIME_DIR`) plus a
+> real-framebuffer `virsh screenshot`. It asserts the packages came **from the
+> COPR** (`%{from_repo}`), the `omedora.desktop` entry is owned by
+> `hyprland-omedora`, GNOME stays selectable, and the install log is clean.
+> Resources are named `omedora-vmtest-*` and self-clean; the user's VMs are never
+> touched.
+>
+> **Not a CI gate** (nested virt on GitHub runners has no KVM → TCG is
+> impractically slow); it's a local / self-hosted-runner **before-each-release**
+> gate. See the README's "CI assessment".
+
+The narrower **manual checklist** below remains the fallback for the residue the
+scripted pipeline doesn't yet automate (notably the GDM *greeter UX* of picking
+"Omedora" by hand, real-hardware install paths, and SELinux denial review):
 
 ### Setup
 
