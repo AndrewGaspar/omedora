@@ -2,7 +2,7 @@
 
 # Omedora bootstrap shim.
 #
-# Usage: bash <(curl -fsSL https://raw.githubusercontent.com/AndrewGaspar/omedora/dev/boot-omedora.sh)
+# Usage: bash <(curl -fsSL https://raw.githubusercontent.com/AndrewGaspar/omedora/3.8.2-omedora/boot-omedora.sh)
 #
 # Sets OMARCHY_BRAND and OMARCHY_REPO so that boot.sh clones omedora instead
 # of upstream Omarchy and prints the Omedora wordmark banner.  The logo is
@@ -30,5 +30,5 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -f "$SCRIPT_DIR/boot.sh" ]]; then
   source "$SCRIPT_DIR/boot.sh"
 else
-  source <(curl -fsSL "https://raw.githubusercontent.com/${OMARCHY_REPO}/${OMARCHY_REF:-dev}/boot.sh")
+  source <(curl -fsSL "https://raw.githubusercontent.com/${OMARCHY_REPO}/${OMARCHY_REF:-3.8.2-omedora}/boot.sh")
 fi
