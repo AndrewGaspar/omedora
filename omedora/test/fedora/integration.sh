@@ -14,7 +14,7 @@
 #   - Brand defaults to omedora on Fedora
 #   - Real dnf install via omarchy-pkg-add (small package: jq)
 #   - Real package-map translation install
-#   - Real COPR enable (lionheartp/Hyprland)
+#   - Real COPR enable (agaspar/omedora-3)
 #   - Update flow staging: omarchy-update-fedora-version-check trigger
 
 set -uo pipefail
@@ -193,7 +193,7 @@ echo "=== Real COPR enablement ==="
 # ============================================================================
 
 # Disable the COPR first to make this test idempotent.
-dnf -y copr disable lionheartp/Hyprland >/dev/null 2>&1 || true
+dnf -y copr disable agaspar/omedora-3 >/dev/null 2>&1 || true
 
 # Trigger a COPR install but stop short of installing the big Hyprland package
 # (it pulls a lot in). Use dry-run mode on pkg.py so we only enable the COPR
@@ -208,23 +208,23 @@ exit_code=$?
 # or accept the install cost. We'll do the real enable since it's idempotent.
 
 # Real test: enable the COPR without installing.
-if dnf -y copr enable lionheartp/Hyprland >/tmp/copr-enable.out 2>&1; then
-  assert_copr_enabled "lionheartp/Hyprland COPR enables cleanly" "lionheartp/Hyprland"
+if dnf -y copr enable agaspar/omedora-3 >/tmp/copr-enable.out 2>&1; then
+  assert_copr_enabled "agaspar/omedora-3 COPR enables cleanly" "agaspar/omedora-3"
 else
   cat /tmp/copr-enable.out >&2
-  fail "COPR enable lionheartp/Hyprland failed"
+  fail "COPR enable agaspar/omedora-3 failed"
 fi
 
 # Verify dnf can resolve hyprland from the COPR.
 if dnf list available hyprland --refresh >/tmp/hyprland-list.out 2>&1; then
-  pass "dnf can resolve hyprland from lionheartp/Hyprland after enable"
+  pass "dnf can resolve hyprland from agaspar/omedora-3 after enable"
 else
   cat /tmp/hyprland-list.out >&2
-  fail "dnf cannot find hyprland after enabling lionheartp/Hyprland"
+  fail "dnf cannot find hyprland after enabling agaspar/omedora-3"
 fi
 
 # Clean up: disable the COPR.
-dnf -y copr disable lionheartp/Hyprland >/dev/null 2>&1 || true
+dnf -y copr disable agaspar/omedora-3 >/dev/null 2>&1 || true
 
 # ============================================================================
 echo "=== Brand-aware omarchy-version reads omedora/version on Fedora ==="

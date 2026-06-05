@@ -66,7 +66,7 @@ assert_file_exists "RPM Fusion free repo file installed" \
   "/etc/yum.repos.d/rpmfusion-free.repo"
 assert_file_exists "RPM Fusion nonfree repo file installed" \
   "/etc/yum.repos.d/rpmfusion-nonfree.repo"
-assert_copr_enabled "lionheartp/Hyprland COPR enabled" "lionheartp/Hyprland"
+assert_copr_enabled "agaspar/omedora-3 COPR enabled" "agaspar/omedora-3"
 
 if flatpak remotes --user 2>/dev/null | grep -q '^flathub'; then
   pass "flathub remote registered (--user scope)"
@@ -215,7 +215,7 @@ fi
 echo "=== Clean up (disable COPR, leave RPM Fusion + flathub for caching) ==="
 # ============================================================================
 
-dnf -y copr disable lionheartp/Hyprland >/dev/null 2>&1 || true
+dnf -y copr disable agaspar/omedora-3 >/dev/null 2>&1 || true
 
 echo ""
 echo "=== All L3 smoke checks passed ==="
