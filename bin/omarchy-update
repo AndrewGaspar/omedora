@@ -14,8 +14,8 @@ set -e
 # util-linux-script package on Fedora 44, which a minimal base may not have. If
 # it's missing, fall through and run the update UNLOGGED rather than aborting
 # the whole update with `env: 'script': No such file or directory`. omedora
-# installs util-linux-script (see install/packages/fedora.toml) so fresh Fedora
-# installs still get the logged path; Arch always has `script`, so its behavior
+# installs util-linux-script (see install/packaging/fedora-baseline.sh) so fresh
+# Fedora installs still get the logged path; Arch always has `script`, so its behavior
 # is unchanged.
 if [[ -z $OMARCHY_UPDATE_LOGGED ]] && command -v script &>/dev/null; then
   script_command=$(printf '%q ' "$0" "$@")
