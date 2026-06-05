@@ -217,6 +217,49 @@ networks, and pools are never touched** — we only ever match the `omedora-vmte
 prefix and only ever talk to `qemu:///session` (the user's `fedora44-dev` lives
 under `qemu:///system` and is out of reach of this tier entirely).
 
+## btrfs snapshot/rollback tier (`run-snapshot-vm-test.sh`)
+
+A second, independent L4-VM entrypoint validates `bin/omedora-snapshot`
+(create/list/delete/rollback) against a **real btrfs root on a rebooted VM** —
+the one thing a container structurally cannot do: rootless podman has no
+loop-device access, so btrfs can't be exercised in a container. The unit test
+(`test/snapshot-test.sh`) mocks `btrfs`/`findmnt` and runs the command *logic*
+against a plain directory; this tier runs the actual subvolume surgery for real.
+
+```bash
+omedora/test/fedora/vm/run-snapshot-vm-test.sh            # full run
+omedora/test/fedora/vm/run-snapshot-vm-test.sh --keep     # leave the VM up
+omedora/test/fedora/vm/run-snapshot-vm-test.sh --cleanup  # destroy omedora-snaptest-*
+```
+
+**Why no second disk:** the cached **Fedora 44 Cloud Base** qcow2 is *already*
+btrfs-root — verified empirically (boot + `findmnt -no FSTYPE /` = `btrfs`).
+Its top level (subvolid=5) holds `root` (mounted `/`), `boot`, `home`, `var`,
+with fstab pinning `subvol=root` — the **exact layout `omedora-snapshot`
+expects**. So the test runs against the VM's real `/`, no extra disk needed.
+(`require_btrfs` would `exit 127` otherwise; that guard is asserted too.)
+
+It reuses this directory's plumbing exactly (rootless `qemu:///session`, passt
+NAT + hostfwd, the cached Cloud Base image, an xorriso-built NoCloud cidata ISO),
+but provisions a **headless** VM (no Workstation groupinstall — it only needs
+btrfs + sshd, so it's fast: ~1–2 min). The flow is split across a reboot:
+
+1. **prepare** (in-VM, as root, `OMEDORA_SNAPSHOT_SUDO=""`):
+   `omedora-snapshot create preinstall` → assert the read-only snapshot appears
+   under `omedora-snapshots/` and `list` shows it; write `/PROOF-marker` into the
+   live root and `/home/HOME-marker` into the home subvol; then
+   `omedora-snapshot rollback <name> --apply`, auto-confirming the prompt by
+   piping `rollback` to its `read` fallback (the base has no `gum`).
+2. **reboot** onto the swapped-in `root` subvolume.
+3. **assert** (in-VM, post-reboot): `/PROOF-marker` is **GONE** (rollback took
+   effect), `/home/HOME-marker` **survived** (separate subvol untouched), and
+   `root.broken-<ts>` exists at the top level and still holds the marker (the
+   swap is reversible).
+
+Resources are named `omedora-snaptest-*` (distinct hostfwd port 2298, distinct
+overlay/seed) and self-cleaning on exit. The `omedora-vmtest-*` pipeline and the
+user's own VMs are never touched.
+
 ## Known gaps / follow-ups
 
 - **Interactive install path.** The default run uses `OMARCHY_NONINTERACTIVE=1`
