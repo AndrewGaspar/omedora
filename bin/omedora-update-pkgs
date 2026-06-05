@@ -11,5 +11,10 @@
 
 set -e
 
+# $OMEDORA_DNF_CMD is the dnf driver (default "sudo dnf"); tests inject a fake to
+# exercise the dispatch without a real multi-hundred-MB system upgrade. Same seam
+# as bin/omedora-replace-foreign.
+DNF="${OMEDORA_DNF_CMD:-sudo dnf}"
+
 echo -e "\e[32m\nUpdate system + omedora packages\e[0m"
-sudo dnf upgrade -y --refresh
+$DNF upgrade -y --refresh
