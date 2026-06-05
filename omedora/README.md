@@ -30,133 +30,92 @@ Long-term, the goal is that agents (Claude) handle most of the rebase work each 
 
 ---
 
-## Manual installation guide (Fedora 44 client VM)
+## Installation guide (Fedora 44 Workstation)
 
-This section walks through installing Omedora by hand on a **fresh Fedora 44 Workstation VM**. It is the closest approximation to the real end-user flow before a published COPR exists. Every command below is taken directly from the installer scripts and build tooling — nothing is invented.
+> **Supported: Fedora 44 only.** The omedora COPR currently targets
+> `fedora-44-x86_64`. Other releases (43, rawhide) aren't built yet — open an
+> issue if you want one and there's demand.
 
-**Assumptions:**
+Omedora installs **on top of an existing Fedora 44 Workstation**. Its vendored
+packages — the Hyprland stack, `walker`/`elephant`/`swayosd`, `uwsm`, the
+nerd-fonts and TUIs — are served from the **`agaspar/omedora-3` COPR**, which the
+installer enables for you. There is nothing to build by hand.
 
-- Fedora 44 Workstation (GNOME spin) installed, with a regular user account that has `sudo` rights via the `wheel` group.
-- x86\_64 only (Omedora's installer hard-checks this).
-- You are **not** running as root.
-- Internet access to Fedora mirrors, COPR, and Flathub.
-- The build steps use `podman` (available in Fedora's main repos) to run the RPM builds in a `fedora:44` container — this avoids needing `rpmbuild` installed on your workstation and exactly matches what CI does.
-- > **PLACEHOLDER:** The GitHub URL used below is `https://github.com/AndrewGaspar/omedora`. Verify this matches the published remote before sharing the guide externally.
+**Before you start:**
 
----
+- Fedora 44 Workstation (GNOME), **x86_64** (the installer hard-checks this).
+- A regular user in the `wheel` group (standard on Workstation); you are **not** root.
+- Internet access (Fedora mirrors, RPM Fusion, the omedora COPR, Flathub).
+- The installer calls `sudo` for system writes and must not block on a password
+  mid-install. If your wheel `sudo` needs a password, run `sudo -v` first (or add
+  a temporary NOPASSWD rule).
 
-### 1. Prerequisites
-
-Install `podman`, `createrepo_c`, `git`, and `gum` on the Fedora host.
-
-`gum` is required **before** `install.sh` runs — the preflight stage uses it for styled output. `podman` is needed to build the RPMs. `createrepo_c` assembles the local repo.
+### 1. Quick install (recommended)
 
 ```bash
-sudo dnf install -y podman createrepo_c git gum
+curl -fsSL https://raw.githubusercontent.com/AndrewGaspar/omedora/3.8.2-omedora/omedora/boot.sh | bash
 ```
 
-Make sure your user is in the `wheel` group (standard on Workstation). The installer calls `sudo` for system-level writes; it must not require a password prompt mid-install. If your wheel sudo needs a password, either enter it proactively (`sudo -v`) or add yourself to a NOPASSWD rule for the duration.
-
----
-
-### 2. Clone omedora
+`omedora/boot.sh` installs the bootstrap prerequisites (`git`, `gum`,
+`dnf-plugins-core`), clones omedora to `~/.local/share/omarchy`, and runs
+`install.sh`. The channel is selected with `OMEDORA_REF` (default `stable` = the
+repository's default branch, which tracks the current stable release line):
 
 ```bash
+OMEDORA_REF=dev curl -fsSL https://raw.githubusercontent.com/AndrewGaspar/omedora/dev/omedora/boot.sh | bash   # track the dev branch
+```
+
+### 2. Manual install
+
+If you'd rather drive it yourself:
+
+```bash
+sudo dnf install -y git gum dnf-plugins-core
 git clone https://github.com/AndrewGaspar/omedora.git ~/.local/share/omarchy
-```
-
-> **Why `~/.local/share/omarchy`?** That is the path the installer hardcodes (`OMARCHY_PATH`). Cloning omedora there is exactly what `boot.sh` does via `OMARCHY_REPO=AndrewGaspar/omedora`. Do not clone to a different path.
-
-If you want a specific branch (the development branch is `dev`):
-
-```bash
-git -C ~/.local/share/omarchy checkout dev
-```
-
----
-
-### 3. Build the omedora RPMs locally
-
-Omedora needs five packages that are not in Fedora's official repos or RPM Fusion. These are built as RPMs and served from a local `dnf` repository. There is no public COPR yet — you build them yourself.
-
-The packages are:
-
-| RPM name | What it provides |
-|---|---|
-| `walker` | The walker application launcher |
-| `elephant` | Walker's calculator and clipboard provider |
-| `omedora-nerd-fonts` | CascadiaCode + JetBrainsMono Nerd Fonts (icon-patched) |
-| `swayosd` | On-screen display for volume/brightness |
-| `python3-terminaltexteffects` | The `tte` terminal-effects CLI |
-
-The build scripts run each `*.spec` inside a throwaway `fedora:44` container via `podman`, so the build environment exactly matches what a COPR would use. The output lands in `omedora/packaging/copr/output/` and the assembled repo (with `createrepo_c` metadata) lands in `omedora/packaging/copr/repo/`.
-
-```bash
-cd ~/.local/share/omarchy
-bash omedora/packaging/copr/build-repo.sh
-```
-
-This runs all five specs in sequence, then assembles `omedora/packaging/copr/repo/`. The first run pulls the `registry.fedoraproject.org/fedora:44` base image and downloads build dependencies — expect 10–20 minutes on a cold cache. Subsequent runs are faster.
-
-When it finishes you should see a `repo contents:` listing with the five `.rpm` files.
-
----
-
-### 4. Enable the local repo
-
-The installer resolves `walker`, `elephant`, `omedora-nerd-fonts`, `swayosd`, and `python3-terminaltexteffects` by name from `dnf`. For those names to resolve, `dnf` needs to know about the local repo you just built.
-
-Drop a `.repo` file pointing at it. Resolve the path **as your own user first** — inside `sudo bash -c`, `~` would expand to `/root`, not your home:
-
-```bash
-REPO_DIR="$(realpath ~/.local/share/omarchy/omedora/packaging/copr/repo)"
-sudo tee /etc/yum.repos.d/omedora-local.repo >/dev/null <<EOF
-[omedora-local]
-name=Omedora local packages
-baseurl=file://$REPO_DIR
-enabled=1
-gpgcheck=0
-EOF
-```
-
-> This is exactly what `omedora/test/fedora/build-session.sh` does (step 2.5), translated from `podman cp` + `exec` into direct host commands. The `file://` URL must point at the directory containing `repodata/`. Note `$REPO_DIR` is expanded by *your* shell before `sudo` runs, so the path resolves against your home — don't move the `realpath` inside the `sudo` command (there `~` becomes `/root`).
-
-Verify `dnf` can see the repo:
-
-```bash
-dnf repoinfo omedora-local
-```
-
----
-
-### 5. Run the installer
-
-The installer sources `~/.local/share/omarchy/install.sh` directly. On Fedora it runs the preflight (guards, third-party repo enablement), the packaging stage (all packages via `dnf`/Flathub dispatch), and the config stage. The Arch-only stages (`login/`, `post-install/` — Plymouth, SDDM, Limine, final pacman config) are gated off automatically because `omarchy-distro` reports `fedora`.
-
-From a terminal in your regular user session:
-
-```bash
 bash ~/.local/share/omarchy/install.sh
 ```
 
-The installer is **interactive** — it uses `gum` for styled output and error handling. If something fails partway through, `gum` prompts you with options (retry, view log, exit). The install log is written to `/var/log/omarchy-install.log`.
+> **Why `~/.local/share/omarchy`?** That's the path the installer hardcodes
+> (`OMARCHY_PATH`). Don't clone anywhere else.
 
-To run non-interactively (useful for scripted or repeatable testing — skips the gum error menu on failure and exits immediately):
+For a scripted/repeatable run (skips the `gum` error menu on failure and exits
+immediately), prefix with `OMARCHY_NONINTERACTIVE=1`:
 
 ```bash
 OMARCHY_NONINTERACTIVE=1 bash ~/.local/share/omarchy/install.sh
 ```
 
-**What to expect:**
+### 3. What the installer does
 
-1. **Preflight:** The Fedora guard checks that you are not root and are on x86\_64. Then `fedora-repos.sh` enables RPM Fusion (free + nonfree) and the `lionheartp/Hyprland` COPR (Hyprland is not in Fedora 44 main repos). Flathub is also enabled as a Flatpak remote.
-2. **Packaging:** All packages are installed via `dnf` or `flatpak`. The omedora-local repo satisfies `walker`, `elephant`, `omedora-nerd-fonts`, `swayosd`, and `python3-terminaltexteffects`. Hyprland and related tools (`hypridle`, `hyprlock`, `hyprpaper`, `hyprsunset`, `xdg-desktop-portal-hyprland`) come from the `lionheartp/Hyprland` COPR. GUI apps (Signal, Obsidian, Spotify, Typora, localsend) install as Flatpaks from Flathub — these require an active user session bus (you're running in a real GNOME session, so this is fine).
-3. **Config:** Omedora's `~/.config/` payload (Hyprland, waybar, walker, mako, etc.) is written to your home directory. Themes are installed. The Wayland session entry `/usr/share/wayland-sessions/omedora.desktop` is shipped by the `hyprland-omedora` package (pulled in when `hyprland` installs on Fedora) — no longer a sudo-cp. **At the login screen, pick "Omedora" — not the bare "Hyprland" entry** (the plain entry launches without uwsm, which breaks PATH so `omarchy-*` commands and Walker can't launch anything).
-4. The install takes **20–40 minutes** on a fresh VM, dominated by Flatpak runtime downloads.
+On Fedora, `install.sh` runs the preflight, packaging, and config stages; the
+Arch-only stages (`login/`, `post-install/` — Plymouth, SDDM, Limine, final
+pacman config) are gated off automatically because `omarchy-distro` reports
+`fedora`.
+
+1. **Preflight** — the Fedora guard (non-root, x86_64, Fedora). Then enables
+   **RPM Fusion** (free + nonfree), the **`agaspar/omedora-3` COPR** (omedora's
+   vendored Hyprland stack + tools), and **Flathub**. If you're installing onto a
+   machine you already use, the up-front coexistence gate runs here — see
+   [Installing onto a machine you already use](#installing-onto-a-machine-you-already-use).
+2. **Packaging** — everything installs via `dnf` or `flatpak`. The Hyprland
+   stack (`hyprland-no-session`, `hyprland-omedora`, `hyprlock`, `hypridle`,
+   `hyprsunset`, `xdg-desktop-portal-hyprland`, …), `walker`, `elephant`,
+   `swayosd`, `uwsm`, `omedora-nerd-fonts`, and the TUIs come from the COPR. GUI
+   apps (Signal, Obsidian, Spotify, Typora, localsend) install as Flatpaks from
+   Flathub — these need a live user session bus, so run the installer from a
+   GNOME terminal, not a bare TTY.
+3. **Config** — omedora's `~/.config/*` payload (Hyprland, waybar, walker, mako,
+   …) is seeded with **backup-then-write** semantics (your existing files are
+   backed up, never clobbered — see the coexistence section). Themes install.
+   The Wayland session entry `/usr/share/wayland-sessions/omedora.desktop` is
+   owned by the `hyprland-omedora` package.
+
+The install takes **20–40 minutes** on a fresh VM, dominated by Flatpak runtime
+downloads. The log is written to `/var/log/omarchy-install.log`.
 
 ---
 
-### 6. Reboot and select the Omedora session
+### 4. Reboot and select the Omedora session
 
 After the install completes, reboot:
 
@@ -180,7 +139,7 @@ Once logged in, Hyprland starts via `uwsm`. The full autostart chain fires: `way
 
 ---
 
-### 7. Verification checklist
+### 5. Verification checklist
 
 After the session is running, confirm the key omedora surfaces work:
 
@@ -189,14 +148,14 @@ After the session is running, confirm the key omedora surfaces work:
 - [ ] **No swayosd crash toast:** Adjust volume (omedora maps `XF86AudioRaiseVolume` / `XF86AudioLowerVolume`). A brief overlay should appear, not a mako error notification.
 - [ ] **Fonts render correctly:** Open `kitty` or `foot`. The terminal should render JetBrainsMono Nerd Font with icon glyphs (no tofu squares). Waybar icons should also render cleanly.
 - [ ] **Theme switching works:** Run `omedora theme set tokyo-night` (or `omarchy theme set tokyo-night`) in a terminal. Waybar, mako, and the Hyprland border color should update without crashing.
-- [ ] **`omedora --version`** prints something like `Omedora 0.1.0-base (rebased on Omarchy ...)`.
+- [ ] **`omedora --version`** prints something like `Omedora 0.1.0 (rebased on Omarchy 3.8.2)`.
 
 ---
 
-### 8. Troubleshooting and known gaps
+### 6. Troubleshooting and known gaps
 
 **Only "Hyprland" (no "Omedora") in the session picker — and `omarchy-*`/Walker don't work**
-A bare "Hyprland" entry (the plain `hyprland.desktop`, `Exec=Hyprland`, no uwsm) launches without `~/.config/uwsm/env`, so `~/.local/share/omarchy/bin` is missing from PATH and every `omarchy-*` command (autostart, keybinds, Walker launches) fails with "command not found". Select **"Omedora"** instead. The "Omedora" entry is shipped by the `hyprland-omedora` package; if it's missing, `sudo dnf reinstall hyprland-omedora` (see §6).
+A bare "Hyprland" entry (the plain `hyprland.desktop`, `Exec=Hyprland`, no uwsm) launches without `~/.config/uwsm/env`, so `~/.local/share/omarchy/bin` is missing from PATH and every `omarchy-*` command (autostart, keybinds, Walker launches) fails with "command not found". Select **"Omedora"** instead. The "Omedora" entry is shipped by the `hyprland-omedora` package; if it's missing, `sudo dnf reinstall hyprland-omedora` (see §4).
 
 **`flatpak install` failed during install**
 Flatpak installs (Signal, Obsidian, Spotify, Typora, localsend) require a live user D-Bus session. If you ran `install.sh` from a tty without a graphical session, these will fail. Re-run from a GNOME terminal, or install the Flatpaks manually afterward:
@@ -206,9 +165,10 @@ flatpak install -y flathub org.signal.Signal md.obsidian.Obsidian com.spotify.Cl
 ```
 
 **`walker` or `elephant` not found after install**
-Confirm the `omedora-local` repo was visible when `install.sh` ran (`dnf repoinfo omedora-local`). If it was missing, install them now:
+Confirm the omedora COPR is enabled (`dnf copr list | grep omedora`). If it's missing, enable it and install the packages:
 
 ```bash
+sudo dnf copr enable -y agaspar/omedora-3
 sudo dnf install -y walker elephant omedora-nerd-fonts swayosd python3-terminaltexteffects
 ```
 
@@ -216,22 +176,14 @@ sudo dnf install -y walker elephant omedora-nerd-fonts swayosd python3-terminalt
 This is normal if you try to launch Hyprland from inside another Wayland compositor (e.g., GNOME) directly from a terminal. Log out of GNOME and select the "Omedora" session at GDM instead. Hyprland must be started as the first compositor on a VT seat — uwsm handles this when launched from the display manager.
 
 **Packages marked `skip` in `install/packages/fedora.toml`**
-Most former skips (`mise`, `starship`, `usage`, `lazygit`, `lazydocker`, `satty`, `bluetui`, `hyprland-preview-share-picker`) are now packaged as omedora RPMs and resolve from the local repo you built in step 3. A few remain deliberately skipped because they're proprietary, vendor-installed, or out of omedora's scope: `claude-code` (proprietary; install via Anthropic's official installer), `1password-cli`, and the 37signals-internal tools. `omarchy-nvim` is also skipped: rather than an RPM, the installer (`install/packaging/nvim.sh`) bootstraps the Neovim config and runs Lazy sync directly on the user's machine, since the package's build needs a network plugin-sync that fails in COPR's offline build. These are logged during install and can be installed manually afterward.
-
-**Build fails: `podman` pull errors**
-If `build-repo.sh` fails pulling `registry.fedoraproject.org/fedora:44`, try:
-
-```bash
-podman pull registry.fedoraproject.org/fedora:44
-```
-
-If that also fails (common behind corporate proxies), set `HTTPS_PROXY` / `HTTP_PROXY` in your environment before running the build.
+Most former skips (`mise`, `starship`, `usage`, `lazygit`, `lazydocker`, `satty`, `bluetui`, `hyprland-preview-share-picker`) are packaged as omedora RPMs and resolve from the COPR. A few remain deliberately skipped because they're proprietary, vendor-installed, or out of omedora's scope: `claude-code` (proprietary; install via Anthropic's official installer), `1password-cli`, and the 37signals-internal tools. `omarchy-nvim` is also skipped: rather than an RPM, the installer (`install/packaging/nvim.sh`) bootstraps the Neovim config and runs Lazy sync directly on the user's machine, since the package's build needs a network plugin-sync that fails in COPR's offline build. These are logged during install and can be installed manually afterward.
 
 **`dnf copr enable` fails**
-The `lionheartp/Hyprland` COPR is enabled automatically by the preflight. If it fails (network hiccup), re-run the preflight step manually:
+The `agaspar/omedora-3` COPR is enabled automatically by the preflight. If it fails (network hiccup, or `dnf-plugins-core` missing), install the plugin and re-enable manually:
 
 ```bash
-sudo dnf copr enable -y lionheartp/Hyprland
+sudo dnf install -y dnf-plugins-core
+sudo dnf copr enable -y agaspar/omedora-3
 ```
 
 ---
@@ -293,18 +245,26 @@ What this means in practice:
                         # transaction, asks once, then applies)
   ```
 
-### 9. After install: staying up to date
-
-When a public COPR is published, the local `.repo` file and the build step (§3–§4) go away. The only change will be swapping the `source = "dnf"` entries in `install/packages/fedora.toml` to reference the COPR, and dropping the `omedora-local.repo` file.
-
-Until then, to pick up new upstream Omarchy config changes:
+### 7. After install: staying up to date
 
 ```bash
-git -C ~/.local/share/omarchy pull --rebase
-bash ~/.local/share/omarchy/install.sh
+omedora update          # pull the latest omedora source + dnf upgrade (COPR + system)
 ```
 
-The install is idempotent — re-running it applies new config files and any package additions without reinstalling everything.
+On Fedora, `omedora update` pulls the omedora source (config/bin) and runs
+`dnf upgrade --refresh`, which picks up new builds from the `agaspar/omedora-3`
+COPR (and your system updates). It does **not** re-copy `config/*` over your
+`~/.config` — those are yours to edit; migrations handle any required changes.
+
+Check whether a newer omedora release is out (it compares git tags):
+
+```bash
+omedora update-available     # "Omedora update available (vX.Y.Z)" / "up to date"
+omedora version              # Omedora 0.1.0 (rebased on Omarchy 3.8.2)
+omedora version-channel      # the tracked git ref + COPR
+```
+
+See [`versioning.md`](versioning.md) for the full release/versioning/update model.
 
 ---
 
@@ -316,7 +276,8 @@ Read these in roughly this order:
 |---|---|
 | [`architecture.md`](architecture.md) | The technical design: dual-distro patch model, package-helper dispatch, install-pipeline gating, CLI rebrand mechanism, update flow, branding. Includes the patch-stack map — the canonical list of files omedora touches. |
 | [`packages.md`](packages.md) | The tiered package-mapping strategy (Fedora main → RPM Fusion → COPR → Flathub → omedora RPMs → skip) and the TOML schema for `install/packages/fedora.toml`. |
-| [`testing.md`](testing.md) | The four-layer test pyramid (shell unit → Fedora container integration → smoke → L4-nested full session). Includes the L4-headless automated test suite. |
+| [`testing.md`](testing.md) | The test pyramid (shell unit → Fedora container integration → smoke → L4-nested full session → L4-VM real Workstation VM). Includes the L4-headless automated suite and the libvirt VM pipeline. |
+| [`versioning.md`](versioning.md) | omedora's SemVer + release-tag scheme, the version-scoped COPR, and the two-channel (git + dnf) update flow. |
 | [`update-and-upgrade.md`](update-and-upgrade.md) | The `omedora update` flow on Fedora and what happens at Fedora major-version upgrades. |
 | [`rebase-workflow.md`](rebase-workflow.md) | How to rebase onto a new upstream Omarchy release: branching, conflict triage, verification matrix. |
 | [`branding.md`](branding.md) | Where "Omedora" surfaces vs where "Omarchy" remains, and the ASCII logo. |
@@ -324,7 +285,7 @@ Read these in roughly this order:
 
 ## Status
 
-The `dev` branch has the install pipeline gating (Fedora arm of `install.sh`, `preflight/guard.sh`, `preflight/fedora-repos.sh`) and the full RPM packaging set shipped. The Wayland session entry install step is planned (step 11 in [`testing.md` §10](testing.md#10-implementation-roadmap)). The L4-nested test path (boot a full Omedora session in a Fedora container under real `systemd --user`) is shipped and verified.
+The stable line is the **`3.8.2-omedora`** branch (the repo default; rebased on Omarchy 3.8.2). The full Fedora install path is shipped and serving from the **`agaspar/omedora-3` COPR** (`fedora-44-x86_64`): all vendored RPMs build on the COPR, the installer enables it and resolves the whole stack, the coexistence gate + foreign-package replacement are in, and the versioning/release/update machinery is wired. The install is verified end-to-end on a **real Fedora 44 Workstation VM** (`omedora/test/fedora/vm/`) — provision GNOME+GDM → install from the live COPR → boot the Omedora session on a real seat → the full assertion suite passes — in addition to the L4-nested container suite.
 
 ## Known Issues
 
