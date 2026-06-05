@@ -222,17 +222,23 @@ provision() {
   # this produces: <interface type=user><backend type=passt><portForward ...>.)
   local netopt="type=user,backend.type=passt,portForward0.proto=tcp,portForward0.address=127.0.0.1,portForward0.range0.start=$SSH_PORT,portForward0.range0.to=22"
 
-  # OMEDORA_VM_RES (default 1920x1080): pin the virtio-gpu's advertised mode so
-  # the session renders at the SAME geometry as the committed visual goldens
-  # (30/40/50), letting those pixel-diffs actually run instead of skipping on a
-  # geometry mismatch. Passed through to QEMU as the virtio-gpu device's
-  # xres/yres (libvirt has no first-class knob for it). Set OMEDORA_VM_RES=
-  # (empty) to let the guest pick its own default mode.
-  local res="${OMEDORA_VM_RES-1920x1080}"
+  # OMEDORA_VM_RES (OPT-IN; empty by default): pin the virtio-gpu's advertised
+  # mode so the session renders at the SAME geometry as the committed visual
+  # goldens (30/40/50), letting those pixel-diffs run instead of skipping on a
+  # geometry mismatch. Off by default because the QEMU `-set device.<alias>.xres`
+  # lever needs the EXACT device alias libvirt assigned (it is NOT a stable
+  # "video0" — a wrong alias makes QEMU refuse to boot), which varies by
+  # libvirt/QEMU version. When unset, the guest picks its own mode (1280x800
+  # here) and SCREENSHOT_GEOMETRY_SKIP turns the golden diffs into SKIPs — the
+  # verified-working path. To use it, find the alias in `virsh dumpxml <vm>`
+  # (the <video> <alias name='…'/>) and pass e.g.
+  #   OMEDORA_VM_RES=1920x1080 OMEDORA_VM_RES_ALIAS=video0 ...
+  local res="${OMEDORA_VM_RES:-}"
+  local res_alias="${OMEDORA_VM_RES_ALIAS:-video0}"
   local qemu_cmdline_args=()
   if [[ -n "$res" ]]; then
     local xres="${res%x*}" yres="${res#*x}"
-    qemu_cmdline_args=(--qemu-commandline="-set device.video0.xres=$xres -set device.video0.yres=$yres")
+    qemu_cmdline_args=(--qemu-commandline="-set device.${res_alias}.xres=$xres -set device.${res_alias}.yres=$yres")
   fi
 
   log "virt-install $VM (rootless qemu:///session, passt NAT, hostfwd $SSH_PORT->22${res:+, ${res} display})"
