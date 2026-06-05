@@ -164,15 +164,19 @@ fi
 echo "=== Real package-map translation: ttf-jetbrains-mono-nerd ==="
 # ============================================================================
 
-# fedora.toml maps ttf-jetbrains-mono-nerd → jetbrains-mono-fonts-all.
-# Verify the translation by installing the Arch name and checking the
-# Fedora name landed.
-dnf -y remove jetbrains-mono-fonts-all >/dev/null 2>&1 || true
-assert_dnf_not_installed "jetbrains-mono-fonts-all not preinstalled" "jetbrains-mono-fonts-all"
+# fedora.toml maps ttf-jetbrains-mono-nerd → omedora-nerd-fonts (the patched
+# CascadiaCode + JetBrainsMono Nerd families; Fedora's plain font lacks the icon
+# glyphs). That package is COPR-only, so enable the omedora COPR first, then
+# verify the translation by installing the Arch name and checking the Fedora
+# name landed.
+dnf -y install dnf-plugins-core >/dev/null 2>&1 || true
+dnf -y copr enable agaspar/omedora-3 >/dev/null 2>&1
+dnf -y remove omedora-nerd-fonts >/dev/null 2>&1 || true
+assert_dnf_not_installed "omedora-nerd-fonts not preinstalled" "omedora-nerd-fonts"
 
 "$REPO/bin/omarchy-pkg-add" ttf-jetbrains-mono-nerd >/tmp/pkg-add-ttf.out 2>&1
 if (( $? == 0 )); then
-  assert_dnf_installed "translated package landed under Fedora name" "jetbrains-mono-fonts-all"
+  assert_dnf_installed "translated package landed under Fedora name" "omedora-nerd-fonts"
 else
   cat /tmp/pkg-add-ttf.out >&2
   fail "omarchy-pkg-add ttf-jetbrains-mono-nerd failed"
