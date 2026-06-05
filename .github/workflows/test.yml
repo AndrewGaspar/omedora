@@ -53,6 +53,9 @@ jobs:
       - name: Run versioning / release test
         run: bash test/versioning-test.sh
 
+      - name: Run snapshot test
+        run: bash test/snapshot-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 
