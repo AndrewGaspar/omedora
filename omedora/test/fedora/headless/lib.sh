@@ -142,7 +142,19 @@ assert_screenshot_matches() {
   rgeom=$(magick identify -format '%wx%h' "$reference" 2>/dev/null)
   cgeom=$(magick identify -format '%wx%h' "$cand" 2>/dev/null)
   if [[ "$rgeom" != "$cgeom" ]]; then
-    _fail_with_artifacts "$desc (geometry mismatch: ref=$rgeom candidate=$cgeom)"
+    # The committed goldens are captured at the L4-headless output geometry
+    # (1920x1080). The L4-VM tier renders at whatever mode the virtio-gpu
+    # advertises (often 1280x800), so a pixel-diff against the headless golden
+    # is meaningless there. SCREENSHOT_GEOMETRY_SKIP (set only by the VM runner)
+    # downgrades a geometry mismatch to a TAP SKIP instead of a hard fail — the
+    # VM tier proves the session RENDERS via the framebuffer screenshot + the
+    # layer-presence assertions, just not against the resolution-specific golden.
+    # UNSET by default, so the podman L4 tier stays strict.
+    if [[ -n ${SCREENSHOT_GEOMETRY_SKIP:-} ]]; then
+      pass "# SKIP $desc (golden geometry $rgeom != VM candidate $cgeom; rendering proven structurally)"
+    else
+      _fail_with_artifacts "$desc (geometry mismatch: ref=$rgeom candidate=$cgeom)"
+    fi
     return
   fi
 

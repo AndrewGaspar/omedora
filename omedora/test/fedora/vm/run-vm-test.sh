@@ -222,7 +222,20 @@ provision() {
   # this produces: <interface type=user><backend type=passt><portForward ...>.)
   local netopt="type=user,backend.type=passt,portForward0.proto=tcp,portForward0.address=127.0.0.1,portForward0.range0.start=$SSH_PORT,portForward0.range0.to=22"
 
-  log "virt-install $VM (rootless qemu:///session, passt NAT, hostfwd $SSH_PORT->22)"
+  # OMEDORA_VM_RES (default 1920x1080): pin the virtio-gpu's advertised mode so
+  # the session renders at the SAME geometry as the committed visual goldens
+  # (30/40/50), letting those pixel-diffs actually run instead of skipping on a
+  # geometry mismatch. Passed through to QEMU as the virtio-gpu device's
+  # xres/yres (libvirt has no first-class knob for it). Set OMEDORA_VM_RES=
+  # (empty) to let the guest pick its own default mode.
+  local res="${OMEDORA_VM_RES-1920x1080}"
+  local qemu_cmdline_args=()
+  if [[ -n "$res" ]]; then
+    local xres="${res%x*}" yres="${res#*x}"
+    qemu_cmdline_args=(--qemu-commandline="-set device.video0.xres=$xres -set device.video0.yres=$yres")
+  fi
+
+  log "virt-install $VM (rootless qemu:///session, passt NAT, hostfwd $SSH_PORT->22${res:+, ${res} display})"
   virt-install \
     --connect "$URI" \
     --name "$VM" \
@@ -237,6 +250,7 @@ provision() {
     --network "$netopt" \
     --graphics vnc,listen=127.0.0.1 \
     --video virtio \
+    "${qemu_cmdline_args[@]}" \
     --noautoconsole \
     || die "virt-install failed"
 

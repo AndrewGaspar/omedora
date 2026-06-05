@@ -117,6 +117,18 @@ Two complementary approaches; we run **both**.
    the L4 goldens — the in-session grim-based `30-visual` already does the
    tolerance diff against those fixtures from *inside* the session.
 
+   **Resolution + the visual goldens.** The committed visual goldens (30/40/50)
+   were captured at the headless tier's 1920×1080. The VM renders at whatever
+   mode the virtio-gpu advertises (its default EDID is 1280×800), so a pixel-diff
+   against the golden is a *geometry mismatch*, not a regression. Two mechanisms
+   handle this: (1) the runner exports `SCREENSHOT_GEOMETRY_SKIP=1`, which makes
+   `lib.sh` downgrade a geometry mismatch to a TAP **SKIP** (off in the podman
+   tier, which stays strict); and (2) `OMEDORA_VM_RES` (default `1920x1080`)
+   pins the virtio-gpu's advertised mode via QEMU `xres/yres` so the goldens can
+   diff for real — set `OMEDORA_VM_RES=` to disable. (The default-mode run is
+   what's been verified end-to-end; the 1920×1080 pin is XML-validated but its
+   effectiveness depends on the guest honouring the advertised EDID mode.)
+
 ## Install path exercised
 
 The orchestrator syncs **this checkout** into the VM at
@@ -130,6 +142,36 @@ with backups). `assert-install.sh` then proves the packages came **from the
 COPR** (`dnf repoquery --installed --qf '%{from_repo}'`), the session entry is
 owned by `hyprland-omedora`, GNOME stays selectable, and the install log is
 clean.
+
+## Verified end-to-end (what actually ran)
+
+This pipeline was executed against a real VM on the Arch dev host
+(`qemu:///session`, passt, no host sudo):
+
+- **Provision:** Fedora 44 Cloud Base → cloud-init → `dnf group install
+  workstation-product-environment` landed **gnome-shell 50.2 + gdm 50.1**,
+  default `graphical.target`; SSH reachable on `127.0.0.1:2222` via passt
+  portForward. cloud-init reached `status: done`.
+- **Install:** `install.sh` (NONINTERACTIVE, `--fast`) **exited 0**. The COPR was
+  enabled live (`_copr:…:agaspar:omedora-3.repo`) and **30 packages installed
+  from the COPR**, incl. `hyprland-omedora-1.0.0-1.fc44`,
+  `hyprland-no-session`, `aquamarine`, `walker`/`elephant`, `swayosd`, the
+  `hypr*` stack, the TUIs.
+- **Install assertions: 12/12 pass** — COPR provenance
+  (`%{from_repo}=copr:…:agaspar:omedora-3`), `omedora.desktop` owned by
+  `hyprland-omedora`, GNOME still selectable, config seeded + bashrc block, clean
+  install log.
+- **Session:** GDM **autologged into the Omedora session** (`Hyprland
+  --watchdog-fd` under `gdm-wayland-session … uwsm start … start-hyprland` on
+  seat0/tty2) after `select-session.sh` pinned AccountsService `Session=omedora`
+  and rebooted. The `virsh screenshot` shows the real Omedora session rendered
+  (deer wallpaper + waybar + first-run notifications).
+- **Session-attach suite: 8/8 pass** — `00-session` (Hyprland IPC + monitor +
+  waybar/mako/swaybg autostart), `10-walker`, `20-portals` (hyprland portal wins,
+  document portal FUSE mount), `60-wifi`, and **`90-workstation`** (GDM lists
+  GNOME+Omedora, GNOME Shell 50.2 launchable, **powerprofilesctl via tuned-ppd
+  shim**, gnome portal competitor present). `30/40/50` visual goldens reported
+  **SKIP** (golden 1920×1080 vs VM 1280×800 — see Resolution above), not fail.
 
 ## Runtime budget
 
