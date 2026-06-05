@@ -24,18 +24,18 @@ trap cleanup EXIT
 # ===========================================================================
 echo "# --- PART 1: omedora-copr resolution ---"
 # ===========================================================================
-assert_equals "default project from the base version (3.8.2)" \
-  "$(OMARCHY_PATH="$ROOT" "$ROOT/bin/omedora-copr")" "agaspar/omedora-3.8.2"
+assert_equals "default project from the base major (3.8.2 -> omedora-3)" \
+  "$(OMARCHY_PATH="$ROOT" "$ROOT/bin/omedora-copr")" "agaspar/omedora-3"
 assert_equals "repo-id form" \
   "$(OMARCHY_PATH="$ROOT" "$ROOT/bin/omedora-copr" --repo-id)" \
-  "copr:copr.fedorainfracloud.org:agaspar:omedora-3.8.2"
+  "copr:copr.fedorainfracloud.org:agaspar:omedora-3"
 assert_equals "owner override" \
   "$(OMARCHY_PATH="$ROOT" OMEDORA_COPR_OWNER=someuser "$ROOT/bin/omedora-copr")" \
-  "someuser/omedora-3.8.2"
-# Derives from whatever the base version file says.
+  "someuser/omedora-3"
+# Scoped per Omarchy major: a 4.x base selects omedora-4, not omedora-4.0.0.
 fakebase="$SCRATCH/fakebase"; mkdir -p "$fakebase"; echo "4.0.0" >"$fakebase/version"
-assert_equals "project tracks the base version file" \
-  "$(OMARCHY_PATH="$fakebase" "$ROOT/bin/omedora-copr")" "agaspar/omedora-4.0.0"
+assert_equals "project tracks the base MAJOR (4.0.0 -> omedora-4)" \
+  "$(OMARCHY_PATH="$fakebase" "$ROOT/bin/omedora-copr")" "agaspar/omedora-4"
 
 # ===========================================================================
 echo "# --- PART 2: omedora-release ---"

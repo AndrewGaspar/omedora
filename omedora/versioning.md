@@ -45,14 +45,15 @@ stable release line** (e.g. `3.8.2-omedora`), and cut `vX.Y.Z` tags on it with
 `omedora-release`. Then `stable` installs land on that line and update detection
 compares its tags.
 
-## Packages = the version-scoped COPR
+## Packages = the per-major-line COPR
 
-RPMs are served from a COPR whose project is **version-scoped per Omarchy base**:
-`omedora-<base>` (today `agaspar/omedora-3.8.2`). The single source of truth is
-**`bin/omedora-copr`** (`owner/project`, or the dnf repo id via `--repo-id`);
-nothing else hard-codes the name. Rebase onto a new Omarchy base → bump `version`
-→ a new isolated COPR (`omedora-4`, …) so existing installs never get an
-ABI-incompatible rebuild pushed underneath them.
+RPMs are served from a COPR whose project is **scoped per Omarchy major line**:
+`omedora-<major>` (today `agaspar/omedora-3`, for the whole Omarchy 3.x line).
+The single source of truth is **`bin/omedora-copr`** (`owner/project`, or the dnf
+repo id via `--repo-id`); nothing else hard-codes the name. A routine patch bump
+(3.8.2 → 3.8.3) stays on the same COPR; a rebase onto Omarchy 4.x bumps the
+`version` major → a new isolated COPR (`omedora-4`) so existing installs never
+get an ABI-incompatible rebuild pushed underneath them.
 
 RPM `Version:` fields track **upstream** (hyprland 0.55.2, uwsm 0.26.4), *not*
 omedora's number. The COPR auto-rebuilds on push, so package updates flow through
@@ -79,7 +80,7 @@ package updates ride the COPR.
 
 ```
 omedora/version   0.1.0     ← public SemVer; tagged vX.Y.Z by omedora-release
-version           3.8.2     ← Omarchy base; names the COPR (omedora-3.8.2)
+version           3.8.2     ← Omarchy base; its major names the COPR (omedora-3)
 bin/omedora-copr            ← single source of truth for the COPR name
 bin/omedora-release         ← cut a release (bump + changelog + tag)
 omedora/boot.sh             ← Fedora bootstrap (stable|dev|rc channel)
