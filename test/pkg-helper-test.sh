@@ -54,6 +54,13 @@ export OMARCHY_DISTRO=fedora
 export OMARCHY_FEDORA_MAP="$FIXTURE_MAP"
 export OMARCHY_FEDORA_INSTALLERS="$INSTALLERS_DIR"
 export MOCK_LOG
+# pkg.py skips Flatpak installs when there's no DBus session bus (correct on a
+# bare container/TTY). These tests verify the flatpak *routing* via the mock, so
+# simulate a session bus; otherwise the assertions fail inside the L2 Fedora
+# container (no bus) while passing on the L1 Ubuntu runner (bus present).
+export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=/run/user/$(id -u)/bus}"
+# Ensure VM-fast mode (another flatpak-skip path) is never inherited from CI env.
+unset OMEDORA_VM_FAST
 
 reset_log() { : >"$MOCK_LOG"; }
 log_contains() { grep -qF "$1" "$MOCK_LOG"; }
