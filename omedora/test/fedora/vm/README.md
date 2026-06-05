@@ -123,11 +123,14 @@ Two complementary approaches; we run **both**.
    against the golden is a *geometry mismatch*, not a regression. Two mechanisms
    handle this: (1) the runner exports `SCREENSHOT_GEOMETRY_SKIP=1`, which makes
    `lib.sh` downgrade a geometry mismatch to a TAP **SKIP** (off in the podman
-   tier, which stays strict); and (2) `OMEDORA_VM_RES` (default `1920x1080`)
-   pins the virtio-gpu's advertised mode via QEMU `xres/yres` so the goldens can
-   diff for real — set `OMEDORA_VM_RES=` to disable. (The default-mode run is
-   what's been verified end-to-end; the 1920×1080 pin is XML-validated but its
-   effectiveness depends on the guest honouring the advertised EDID mode.)
+   tier, which stays strict) — **this is the verified default path**; and (2) an
+   **opt-in** `OMEDORA_VM_RES` (e.g. `1920x1080`) that pins the virtio-gpu's
+   advertised mode via QEMU `xres/yres` so the goldens can diff for real. It is
+   **off by default**: the `-set device.<alias>.xres` lever needs the exact
+   libvirt-assigned video alias (not a stable `video0` — a wrong alias makes QEMU
+   refuse to boot), so to use it you pass both `OMEDORA_VM_RES=1920x1080` and
+   `OMEDORA_VM_RES_ALIAS=<alias>` (find it in `virsh dumpxml <vm>` → `<video>
+   <alias name='…'/>`).
 
 ## Install path exercised
 
