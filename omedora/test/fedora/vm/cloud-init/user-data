@@ -1,0 +1,90 @@
+#cloud-config
+# L4-VM cloud-init seed — the real Fedora Workstation coexistence baseline.
+#
+# Consumed by cloud-init on first boot of the Fedora 44 Cloud Base qcow2. It
+# turns the headless Cloud Base into the baseline a real user installs Omedora
+# onto: a Fedora *Workstation* (GNOME + GDM) with a wheel/passwordless-sudo
+# user and GDM autologin into a graphical seat — the coexistence scenario the
+# podman L4 tiers cannot represent (no real DM, no real seat/DRM master).
+#
+# WHY Cloud Base + groupinstall (not the Workstation Live ISO): the Cloud Base
+# qcow2 is the only Fedora deliverable that is cloud-init-seedable and so fully
+# unattended/scriptable. The Workstation *product* is then layered on with
+# `dnf group install workstation-product-environment`, which pulls the exact
+# same GNOME/GDM/gnome-shell/xdg-desktop-portal-gnome/tuned-ppd set a Live
+# install lays down (it's the same comps group). End state: a genuine
+# Workstation package set with GDM as the DM — the faithful coexistence base.
+#
+# Templated by host-provision.sh: @@SSH_PUBKEY@@, @@VM_USER@@, @@HOSTNAME@@.
+
+hostname: @@HOSTNAME@@
+fqdn: @@HOSTNAME@@.omedora-vmtest.local
+
+users:
+  - name: @@VM_USER@@
+    groups: [wheel]
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    shell: /bin/bash
+    lock_passwd: false
+    # Password hash for "omedora" (console/VNC login if ever needed); SSH key is
+    # the primary access path. Substituted by host-provision.sh (openssl passwd
+    # -6). Throwaway VM only.
+    passwd: "@@PASSWD_HASH@@"
+    ssh_authorized_keys:
+      - @@SSH_PUBKEY@@
+
+ssh_pwauth: true
+
+# Grow the root fs to fill the resized disk (Omedora's package set + Workstation
+# group + RPM Fusion need well over the ~5G the base image ships with).
+growpart:
+  mode: auto
+  devices: ["/"]
+resize_rootfs: true
+
+write_files:
+  # GDM autologin into the *default* session. The default wayland session is
+  # selected at runtime by the in-VM harness (it writes the user's
+  # AccountsService session = "omedora" before triggering the graphical target),
+  # so the seat comes up straight into the Omedora/Hyprland session with a real
+  # DRM master — exactly what the session-attach + screenshot assertions need.
+  - path: /etc/gdm/custom.conf
+    permissions: "0644"
+    content: |
+      [daemon]
+      AutomaticLoginEnable=True
+      AutomaticLogin=@@VM_USER@@
+      WaylandEnable=True
+
+  # A sentinel the host orchestrator polls (via SSH) to know cloud-init's
+  # heavy runcmd (the Workstation groupinstall) has finished.
+  - path: /etc/omedora-vmtest/provision.marker
+    permissions: "0644"
+    content: |
+      seeded
+
+# The heavy lifting: turn Cloud Base into Workstation. Kept in runcmd (not
+# packages:) so we control ordering and can install a comps GROUP, not just
+# leaf packages.
+runcmd:
+  # Real Workstation product: GNOME shell, GDM, gnome portals, tuned-ppd, the
+  # whole Workstation comps group. This is what makes it a faithful coexistence
+  # base rather than a bare server.
+  - [ dnf, -y, group, install, workstation-product-environment ]
+  # Make sure the display manager + graphical target are the boot default, just
+  # like a real Workstation install.
+  - [ systemctl, set-default, graphical.target ]
+  - [ systemctl, enable, gdm.service ]
+  # Bootstrap prerequisites Omedora's boot.sh would dnf-install anyway; doing it
+  # here lets the install phase start immediately and keeps that step out of the
+  # timed install window.
+  - [ dnf, -y, install, git, gum, dnf-plugins-core ]
+  # Signal completion: the orchestrator greps this file's contents over SSH.
+  - [ sh, -c, "echo done > /etc/omedora-vmtest/provision.done" ]
+
+# Reboot into the graphical target once Workstation is laid down, so GDM is the
+# live DM when the orchestrator connects.
+power_state:
+  mode: reboot
+  condition: true
+  message: "Rebooting into Workstation (GDM) after provisioning"

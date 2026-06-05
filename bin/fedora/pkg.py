@@ -210,7 +210,17 @@ def cmd_add(entries: list[Entry], args: argparse.Namespace) -> int:
     # and exits non-zero. Skipping with a warning lets the rest of the
     # install proceed; production users (with a real session) re-run
     # `omedora update` later to pick the flatpaks up.
-    if flathub_ids and not (os.environ.get("DBUS_SESSION_BUS_ADDRESS")
+    # OMEDORA_VM_FAST: the L4-VM test harness's fast mode. Flatpak runtimes are
+    # multi-GB and dominate the VM install time; skipping them keeps a faithful
+    # dnf/COPR install (the thing the VM tier is actually validating) while
+    # cutting ~10-20min off the run. Off by default — full runs still install
+    # Flatpaks. (Same shape as the DBus-absent skip below.)
+    if flathub_ids and os.environ.get("OMEDORA_VM_FAST"):
+        warn(
+            f"OMEDORA_VM_FAST set; skipping {len(flathub_ids)} Flatpak "
+            "install(s) (fast L4-VM mode). dnf/COPR packages still install."
+        )
+    elif flathub_ids and not (os.environ.get("DBUS_SESSION_BUS_ADDRESS")
                             or os.path.exists(f"/run/user/{os.getuid()}/bus")):
         warn(
             f"no DBus session bus detected; skipping {len(flathub_ids)} "
