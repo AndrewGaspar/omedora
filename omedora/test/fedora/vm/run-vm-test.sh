@@ -275,14 +275,24 @@ provision() {
   done
 
   log "waiting for cloud-init to finish (Workstation groupinstall, ~6-12min)..."
+  # Run `cloud-init status` via sudo: as the unprivileged user it can hit a
+  # PermissionError on /run/cloud-init/cloud.cfg mid-run (a CLI quirk, not a
+  # provisioning failure), which would make the poll see no status. The user has
+  # passwordless sudo.
   for i in $(seq 1 120); do
-    local st; st=$(vmssh 'cloud-init status 2>/dev/null' 2>/dev/null | awk -F': ' '/status/{print $2}')
+    local st; st=$(vmssh 'sudo cloud-init status 2>/dev/null' 2>/dev/null | awk -F': ' '/status/{print $2}')
     case "$st" in
       done)  log "cloud-init done"; return 0 ;;
       error) warn "cloud-init reported error; provisioning may be incomplete:"
-             vmssh 'cloud-init status --long 2>/dev/null' 2>/dev/null | sed 's/^/  /' >&2 || true
+             vmssh 'sudo cloud-init status --long 2>/dev/null' 2>/dev/null | sed 's/^/  /' >&2 || true
              return 0 ;;  # continue — partial base is often still installable
     esac
+    # Fallback signal: gnome-shell present + dnf idle => the Workstation
+    # groupinstall finished even if `cloud-init status` is momentarily unhappy.
+    if [[ -z "$st" ]] && vmssh 'rpm -q gnome-shell >/dev/null 2>&1 && ! pgrep -x dnf5 >/dev/null && ! pgrep -x dnf >/dev/null' 2>/dev/null; then
+      log "cloud-init status unavailable but gnome-shell installed + dnf idle — treating provisioning as complete"
+      return 0
+    fi
     [[ $i -eq 120 ]] && { warn "cloud-init did not reach done within ~20min; continuing"; return 0; }
     sleep 10
   done
