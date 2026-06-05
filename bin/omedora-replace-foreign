@@ -158,13 +158,16 @@ fi
 
 rc=0
 
-# 1. RENAMES via `dnf swap` (atomic remove-foreign + install-omedora). This is
-#    what actually removes the foreign `hyprland` — it owns the same
-#    /usr/bin/Hyprland as omedora's hyprland-no-session, and a plain
-#    `install --allowerasing` will NOT erase a package over a *file* conflict.
-#    The swap can CASCADE-REMOVE same-name packages that depend on the foreign
-#    one (e.g. xdg-desktop-portal-hyprland needs the foreign hyprland); step 2
-#    puts those back. Foreign repo disabled so deps resolve from omedora.
+# THE ATOMIC, CRITICAL STEP — `dnf swap` (one RPM transaction: it fully applies
+# or rolls back). This is what removes the foreign `hyprland` (it owns the same
+# /usr/bin/Hyprland as omedora's hyprland-no-session; a plain `install
+# --allowerasing` will NOT erase a package over a *file* conflict) and installs
+# omedora's compositor in its place. If it fails, rc is non-zero and we abort —
+# leaving the system untouched by the (rolled-back) transaction.
+#
+# dnf5 has no way to fold the same-name cross-grades into this one transaction
+# (it dropped both the `pkg-` remove syntax and the built-in `shell`), so those
+# happen in best-effort follow-up steps below — see the comment there.
 for s in "${swaps[@]}"; do
   read -ra parts <<<"$s"
   foreign="${parts[0]}"
@@ -177,20 +180,19 @@ for s in "${swaps[@]}"; do
   fi
 done
 
-# 2. Ensure the same-name targets are INSTALLED from omedora. A swap above may
-#    have cascade-removed some; `install` re-adds those and no-ops the rest. We
-#    use install (not distro-sync) here precisely because distro-sync ERRORS on a
-#    package that the swap removed ("available, but not installed") — the bug
-#    this fixes.
+# BEST-EFFORT RECONCILIATION — NOT atomic with the swap, and deliberately NOT
+# allowed to fail the replacement. A swap above can cascade-remove a same-name
+# dependent (e.g. xdg-desktop-portal-hyprland needs the foreign hyprland); we
+# re-`install` those from omedora and `distro-sync` to move provenance. If either
+# hiccups it must NOT abort the install: the critical swap already gave you a
+# working omedora compositor, the foreign COPR is about to be disabled, and the
+# packaging stage (which installs the full omedora set) plus any re-run will
+# reconcile the rest. So these warn instead of setting rc.
 if [[ $rc -eq 0 && ${#syncs[@]} -gt 0 ]]; then
-  $DNF -y "${disable_args[@]}" install "${syncs[@]}" || rc=$?
-fi
-
-# 3. Move the same-name packages' provenance onto omedora's repo. Safe now — all
-#    are installed by step 2, and the foreign repo is disabled, so this just
-#    re-pulls them from omedora.
-if [[ $rc -eq 0 && ${#syncs[@]} -gt 0 ]]; then
-  $DNF -y "${disable_args[@]}" distro-sync "${syncs[@]}" || rc=$?
+  $DNF -y "${disable_args[@]}" install "${syncs[@]}" \
+    || echo -e "\033[33momedora: note: couldn't re-pull ${syncs[*]} now; the packaging stage will install them.\033[0m" >&2
+  $DNF -y "${disable_args[@]}" distro-sync "${syncs[@]}" \
+    || echo -e "\033[33momedora: note: provenance sync of ${syncs[*]} deferred (harmless).\033[0m" >&2
 fi
 
 # Now that the foreign packages are replaced, DISABLE the foreign COPR(s) we
