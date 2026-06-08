@@ -62,6 +62,12 @@ jobs:
       - name: Run mimetypes default-browser test
         run: bash test/mimetypes-browser-test.sh
 
+      - name: Run fcitx IME seed-skip test
+        run: bash test/config-fcitx-seed-test.sh
+
+      - name: Run XCompose backup test
+        run: bash test/xcompose-backup-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 
