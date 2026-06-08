@@ -97,6 +97,14 @@ omedora_plan_summary() {
   echo "  ${create_count} new config file(s) will be added (no existing file at those paths)."
   echo "  ~/.bashrc: ${bashrc_action}."
   echo "  ~/.config/git/config: never touched (your git identity is protected)."
+  echo
+  echo -e "\033[1m  Default-app & preference changes the install will make:\033[0m"
+  echo "      • set Chromium as the default browser + http(s) handlers — only if you have none set"
+  echo "      • install Alacritty and set it as the default terminal"
+  echo "      • set default apps for images (imv), PDF (Evince), video (mpv), and text (nvim)"
+  echo "      • set HEY as the mailto handler — only if you have none set"
+  echo "      • seed fcitx IME environment variables — only if fcitx is installed"
+  echo "      • back up an existing ~/.XCompose before writing omedora's"
   if [[ $doctor_rc -ne 0 ]]; then
     echo
     echo -e "\033[33m  Foreign-repo Hyprland packages detected — installing omedora's pinned stack over them may leave a mismatched session:\033[0m"
