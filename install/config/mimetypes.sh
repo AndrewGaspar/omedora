@@ -23,10 +23,51 @@ xdg-mime default imv.desktop image/tiff
 # Open PDFs with the Document Viewer
 xdg-mime default org.gnome.Evince.desktop application/pdf
 
-# Use Chromium as the default browser
-xdg-settings set default-web-browser chromium.desktop
-xdg-mime default chromium.desktop x-scheme-handler/http
-xdg-mime default chromium.desktop x-scheme-handler/https
+# Use Chromium as the default browser.
+#
+# On Arch (upstream omarchy) this is unconditional — byte-identical to upstream.
+# On Fedora Workstation the user already has a default (Firefox), and forcing
+# Chromium here silently clobbers their choice. So on Fedora we only claim the
+# default-browser / http(s) handlers when nothing is set yet. An existing,
+# installed default is respected and left alone. See omedora/architecture.md.
+set_chromium_default_browser() {
+  xdg-settings set default-web-browser chromium.desktop
+  xdg-mime default chromium.desktop x-scheme-handler/http
+  xdg-mime default chromium.desktop x-scheme-handler/https
+}
+
+# True if $1 (a foo.desktop id) resolves to an installed application, i.e. the
+# file exists under any XDG applications/ dir. Mirrors the lookup order the
+# desktop spec uses ($XDG_DATA_HOME then $XDG_DATA_DIRS, defaulting per spec).
+desktop_id_is_installed() {
+  local id="$1" dir
+  local home="${XDG_DATA_HOME:-$HOME/.local/share}"
+  local dirs="${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+  for dir in "$home" ${dirs//:/ }; do
+    [[ -f "$dir/applications/$id" ]] && return 0
+  done
+  return 1
+}
+
+if [[ "$(omarchy-distro 2>/dev/null || echo arch)" == "fedora" ]]; then
+  # `xdg-settings get default-web-browser` may fail, print an error, or emit an
+  # empty line when nothing is set — capture stdout only and trim whitespace.
+  current_browser="$(xdg-settings get default-web-browser 2>/dev/null | head -n1)"
+  current_browser="${current_browser//[[:space:]]/}"
+
+  # Treat as "already chosen" only if it's a non-empty .desktop id that resolves
+  # to an actually-installed application (a real existing choice). A stale id
+  # pointing at an uninstalled app is not a choice we should preserve.
+  if [[ -n $current_browser && $current_browser == *.desktop ]] &&
+    desktop_id_is_installed "$current_browser"; then
+    echo "Keeping existing default browser: $current_browser"
+  else
+    echo "No default browser set; using Chromium."
+    set_chromium_default_browser
+  fi
+else
+  set_chromium_default_browser
+fi
 
 # Open video files with mpv
 xdg-mime default mpv.desktop video/mp4
