@@ -86,8 +86,26 @@ xdg-mime default mpv.desktop video/x-ogm+ogg
 xdg-mime default mpv.desktop video/x-theora+ogg
 xdg-mime default mpv.desktop application/ogg
 
-# Use Hey for mailto: links
-xdg-mime default HEY.desktop x-scheme-handler/mailto
+# Use Hey for mailto: links.
+#
+# On Arch (upstream omarchy) this is unconditional — byte-identical to upstream.
+# On Fedora the user may already have a mail client wired to mailto:, and forcing
+# HEY here silently clobbers it. So on Fedora we only claim the mailto handler
+# when nothing installed is set yet (mirrors the default-browser logic above,
+# reusing desktop_id_is_installed).
+if [[ "$(omarchy-distro 2>/dev/null || echo arch)" == "fedora" ]]; then
+  current_mailto="$(xdg-mime query default x-scheme-handler/mailto 2>/dev/null | head -n1)"
+  current_mailto="${current_mailto//[[:space:]]/}"
+  if [[ -n $current_mailto && $current_mailto == *.desktop ]] &&
+    desktop_id_is_installed "$current_mailto"; then
+    echo "Keeping existing mailto handler: $current_mailto"
+  else
+    echo "No mailto handler set; using HEY."
+    xdg-mime default HEY.desktop x-scheme-handler/mailto
+  fi
+else
+  xdg-mime default HEY.desktop x-scheme-handler/mailto
+fi
 
 # Open text files with nvim
 xdg-mime default nvim.desktop text/plain

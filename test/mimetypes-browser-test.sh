@@ -49,6 +49,11 @@ EOF
 cat >"$BIN/xdg-mime" <<'EOF'
 #!/bin/bash
 printf 'xdg-mime %s\n' "$*" >>"$MOCK_LOG"
+# `query default x-scheme-handler/mailto` echoes $MOCK_XDG_MAILTO (the user's
+# existing mailto handler, if any) so the Fedora only-if-unset path can be tested.
+if [[ ${1:-} == query && ${2:-} == default && ${3:-} == x-scheme-handler/mailto ]]; then
+  [[ -n ${MOCK_XDG_MAILTO-} ]] && printf '%s\n' "$MOCK_XDG_MAILTO"
+fi
 exit 0
 EOF
 
@@ -75,11 +80,33 @@ run_mimetypes() {
     export OMARCHY_DISTRO="$1"
     export MOCK_XDG_GET_OUT="$2"
     export MOCK_XDG_GET_RC="$3"
+    export MOCK_XDG_MAILTO="${4-}"
     bash "$SCRIPT"
   )
 }
 
 log_has()  { grep -qF "$1" "$MOCK_LOG"; }
+
+assert_mailto_forced() {
+  local desc="$1"
+  if log_has 'xdg-mime default HEY.desktop x-scheme-handler/mailto'; then
+    pass "$desc"
+  else
+    printf 'Expected HEY to be set as the mailto handler. Log:\n' >&2
+    cat "$MOCK_LOG" >&2
+    fail "$desc"
+  fi
+}
+
+assert_mailto_not_forced() {
+  local desc="$1"
+  if log_has 'xdg-mime default HEY.desktop x-scheme-handler/mailto'; then
+    printf 'Did not expect HEY to be set as the mailto handler. Log:\n' >&2
+    cat "$MOCK_LOG" >&2
+    fail "$desc"
+  fi
+  pass "$desc"
+}
 
 assert_chromium_forced() {
   local desc="$1"
@@ -132,5 +159,32 @@ assert_chromium_forced "Fedora sets Chromium when xdg-settings get errors"
 rm -f "$DATA_HOME/applications/firefox.desktop"
 out=$(run_mimetypes fedora "firefox.desktop" 0)
 assert_chromium_forced "Fedora sets Chromium when the existing default isn't installed"
+
+# --- mailto -> HEY only-if-unset --------------------------------------------
+# Arch: HEY is always forced as the mailto handler (upstream parity), regardless
+# of any existing handler.
+out=$(run_mimetypes arch "" 0 "thunderbird.desktop")
+assert_mailto_forced "Arch forces HEY as mailto handler even when one exists (upstream parity)"
+
+out=$(run_mimetypes arch "" 0 "")
+assert_mailto_forced "Arch forces HEY as mailto handler when none is set"
+
+# Fedora: respects an existing, installed mailto handler.
+: >"$DATA_HOME/applications/thunderbird.desktop"  # thunderbird "installed"
+out=$(run_mimetypes fedora "" 0 "thunderbird.desktop")
+assert_mailto_not_forced "Fedora keeps an existing installed mailto handler (thunderbird)"
+assert_output_contains "Fedora logs that it keeps the existing mailto handler" "$out" \
+  "Keeping existing mailto handler: thunderbird.desktop"
+
+# Fedora: no mailto handler set -> HEY.
+out=$(run_mimetypes fedora "" 0 "")
+assert_mailto_forced "Fedora sets HEY when no mailto handler is configured"
+assert_output_contains "Fedora logs that it falls back to HEY" "$out" \
+  "No mailto handler set; using HEY."
+
+# Fedora: stale mailto handler pointing at an UNINSTALLED app -> HEY.
+rm -f "$DATA_HOME/applications/thunderbird.desktop"
+out=$(run_mimetypes fedora "" 0 "thunderbird.desktop")
+assert_mailto_forced "Fedora sets HEY when the existing mailto handler isn't installed"
 
 echo "# all mimetypes-browser tests passed"
