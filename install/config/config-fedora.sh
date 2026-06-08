@@ -22,8 +22,35 @@ set -euo pipefail
 
 # --- Seed config/* (backup-then-write; skips the user's git/config) ---------
 
-# Never write omedora's git config over the user's identity.
-OMEDORA_SEED_SKIP="git/config" \
+# Build the seed skip-list. The user's git identity is always protected.
+seed_skip="git/config"
+
+# fcitx IME env vars: config/environment.d/fcitx.conf points QT/SDL/X input
+# modules at fcitx. But fcitx is NOT in omedora's Fedora package set, so seeding
+# it on Fedora aims IME env vars at uninstalled software and can break Qt/SDL
+# text input. Skip seeding it unless fcitx is actually installed on this machine.
+# (Arch installs fcitx upstream, so this only applies to the Fedora path, which
+# is the only path that reaches config-fedora.sh.)
+#
+# fcitx_installed: true if fcitx is present. Wrapped in a function so tests can
+# force either branch via OMEDORA_FCITX_INSTALLED (1/0) without depending on
+# whatever the test host happens to have installed.
+fcitx_installed() {
+  case "${OMEDORA_FCITX_INSTALLED:-}" in
+    1) return 0 ;;
+    0) return 1 ;;
+  esac
+  command -v fcitx5 >/dev/null 2>&1 || command -v fcitx >/dev/null 2>&1
+}
+
+if fcitx_installed; then
+  echo -e "\033[32momedora: fcitx detected; seeding environment.d/fcitx.conf\033[0m"
+else
+  echo -e "\033[33momedora: fcitx not installed; skipping environment.d/fcitx.conf (would point IME env vars at uninstalled software)\033[0m"
+  seed_skip+=$'\n'"environment.d/fcitx.conf"
+fi
+
+OMEDORA_SEED_SKIP="$seed_skip" \
   omedora-seed-config --source ~/.local/share/omarchy/config --dest ~/.config
 
 # --- ~/.bashrc: append a sentinel-guarded sourcing block, never overwrite ----
