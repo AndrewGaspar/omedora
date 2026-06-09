@@ -67,7 +67,12 @@ done
 chmod +x "$BIN"/*
 
 export PATH="$BIN:$ROOT/bin:$PATH"
+# Isolate BOTH XDG dirs: desktop_id_is_installed probes $XDG_DATA_HOME *and*
+# $XDG_DATA_DIRS. Without pinning DATA_DIRS the probe falls back to the spec
+# default (/usr/local/share:/usr/share), so a CI runner that actually ships
+# firefox.desktop would make the "isn't installed" cases resolve as installed.
 export XDG_DATA_HOME="$DATA_HOME"
+export XDG_DATA_DIRS="$DATA_HOME"
 
 MOCK_LOG="$TMPDIR/mock.log"
 export MOCK_LOG
