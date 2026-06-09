@@ -305,7 +305,7 @@ The full autostart chain (waybar, mako, swaybg, hypridle, fcitx5) comes up exact
 **GPU vs software rendering.** Aquamarine's GBM allocator needs a DRM **render node** (`/dev/dri/renderD*`) — it has *no* shm/pixman fallback for nesting, so a pure-software (`--renderer=pixman`, no render node) path does **not** work.
 
 - **Local dev (has a GPU):** the runner passes `--device /dev/dri`; labwc/wlroots picks a node automatically. On **multi-GPU** hosts one node's GBM allocator can fail (observed: NVIDIA `renderD128` → *"Couldn't allocate a gbm buffer … format XR24"*, while AMD `renderD129` works). Pin the good one with `OMEDORA_RENDER_NODE=/dev/dri/renderD129` — it's forwarded to both labwc (`WLR_RENDER_DRM_DEVICE`) and aquamarine (`AQ_DRM_DEVICES`).
-- **GPU-less CI:** load the host kernel **`vkms`** module (Virtual KMS — a software DRM device that llvmpipe renders into; shipped by stock Fedora/Ubuntu CI kernels) and pass that render node via `OMEDORA_RENDER_NODE`. This is the no-GPU path. (The dev box used here runs an Arch kernel built **without** `CONFIG_DRM_VKMS`, so the pure-no-GPU path couldn't be demonstrated locally — but the chain is identical: any working render node, real or vkms, satisfies aquamarine.)
+- **GPU-less CI: not possible (proven 2026-06-09).** `vkms` was the assumed no-GPU path, but it **does not provide a render node** — loaded on a GitHub-hosted runner it creates only a display `card` node (`/dev/dri/card0`), no `renderD*`. `vgem` yields no usable GL node either, and the `vkms` *card* node + Mesa `kms_swrast` (the dedicated software-KMS driver) still fails: wlroots aborts with `Cannot create GLES2 renderer: no DRM FD available`. Software *rendering* (llvmpipe) is present, but the GBM/dma-buf **render-node FD** wlroots + aquamarine require is unobtainable in software. **L4 therefore needs a real render node → a self-hosted runner with a GPU (or a paid GPU-enabled hosted runner); it cannot run on standard GitHub-hosted runners.** (`podman --systemd=always` *does* work on hosted runners — the render node is the only blocker.)
 
 **Knobs:** `OMEDORA_RENDER_NODE` (pin a render node), `OMEDORA_HEADLESS_RES` (default `1920x1080`), `OMEDORA_HEADLESS_KEEP` (return after the session is up instead of blocking — for scripted/CI driving).
 
@@ -441,7 +441,7 @@ Both are walker layer-surfaces (gtk4-layer-shell, same render path as `10-walker
 
 > The same affirmative-regenerate procedure is documented inline in each test's header comment, so a contributor who hits the red test sees it at the point of failure.
 
-**CI notes.** Same requirement as `--headless`: a DRM render node (`--device /dev/dri`). GPU-less runners: `sudo modprobe vkms`, then `OMEDORA_RENDER_NODE=/dev/dri/renderD<n>`. Build-once-then-run on a scheduled/on-demand job (the image build is ~15–30 min).
+**CI notes.** Same requirement as `--headless`: a DRM render node (`--device /dev/dri`). This rules out standard GitHub-hosted runners — they have no render node and no software substitute (see "GPU vs software rendering" above; proven 2026-06-09). Running L4 in CI needs a **self-hosted runner with a GPU** (or a paid GPU-enabled hosted runner); build-once-then-run on a scheduled/on-demand job (the image build is ~15–30 min).
 
 ### Workstation-base variant (`--workstation`)
 
@@ -486,11 +486,11 @@ omedora/test/fedora/raw-hyprland-test.sh --keep     # leave the container up to 
 omedora/test/fedora/raw-hyprland-test.sh --rebuild  # rebuild the vanilla image first
 ```
 
-It validates `hyprland-no-session` is self-sufficient as the binaries package **and** that `dnf install hyprland` yields a working default session — the piggybacker contract — independently of anything omedora installs. (On GPU-less CI, `modprobe vkms` + `OMEDORA_RENDER_NODE=/dev/dri/renderD<n>` as for the headless suite.)
+It validates `hyprland-no-session` is self-sufficient as the binaries package **and** that `dnf install hyprland` yields a working default session — the piggybacker contract — independently of anything omedora installs. (Like the headless suite, it needs a real DRM render node, so it's local / GPU-runner only — not standard GitHub-hosted; see "GPU vs software rendering" above.)
 
-### Why this *can now* be in CI
+### CI status: needs a GPU runner (not standard GitHub-hosted)
 
-The original blocker was "GitHub Actions runners are headless — no compositor to nest under." `--headless` removes that: the container brings its own compositor. The remaining requirement is a **DRM render node**, satisfied on GPU-less runners by loading **`vkms`** (`sudo modprobe vkms` in a CI step, then `OMEDORA_RENDER_NODE=/dev/dri/renderD128`). The systemd image build (~15–30 min) is still at the upper edge of practical CI runtime, so the pragmatic plan is a **scheduled / on-demand** CI job (not every push) that builds once, caches the image, and runs the `--headless` smoke. The earlier Xvfb + `x11`-backend idea is unnecessary.
+The first blocker — "GitHub Actions runners are headless, no compositor to nest under" — *is* solved: `--headless` makes the container bring its own compositor (labwc), and `podman --systemd=always` boots PID-1 systemd fine on hosted runners (both verified). The remaining requirement is a **DRM render node**, and that's the wall: **standard GitHub-hosted runners cannot provide one**, in hardware or software. Proven 2026-06-09 (see "GPU vs software rendering" above): `vkms` gives only a `card` node, `vgem` gives no GL node, and `vkms` + `kms_swrast` still leaves wlroots with "no DRM FD available." So running L4-headless in CI requires a **self-hosted runner with a GPU** (or a paid GPU-enabled hosted runner) — `runs-on: [self-hosted, drm]`, scheduled/on-demand, build-once. Absent that, L4 stays a **local / pre-release manual gate** (run `run-tests.sh` or the L4-VM pipeline before releases). The earlier Xvfb + `x11`-backend idea is unnecessary; the earlier "vkms makes it CI-able" assumption was wrong.
 
 ### File layout
 
@@ -544,7 +544,7 @@ Specific friction points worth knowing about before writing tests:
 
 ## 8. CI workflow shape
 
-`.github/workflows/test.yml` defines four parallel jobs on push and pull_request. **L4-nested is not in CI** (no host Wayland on GitHub runners for the nested compositor to render into; an Xvfb-wrapped headless path is technically possible but the systemd image build cost makes it impractical for every PR).
+`.github/workflows/test.yml` defines four parallel jobs on push and pull_request. **L4-nested is not in CI, and cannot be on standard GitHub-hosted runners** — `--headless` solved the "no host compositor" problem (the container brings its own labwc), but the deeper blocker is the **DRM render node** wlroots+aquamarine require, which hosted runners cannot provide in hardware or software (proven 2026-06-09; see "GPU vs software rendering"). It would need a self-hosted/GPU runner; until then L4 stays a local / pre-release gate.
 
 ### `shell-unit` (fast, every PR)
 
