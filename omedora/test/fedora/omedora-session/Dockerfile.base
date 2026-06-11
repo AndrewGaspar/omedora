@@ -1,0 +1,130 @@
+# syntax=docker/dockerfile:1
+# L4-nested base image — Omedora-in-a-real-systemd-container.
+#
+# Unlike the old omedora/test/fedora/omedora-session/Dockerfile (a namespaced rootfs +
+# shims), this image boots PID-1 systemd so the container has a real system
+# D-Bus, systemd-logind, and per-user `systemd --user`. That lets us install
+# and run Omedora exactly the way a bare-metal Fedora 44 user would — no
+# systemctl shim, no uwsm-app shim, no dbus-run-session wrapper.
+#
+# This Dockerfile builds only the BASE (Fedora + systemd + deps + the omedora
+# tree). The install does NOT run here — a Dockerfile RUN has no PID-1 systemd.
+# Instead omedora/test/fedora/build-session.sh boots this image, runs install.sh
+# inside the live logind session, and commits the result. See omedora/testing.md
+# §6 and the migration plan.
+#
+# Built and run entirely under podman (--systemd=always); independent of the
+# docker-based L1/L2/L3 images. Build product: omedora-test:fedora44-session-base.
+
+FROM registry.fedoraproject.org/fedora:44
+
+# --- install toolchain + systemd + session prerequisites ---------------------
+#   systemd / systemd-container → PID-1 init + `machinectl shell` login
+#   dbus-broker / polkit        → system bus + privilege prompts the session wants
+#   git gum jq python3 flatpak sudo dnf-plugins-core → what install.sh needs
+#     (mirrors omedora/test/fedora/Dockerfile's set so the install resolves the same way)
+#   util-linux-script           → some omarchy helpers probe for `script`
+# NOTE: Fedora 44's dnf is dnf5, which caches packages under /var/cache/libdnf5
+# (not the dnf4 /var/cache/dnf). The BuildKit cache mount + keepcache=True only
+# persist downloads if they target the dnf5 path. build-session.sh mounts its
+# named cache volume at the same /var/cache/libdnf5 path for the same reason.
+RUN --mount=type=cache,target=/var/cache/libdnf5,sharing=locked \
+    printf 'keepcache=True\n' >>/etc/dnf/dnf.conf && \
+    dnf install -y --setopt=install_weak_deps=False \
+        systemd \
+        systemd-container \
+        systemd-pam \
+        dbus-broker \
+        polkit \
+        dnf-plugins-core \
+        git \
+        gum \
+        jq \
+        python3 \
+        flatpak \
+        findutils \
+        which \
+        procps-ng \
+        diffutils \
+        sudo \
+        util-linux-script
+
+# --- headless nesting host for the L4 --headless test ------------------------
+# labwc is the headless Wayland compositor that Omedora's Hyprland nests into
+# when run via session-launch-headless.sh (run-session.sh --headless). It is the
+# lightest Fedora 44 compositor that advertises the protocols Aquamarine 0.12's
+# nested backend requires: xdg_wm_base v6 AND zwp_linux_dmabuf_v1 (weston 15 and
+# sway 1.11 only expose xdg_wm_base v5, so they can't host the nested Hyprland).
+# wayland-utils gives `wayland-info` for diagnosing what the host advertises.
+# This is TEST-ONLY scaffolding — it is not part of the Omedora desktop install.
+RUN --mount=type=cache,target=/var/cache/libdnf5,sharing=locked \
+    dnf install -y --setopt=install_weak_deps=False \
+        labwc \
+        wayland-utils && \
+    # labwc ships with the cap_sys_nice file capability; under rootless podman
+    # that cap is not in the user-ns bounding set, so `systemd-run --user labwc`
+    # fails at exec (status 203/EXEC "Operation not permitted"). Strip it — labwc
+    # runs fine without realtime priority in a test container.
+    setcap -r /usr/bin/labwc || true
+
+# --- container-friendly systemd ----------------------------------------------
+# podman --systemd=always masks most problematic units and mounts the cgroup +
+# tmpfs scaffolding, but a couple still try (and fail) to touch host-owned
+# state. Mask the ones that reliably error so `systemctl is-system-running`
+# settles at running/degraded quickly.
+RUN systemctl mask \
+        systemd-remount-fs.service \
+        systemd-machine-id-commit.service \
+        dev-hugepages.mount \
+        sys-kernel-config.mount \
+        sys-kernel-debug.mount \
+    || true
+
+# dbus-broker is the Fedora default system bus and the most container-friendly.
+# Ensure it + logind come up at boot.
+RUN systemctl enable dbus-broker.service systemd-logind.service || true
+
+# When `user@1000.service` is started by lingering at boot (no PAM login yet),
+# PID 1 doesn't inject XDG_RUNTIME_DIR into the `systemd --user` manager, so it
+# dies with "Trying to run as user instance, but $XDG_RUNTIME_DIR is not set"
+# (exit 49). Pin it via a drop-in so the user manager comes up at boot. (Once a
+# `machinectl shell` login happens, pam_systemd sets it too — this covers the
+# pre-login linger start.)
+RUN mkdir -p /etc/systemd/system/user@.service.d && \
+    printf '[Service]\nEnvironment=XDG_RUNTIME_DIR=/run/user/%%i\n' \
+        >/etc/systemd/system/user@.service.d/10-xdg-runtime-dir.conf
+
+# --- omedora user ------------------------------------------------------------
+# uid 1000, wheel + NOPASSWD sudo (install.sh expects passwordless sudo). A
+# known password (omedora) so hyprlock / PAM prompts in the session accept it.
+RUN useradd --create-home --uid 1000 --shell /bin/bash --groups wheel omedora && \
+    printf '%%wheel ALL=(ALL) NOPASSWD: ALL\n' >/etc/sudoers.d/wheel-nopasswd && \
+    chmod 0440 /etc/sudoers.d/wheel-nopasswd && \
+    echo 'omedora:omedora' | chpasswd
+
+# Enable lingering so `systemd --user` for omedora starts at boot (not just on
+# first login). The persistent marker file is exactly what
+# `loginctl enable-linger omedora` writes, and needs no logind at build time.
+RUN install -d -m 0755 /var/lib/systemd/linger && \
+    touch /var/lib/systemd/linger/omedora
+
+# --- the omedora tree --------------------------------------------------------
+# install.sh expects the tree at ~/.local/share/omarchy and finds itself via
+# OMARCHY_PATH. Bake it in so the build-via-commit step is reproducible.
+#
+# Create the XDG dirs omedora-owned. NOTE: `install -d -o omedora` only chowns
+# the leaf it's told to create, NOT intermediate parents — so a bare
+# `install -d .../​.local/share` leaves `.local` root-owned, and the install's
+# preflight/migrations.sh then can't `mkdir ~/.local/state` (Permission
+# denied). Chown `.local` explicitly so the whole XDG tree is writable.
+RUN install -d -o omedora -g omedora /home/omedora/.local/share && \
+    chown omedora:omedora /home/omedora/.local
+COPY --chown=omedora:omedora . /home/omedora/.local/share/omarchy
+
+# install.sh's logger appends to /var/log/omarchy-install.log. Pre-create it
+# owned by omedora so the install writes without sudo.
+RUN install -m 0664 -o omedora -g omedora /dev/null /var/log/omarchy-install.log
+
+# Boot systemd. The committed session image inherits this CMD.
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]
