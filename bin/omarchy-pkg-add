@@ -5,6 +5,11 @@
 # omarchy:examples=omarchy pkg add jq ripgrep
 # omarchy:requires-sudo=true
 
+# Fedora dispatch — see omedora/architecture.md §3. Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora) exec "$(dirname -- "${BASH_SOURCE[0]}")/fedora/pkg.py" add "$@" ;;
+esac
+
 if omarchy-pkg-missing "$@"; then
   if (( EUID == 0 )); then
     pacman -S --noconfirm --needed "$@" || exit 1

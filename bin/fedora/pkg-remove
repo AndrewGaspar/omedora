@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+# Fedora sibling of bin/omarchy-pkg-remove (exec'd by its distro dispatch):
+# the same fzf picker UX over the user-installed dnf package set. Mirrors the
+# upstream flow — multi-select, info preview, remove, done toast.
+
+set -euo pipefail
+
+fzf_args=(
+  --multi
+  --preview 'rpm -qi {1} 2>/dev/null || echo "(no info)"'
+  --preview-label='alt-p: toggle description, alt-j/k: scroll, tab: multi-select'
+  --preview-label-pos='bottom'
+  --preview-window 'down:65%:wrap'
+  --bind 'alt-p:toggle-preview'
+  --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
+  --bind 'alt-k:preview-up,alt-j:preview-down'
+  --color 'pointer:red,marker:red'
+)
+
+# User-installed packages (the dnf analogue of `yay -Qqe`): explicitly
+# installed by the user, not pulled in as dependencies.
+pkg_names=$(dnf -q repoquery --userinstalled --qf '%{name}\n' 2>/dev/null | sort -u | fzf "${fzf_args[@]}")
+
+if [[ -n $pkg_names ]]; then
+  # Convert newline-separated selections to space-separated for dnf
+  echo "$pkg_names" | tr '\n' ' ' | xargs sudo dnf remove -y
+  omarchy-show-done
+fi
