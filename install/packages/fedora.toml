@@ -42,11 +42,6 @@ names = ["google-noto-emoji-fonts"]
 [nvim]
 source = "dnf"
 names = ["neovim"]
-
-[github-cli]
-source = "dnf"
-names = ["gh"]
-
 [qt5-wayland]
 source = "dnf"
 names = ["qt5-qtwayland"]
@@ -94,14 +89,6 @@ reason = "Not in Fedora main repos; Flathub is the upstream-blessed install path
 [imagemagick]
 source = "dnf"
 names = ["ImageMagick"]
-
-# polkit-gnome isn't on Fedora; polkit-kde is the agent variant in repos.
-# This is a tentative mapping — we may want to skip and let the user pick.
-[polkit-gnome]
-source = "dnf"
-names = ["polkit-kde"]
-reason = "polkit-gnome not in Fedora repos; polkit-kde provides the polkit auth agent. TODO: validate against omedora's actual polkit usage."
-
 [qemu-user-static-binfmt]
 source = "dnf"
 names = ["qemu-user-static"]
@@ -135,12 +122,6 @@ reason = "Anthropic's CLI is a proprietary self-contained Bun binary (downloads.
 [omarchy-nvim]
 source = "skip"
 reason = "Not packaged as an RPM on Fedora: the omarchy-nvim build bakes its plugin cache via a headless `:Lazy! sync` that fetches ~50 plugins from GitHub, which fails in COPR's offline mock build. Nothing Requires it (it's just user-level Neovim config + a setup script). Instead install/packaging/nvim.sh bootstraps the same commit-pinned config (omacom-io/omarchy-pkgs) directly on the user's networked machine and runs Lazy sync there. The retired spec/sources remain in omedora/packaging/copr/ (dropped from build-repo.sh) for reference."
-
-[omarchy-walker]
-source = "dnf"
-names = ["walker", "elephant"]
-reason = "AUR meta pulling walker + elephant; neither is in Fedora repos. Both are packaged as RPMs in omedora/packaging/copr/ (walker pulls gtk4-layer-shell, elephant pulls qalculate for the calc provider's qalc CLI + ships its providers and user service) and served from the omedora repo (local now, COPR later)."
-
 [starship]
 source = "dnf"
 names = ["starship"]
@@ -155,31 +136,10 @@ reason = "Not in Fedora main or RPM Fusion; atim/lazygit COPR not on the allowli
 source = "dnf"
 names = ["lazydocker"]
 reason = "Not in Fedora main or RPM Fusion; atim/lazydocker COPR not on the allowlist. Binary-repackaged from upstream's prebuilt release tarball (omedora/packaging/copr/lazydocker.spec)."
-
-[swayosd]
-source = "dnf"
-names = ["swayosd"]
-reason = "Not in Fedora main repos and ships no prebuilt binaries, so the omedora swayosd RPM (omedora/packaging/copr/swayosd.spec) builds it from source via meson+cargo. Served from the omedora repo (local now, COPR later). Provides swayosd-server/-client (omedora drives them via its own user unit + ~/.config/swayosd theme) plus the libinput backend glue; fixes the swayosd-server.service 203/EXEC crash-loop."
-
 [satty]
 source = "dnf"
 names = ["satty"]
 reason = "Wayland screenshot annotation (Rust/GTK4). Not in Fedora repos/RPM Fusion, and — despite being a GUI — NOT on Flathub (verified against Flathub appstream+search). Built from source by omedora/packaging/copr/satty.spec."
-
-[bluetui]
-source = "dnf"
-names = ["bluetui"]
-reason = "Bluetooth TUI (Rust). Not in Fedora repos/RPM Fusion; a TUI is not a Flathub fit. Built from source by omedora/packaging/copr/bluetui.spec (Requires bluez)."
-
-[gazelle-tui]
-source = "dnf"
-names = ["gazelle-tui"]
-reason = "NetworkManager wifi TUI; omedora's Fedora stand-in for impala (whose iwd backend Fedora doesn't use — see [impala]). Not in Fedora repos/RPM Fusion. Packaged from source by omedora/packaging/copr/gazelle-tui.spec (pure Python; Requires python3-textual/python3-dbus/NetworkManager) and served from the omedora repo (local now, COPR later). Installed by install/packaging/fedora-baseline.sh; launched by omarchy-launch-wifi on Fedora."
-
-[impala]
-source = "skip"
-reason = "Open-source iwd wifi TUI (pythops/impala) — NOT a 37signals tool. Skipped on Fedora because it requires iwd, and Fedora Workstation rides NetworkManager (no iwd; install/config/hardware/network.sh that enables iwd.service is Arch-gated). omedora installs gazelle-tui instead (see [gazelle-tui]) and omarchy-launch-wifi launches that on Fedora. Listed in omarchy-base.packages, so it reaches omarchy-pkg-add on Fedora as a harmless skip."
-
 [hyprland-preview-share-picker]
 source = "dnf"
 names = ["hyprland-preview-share-picker"]
@@ -272,17 +232,6 @@ reason = "Hyprland not in Fedora 44 main repos. Vendored as omedora/packaging/co
 source = "dnf"
 names = ["hyprland-no-session"]
 reason = "The Hyprland compositor binaries without any wayland-sessions/*.desktop entry (omedora/packaging/copr/hyprland.spec subpackage). Not referenced by name in install/omarchy-base.packages — listed here for the validator + clarity, since it is what hyprland-omedora (the [hyprland] remap target) pulls in to provide the compositor. Served from the omedora repo."
-
-[hypridle]
-source = "dnf"
-names = ["hypridle"]
-reason = "Vendored as omedora/packaging/copr/hypridle.spec (0.1.7); served from the omedora repo. Replaces lionheartp/Hyprland."
-
-[hyprlock]
-source = "dnf"
-names = ["hyprlock"]
-reason = "Vendored as omedora/packaging/copr/hyprlock.spec (0.9.5); served from the omedora repo. Replaces lionheartp/Hyprland."
-
 [hyprland-guiutils]
 source = "dnf"
 names = ["hyprland-guiutils"]
@@ -397,3 +346,47 @@ reason = "Intel Low Power Mode Daemon; not packaged on Fedora; users with Intel 
 [kernel-modules-hook]
 source = "skip"
 reason = "Pacman hook for kernel module cleanup; Fedora's dnf has equivalent behavior built-in."
+
+# --- Omarchy 4 additions (new in install/omarchy-base.packages on the 4.x line)
+
+[networkmanager]
+source = "dnf"
+names = ["NetworkManager"]
+reason = "Case difference only — Fedora capitalizes the package name. Already installed on every Fedora Workstation/Server; listed so the base transaction resolves."
+
+[bluez-utils]
+source = "dnf"
+names = ["bluez"]
+reason = "Arch splits bluetoothctl into bluez-utils; Fedora ships it inside the main bluez package (bluez-tools resolves same-name separately)."
+
+[lua51]
+source = "dnf"
+names = ["compat-lua"]
+reason = "Arch's lua51 maps to Fedora's compat-lua (5.1.5). Note the omedora hyprland RPM bundles its own Lua for the config runtime, so this is only for parity with whatever else expects a system Lua 5.1."
+
+[ttf-jetbrains-mono-nerd-basic]
+source = "dnf"
+names = ["omedora-nerd-fonts"]
+reason = "Omarchy 4's renamed basic Nerd Font package; the omedora-nerd-fonts RPM bundles the patched JetBrainsMono (and CascadiaCode) families, same as the pre-4 ttf-jetbrains-mono-nerd mapping."
+
+[pacman-contrib]
+source = "skip"
+reason = "Provides checkupdates, a pacman tool. The Fedora update-available sibling uses dnf check-upgrade for the same job; nothing to install."
+
+[sddm]
+source = "skip"
+reason = "Omedora stays on GDM on Fedora — the packaged wayland-session entry makes GDM list the Omedora session, and install/login is Arch-gated. Installing a second display manager would add risk for no benefit."
+
+[moonlight-qt]
+source = "flathub"
+app_id = "com.moonlight_stream.Moonlight"
+reason = "Not in Fedora main or RPM Fusion (verified against both, 2026-06-11); Flathub is the maintained distribution channel."
+
+[voxtype-bin]
+source = "skip"
+reason = "Voxtype publishes Arch binaries only. It is on-demand (omarchy-voxtype-install), not in the base set; the install command degrades gracefully. Revisit (omedora RPM or upstream Fedora build) if demand surfaces."
+
+[yaru-icon-theme]
+source = "dnf"
+names = ["yaru-theme"]
+reason = "Fedora packages the Yaru icon set inside the yaru-theme package (no standalone yaru-icon-theme). Verify at L3 smoke."
