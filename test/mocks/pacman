@@ -1,0 +1,17 @@
+#!/bin/bash
+# Mock pacman — records invocation into $MOCK_LOG and exits 0.
+printf 'pacman %s\n' "$*" >>"${MOCK_LOG:-/tmp/mock.log}"
+
+# Implement enough of `pacman -Q <name>` semantics for the Arch path tests.
+if [[ ${1:-} == "-Q" && -n ${2:-} ]]; then
+  for pkg in ${MOCK_PACMAN_INSTALLED:-}; do
+    if [[ $pkg == "$2" ]]; then
+      printf '%s 1.0-1\n' "$2"
+      exit 0
+    fi
+  done
+  printf 'error: package "%s" was not found\n' "$2" >&2
+  exit 1
+fi
+
+exit "${MOCK_PACMAN_EXIT:-0}"
