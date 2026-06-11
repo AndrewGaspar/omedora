@@ -3,6 +3,14 @@
 # omarchy:summary=Show a fuzzy-finder TUI for picking new AUR packages to install.
 # omarchy:requires-sudo=true
 
+# Fedora gate — there is no AUR on Fedora. See omedora/architecture.md §3.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora)
+    echo "The AUR is not available on Fedora — use 'omarchy pkg install' instead." >&2
+    exit 1
+    ;;
+esac
+
 fzf_args=(
   --multi
   --preview 'yay -Siia {1}'
