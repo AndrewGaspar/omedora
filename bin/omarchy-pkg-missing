@@ -3,6 +3,11 @@
 # omarchy:summary=Returns true if any of the named packages are missing from the system (or false if they're all there).
 # omarchy:args=<packages...>
 
+# Fedora dispatch — see omedora/architecture.md §3. Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora) exec "$(dirname -- "${BASH_SOURCE[0]}")/fedora/pkg.py" missing "$@" ;;
+esac
+
 for pkg in "$@"; do
   if ! pacman -Q "$pkg" &>/dev/null; then
     exit 0

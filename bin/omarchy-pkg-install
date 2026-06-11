@@ -3,6 +3,11 @@
 # omarchy:summary=Show a fuzzy-finder TUI for picking new Arch and OPR packages to install.
 # omarchy:requires-sudo=true
 
+# Fedora dispatch — dnf-backed picker sibling. Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora) exec "$(dirname -- "${BASH_SOURCE[0]}")/fedora/pkg-install" "$@" ;;
+esac
+
 fzf_args=(
   --multi
   --preview 'pacman -Sii {1}'
