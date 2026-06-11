@@ -1,0 +1,5 @@
+# cloud-init meta-data (NoCloud datasource). Templated by host-provision.sh:
+# @@INSTANCE_ID@@, @@HOSTNAME@@. instance-id MUST change per provision or
+# cloud-init treats the instance as already-seeded and skips user-data.
+instance-id: @@INSTANCE_ID@@
+local-hostname: @@HOSTNAME@@
