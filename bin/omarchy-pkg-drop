@@ -4,6 +4,11 @@
 # omarchy:args=<packages...>
 # omarchy:requires-sudo=true
 
+# Fedora dispatch — see omedora/architecture.md §3. Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora) exec "$(dirname -- "${BASH_SOURCE[0]}")/fedora/pkg.py" drop "$@" ;;
+esac
+
 installed=()
 declare -A installed_exact=()
 declare -A selected=()
