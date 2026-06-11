@@ -39,6 +39,29 @@ TOPDIR=$(rpm --eval %_topdir)
 mkdir -p "$TOPDIR"/{SPECS,SOURCES,SRPMS,BUILD}
 cp "$spec_dir/$spec_base" "$TOPDIR/SPECS/"
 
+# SELF-SOURCE MODE: a spec that declares `Source0: omedora-self.tar.gz` (a
+# marker filename, not a URL) is sourced from THIS repo checkout — the
+# omedora/omedora-settings specs package the repo itself. Generate the tarball
+# with git archive straight into SOURCES/ (COPR's SCM method gives us the full
+# clone; git-core may be absent from the bare SRPM chroot, so install on
+# demand). The sha256-pin INTEGRITY GATE below does not apply to it: the
+# tarball is produced from the local tree, not fetched from a remote (these
+# specs ship no .sources pin file). Remote-source specs keep the pin
+# verification untouched. Mirrors the same mode in
+# omedora/packaging/copr/build-local.sh — keep the two in sync.
+if grep -qE '^Source0:[[:space:]]*omedora-self\.tar\.gz[[:space:]]*$' "$spec_dir/$spec_base"; then
+  command -v git >/dev/null 2>&1 || \
+    dnf install -y --setopt=keepcache=1 --setopt=install_weak_deps=False git-core >/dev/null
+  # The chroot user may not own the clone (mock runs as a different uid) —
+  # whitelist it so rev-parse/archive don't trip git's dubious-ownership check.
+  git config --global --add safe.directory '*' 2>/dev/null || :
+  repo_root=$(git -C "$spec_dir" rev-parse --show-toplevel)
+  self_version=$(grep -E '^Version:' "$spec_dir/$spec_base" | head -n1 | awk '{print $2}')
+  echo "==> Self-source spec: git archive HEAD -> omedora-self.tar.gz (prefix omedora-$self_version/)"
+  git -C "$repo_root" archive --format=tar.gz --prefix="omedora-${self_version}/" \
+    -o "$TOPDIR/SOURCES/omedora-self.tar.gz" HEAD
+fi
+
 # Stage local (non-URL) Source siblings — spectool -g only fetches URL sources,
 # so plain filenames (e.g. hyprland's macros.hyprland) are copied in by hand.
 grep -iE '^Source[0-9]*:' "$spec_dir/$spec_base" | sed -E 's/^[^:]+:[[:space:]]*//' | while read -r src; do
