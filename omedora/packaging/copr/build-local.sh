@@ -31,6 +31,23 @@ CACHE_VOL="${OMEDORA_RPMBUILD_DNF_CACHE:-omedora-rpmbuild-dnf-cache}"
 
 mkdir -p "$COPR_DIR/output"
 
+# SELF-SOURCE MODE: a spec that declares `Source0: omedora-self.tar.gz` (a
+# marker filename, not a URL) is sourced from THIS repo checkout — the
+# omedora/omedora-settings specs package the repo itself. Generate the tarball
+# here on the host with git archive (the build container only sees /copr); the
+# in-container "local Source siblings" copy below then stages it into SOURCES/
+# like any other bare-filename Source. The sha256-pin INTEGRITY GATE does not
+# apply to it: the tarball is produced from the local tree, not fetched from a
+# remote (these specs ship no .sources pin file). Remote-source specs keep the
+# pin verification untouched. NOTE: archives HEAD — uncommitted payload changes
+# are not picked up (the spec itself IS, since it's staged straight from /copr).
+if grep -qE '^Source0:[[:space:]]*omedora-self\.tar\.gz[[:space:]]*$' "$COPR_DIR/$spec"; then
+  self_version=$(grep -E '^Version:' "$COPR_DIR/$spec" | head -n1 | awk '{print $2}')
+  echo "==> Self-source spec: git archive HEAD -> omedora-self.tar.gz (prefix omedora-$self_version/)"
+  git -C "$REPO" archive --format=tar.gz --prefix="omedora-${self_version}/" \
+    -o "$COPR_DIR/omedora-self.tar.gz" HEAD
+fi
+
 echo "Building $spec in $IMAGE ..."
 podman run --rm \
   -v "$COPR_DIR:/copr:z" \
