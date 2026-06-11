@@ -58,6 +58,13 @@ SPECS=(
   hyprland-omedora.spec
   # claude-code.spec is intentionally NOT built here — parked pending a
   # redistribution-licensing decision before any public COPR (proprietary binary).
+  # omedora's two core packages, built from THIS repo via build-local.sh's
+  # self-source mode (Source0: omedora-self.tar.gz -> git archive HEAD).
+  # ORDER MATTERS: omedora Requires omedora-settings, so settings must land in
+  # the local repo first. omedora-settings supersedes hyprland-omedora
+  # (Obsoletes/Provides) but the latter stays above for existing installs.
+  omedora-settings.spec
+  omedora.spec
 )
 
 # --- Incremental build selection -------------------------------------------
