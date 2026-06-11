@@ -1,0 +1,176 @@
+#!/bin/bash
+
+# omarchy:summary=Create / list / roll back btrfs system snapshots (Fedora).
+# omarchy:args=<create|list|delete|rollback> [args]
+# omarchy:examples=omedora snapshot create | omedora snapshot rollback <name>
+# omarchy:requires-sudo=true
+
+# omedora's btrfs snapshot tool (the Fedora counterpart of omarchy-snapshot,
+# which uses snapper on Arch). omedora does NOT own the boot stack, so this is
+# deliberately raw btrfs — no snapper, no grub-btrfs.
+#
+# It snapshots the ROOT subvolume to read-only snapshots kept at the btrfs top
+# level (siblings of `root`, snapper-style), so a rollback is a clean subvolume
+# swap. /home is a separate subvolume and is NEVER touched.
+#
+#   create [label]     read-only snapshot of / now (label defaults to "manual")
+#   list               list omedora snapshots (newest first)
+#   delete <name>      delete a snapshot
+#   rollback <name>    DRY RUN by default: print exactly what it would do + the
+#                      recovery steps. Add --apply to actually do it: it stages a
+#                      writable copy of the snapshot, swaps it in for the live
+#                      `root` subvolume, and tells you to reboot. The current root
+#                      is preserved as `root.broken-<ts>` so the swap is reversible.
+#
+# Exit status: 127 when root is NOT btrfs (so callers can ignore it cleanly), 2
+# on usage error, 1 on operational error, 0 on success.
+#
+# Test seam: OMEDORA_SNAPSHOT_SUDO overrides the privilege wrapper (default
+# "sudo"); tests set it to a logger and mock btrfs/findmnt/mount on PATH.
+
+set -uo pipefail
+
+SUDO="${OMEDORA_SNAPSHOT_SUDO-sudo}"
+SNAP_SUBDIR="omedora-snapshots"
+
+die() { echo -e "\033[31momedora-snapshot: $*\033[0m" >&2; exit 1; }
+
+# --- btrfs guard + device resolution ----------------------------------------
+require_btrfs() {
+  local fstype
+  fstype="$(findmnt -no FSTYPE / 2>/dev/null || true)"
+  if [[ $fstype != "btrfs" ]]; then
+    echo "omedora-snapshot: root filesystem is '$fstype', not btrfs — snapshots unavailable." >&2
+    exit 127
+  fi
+  # SOURCE looks like /dev/nvme0n1p3[/root]; strip the [subvol] suffix.
+  ROOT_DEV="$(findmnt -no SOURCE / 2>/dev/null | sed 's/\[.*\]//')"
+  [[ -n $ROOT_DEV ]] || die "could not determine the btrfs root device"
+}
+
+# Run a function with the btrfs TOP LEVEL (subvolid=5) mounted at $TOP.
+# Test seam: OMEDORA_SNAPSHOT_TOP, if set, is used as the already-available top
+# level (no mount/umount) — lets the suite exercise create/list/rollback against
+# a plain directory with mocked `btrfs`.
+with_top() {
+  local fn="$1"; shift
+  if [[ -n ${OMEDORA_SNAPSHOT_TOP:-} ]]; then
+    TOP="$OMEDORA_SNAPSHOT_TOP"
+    mkdir -p "$TOP/$SNAP_SUBDIR"
+    "$fn" "$@"
+    return $?
+  fi
+  TOP="$(mktemp -d /tmp/omedora-btrfs-top.XXXXXX)"
+  $SUDO mount -o subvolid=5 "$ROOT_DEV" "$TOP" || die "could not mount the btrfs top level"
+  $SUDO mkdir -p "$TOP/$SNAP_SUBDIR"
+  local rc=0
+  "$fn" "$@" || rc=$?
+  $SUDO umount "$TOP" 2>/dev/null || true
+  rmdir "$TOP" 2>/dev/null || true
+  return $rc
+}
+
+now() { date +%Y%m%d-%H%M%S; }
+
+# --- create -----------------------------------------------------------------
+_do_create() {
+  local label="$1" name dest
+  name="${label}-$(now)"
+  dest="$TOP/$SNAP_SUBDIR/$name"
+  echo -e "\033[32momedora-snapshot: creating read-only snapshot '$name' of /\033[0m"
+  $SUDO btrfs subvolume snapshot -r / "$dest" || die "snapshot failed"
+  echo "  saved: $name   (roll back with: omedora snapshot rollback $name)"
+}
+cmd_create() { require_btrfs; with_top _do_create "${1:-manual}"; }
+
+# --- list -------------------------------------------------------------------
+_do_list() {
+  if [[ -d "$TOP/$SNAP_SUBDIR" ]]; then
+    # Newest first; just the snapshot directory names.
+    ( cd "$TOP/$SNAP_SUBDIR" && ls -1t 2>/dev/null ) || true
+  fi
+}
+cmd_list() {
+  require_btrfs
+  local out; out="$(with_top _do_list)"
+  if [[ -z ${out//[$' \t\n']/} ]]; then
+    echo "omedora-snapshot: no snapshots."
+  else
+    echo "omedora snapshots (newest first):"; printf '%s\n' "$out" | sed 's/^/  /'
+  fi
+}
+
+# --- delete -----------------------------------------------------------------
+_do_delete() {
+  local name="$1" path="$TOP/$SNAP_SUBDIR/$1"
+  [[ -e $path ]] || die "no such snapshot: $name"
+  $SUDO btrfs subvolume delete "$path" || die "delete failed"
+  echo "omedora-snapshot: deleted $name"
+}
+cmd_delete() { [[ -n ${1:-} ]] || { echo "usage: omedora-snapshot delete <name>" >&2; exit 2; }; require_btrfs; with_top _do_delete "$1"; }
+
+# --- rollback ---------------------------------------------------------------
+_do_rollback() {
+  local name="$1" apply="$2"
+  local snap="$TOP/$SNAP_SUBDIR/$name"
+  [[ -e $snap ]] || die "no such snapshot: $name"
+  # Sanity: the snapshot should look like a root (has etc/ and usr/).
+  if [[ ! -d "$snap/etc" || ! -d "$snap/usr" ]]; then
+    die "snapshot '$name' doesn't look like a root subvolume (no etc/ or usr/) — refusing to roll back"
+  fi
+  local ts staged broken
+  ts="$(now)"
+  staged="$TOP/root.rollback-$ts"   # writable copy of the snapshot
+  broken="$TOP/root.broken-$ts"     # the current root, kept aside (reversible)
+
+  echo -e "\033[1mRollback plan\033[0m (snapshot: $name)"
+  echo "  1. btrfs subvolume snapshot $TOP/$SNAP_SUBDIR/$name  ->  $(basename "$staged")   (writable copy)"
+  echo "  2. mv  root  ->  $(basename "$broken")               (preserve current system, reversible)"
+  echo "  3. mv  $(basename "$staged")  ->  root               (the restored system becomes /)"
+  echo "  4. reboot                                            (/ then mounts the restored root)"
+  echo
+  echo -e "\033[33m  /home is a separate subvolume and is NOT touched.\033[0m"
+  echo -e "\033[33m  If interrupted between steps 2 and 3 (a brief window), recover from a live USB with:\033[0m"
+  echo    "      mount -o subvolid=5 $ROOT_DEV /mnt && mv /mnt/$(basename "$broken") /mnt/root"
+  echo
+
+  if [[ $apply -ne 1 ]]; then
+    echo -e "\033[36mDry run — nothing changed. Re-run with --apply to perform the rollback.\033[0m"
+    return 0
+  fi
+
+  echo -e "\033[31mThis will replace your current system with snapshot '$name' and reboot.\033[0m"
+  local ok=0
+  if command -v gum >/dev/null 2>&1; then
+    gum confirm "Proceed with the rollback?" && ok=1
+  else
+    read -r -p "Type 'rollback' to proceed: " r; [[ $r == "rollback" ]] && ok=1
+  fi
+  [[ $ok -eq 1 ]] || { echo "omedora-snapshot: cancelled; nothing changed."; return 0; }
+
+  # Stage the writable copy FIRST, so the window where `root` doesn't exist is
+  # just the two consecutive renames below.
+  $SUDO btrfs subvolume snapshot "$snap" "$staged" || die "could not stage the rollback copy"
+  $SUDO mv "$TOP/root" "$broken"   || die "could not move the current root aside (root left in place)"
+  $SUDO mv "$staged" "$TOP/root"   || die "CRITICAL: root was moved to $(basename "$broken") but the restore failed. From a live USB: mv $(basename "$broken") root"
+  echo -e "\033[32momedora-snapshot: rolled back to '$name'. The previous system is kept as $(basename "$broken").\033[0m"
+  echo    "Reboot now to boot the restored system:  sudo systemctl reboot"
+}
+cmd_rollback() {
+  local name="${1:-}" apply=0
+  shift || true
+  for a in "$@"; do [[ $a == "--apply" ]] && apply=1; done
+  [[ -n $name ]] || { echo "usage: omedora-snapshot rollback <name> [--apply]" >&2; exit 2; }
+  require_btrfs
+  with_top _do_rollback "$name" "$apply"
+}
+
+# --- dispatch ---------------------------------------------------------------
+case "${1:-}" in
+  create)   shift; cmd_create "$@" ;;
+  list)     cmd_list ;;
+  delete)   shift; cmd_delete "$@" ;;
+  rollback) shift; cmd_rollback "$@" ;;
+  -h | --help | "") grep '^# ' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+  *) echo "omedora-snapshot: unknown command '$1' (create|list|delete|rollback)" >&2; exit 2 ;;
+esac

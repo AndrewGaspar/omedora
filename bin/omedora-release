@@ -1,0 +1,94 @@
+#!/bin/bash
+
+# omarchy:summary=Cut an omedora release: bump omedora/version, update the changelog, commit, and tag vX.Y.Z.
+# omarchy:args=<new-version> [--push]
+# omarchy:examples=omedora release 0.2.0 | omedora release 0.2.0 --push
+# omarchy:hidden=true
+
+# omedora's release-cutting helper. omedora versions on its OWN SemVer
+# (omedora/version) over an Omarchy base (the `version` file). A release is an
+# annotated git tag `v<omedora-version>` — which is also what omarchy-update-available
+# compares against, so tagging is what makes update detection work for installs.
+#
+# This:
+#   1. validates <new-version> is a SemVer greater than the current one,
+#   2. writes it to omedora/version,
+#   3. prepends a changelog section (auto-filled from commits since the last tag),
+#   4. commits "release: omedora vX.Y.Z (Omarchy <base>)",
+#   5. creates the annotated tag vX.Y.Z.
+# With --push it also pushes the branch + tag; otherwise it prints the push line.
+#
+# Requires a clean working tree. Run from anywhere inside the repo.
+
+set -euo pipefail
+
+REPO="$(git rev-parse --show-toplevel)"
+VERSION_FILE="$REPO/omedora/version"
+CHANGELOG="$REPO/omedora/CHANGELOG.md"
+
+push=0
+new=""
+for a in "$@"; do
+  case "$a" in
+    --push) push=1 ;;
+    -h | --help) grep '^# ' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -*) echo "omedora-release: unknown arg: $a" >&2; exit 2 ;;
+    *) new="$a" ;;
+  esac
+done
+[[ -n $new ]] || { echo "usage: omedora-release <new-version> [--push]" >&2; exit 2; }
+new="${new#v}"
+
+# SemVer (with optional -prerelease / .build-ish suffix).
+[[ $new =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.]+)?$ ]] \
+  || { echo "omedora-release: '$new' is not a SemVer (X.Y.Z)" >&2; exit 2; }
+
+cur="$(cat "$VERSION_FILE")"
+# Must be strictly greater (version-sorted).
+if [[ "$cur" == "$new" || "$(printf '%s\n%s\n' "$cur" "$new" | sort -V | tail -1)" != "$new" ]]; then
+  echo "omedora-release: new version $new must be greater than current $cur" >&2
+  exit 1
+fi
+
+# Clean tree, please.
+if ! git -C "$REPO" diff --quiet || ! git -C "$REPO" diff --cached --quiet; then
+  echo "omedora-release: working tree not clean — commit or stash first" >&2
+  exit 1
+fi
+
+base="$(cat "$REPO/version")"
+tag="v$new"
+if git -C "$REPO" rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+  echo "omedora-release: tag $tag already exists" >&2
+  exit 1
+fi
+
+# Changelog notes = non-merge commit subjects since the last tag.
+last="$(git -C "$REPO" describe --tags --abbrev=0 2>/dev/null || true)"
+range="${last:+$last..}HEAD"
+notes="$(git -C "$REPO" log --no-merges --pretty='- %s' "$range" 2>/dev/null || true)"
+[[ -n $notes ]] || notes="- (no changes recorded)"
+
+today="$(date +%Y-%m-%d)"
+tmp="$(mktemp)"
+{
+  printf '## %s — %s (Omarchy %s)\n\n%s\n' "$tag" "$today" "$base" "$notes"
+  if [[ -f $CHANGELOG ]]; then printf '\n'; cat "$CHANGELOG"; fi
+} >"$tmp"
+mkdir -p "$(dirname "$CHANGELOG")"
+mv "$tmp" "$CHANGELOG"
+
+printf '%s\n' "$new" >"$VERSION_FILE"
+
+git -C "$REPO" add "$VERSION_FILE" "$CHANGELOG"
+git -C "$REPO" commit -q -m "release: omedora $tag (Omarchy $base)"
+git -C "$REPO" tag -a "$tag" -m "omedora $tag (rebased on Omarchy $base)"
+echo "omedora-release: committed + tagged $tag (Omarchy $base)"
+
+if [[ $push -eq 1 ]]; then
+  git -C "$REPO" push origin HEAD "$tag"
+  echo "omedora-release: pushed branch + $tag"
+else
+  branch="$(git -C "$REPO" rev-parse --abbrev-ref HEAD)"
+  echo "omedora-release: to publish, run:  git push origin $branch $tag"
+fi
