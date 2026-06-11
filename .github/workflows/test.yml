@@ -38,6 +38,12 @@ jobs:
       - name: Run pkg map test
         run: bash test/pkg-map-test.sh
 
+      - name: Run pkg helper test
+        run: bash test/pkg-helper-test.sh
+
+      - name: Run adopt-user test
+        run: bash test/adopt-user-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 
