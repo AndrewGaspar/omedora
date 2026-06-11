@@ -44,6 +44,9 @@ jobs:
       - name: Run adopt-user test
         run: bash test/adopt-user-test.sh
 
+      - name: Run etc-overrides audit
+        run: bash test/etc-overrides-audit-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 
