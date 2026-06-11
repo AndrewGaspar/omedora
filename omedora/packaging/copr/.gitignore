@@ -1,0 +1,3 @@
+# Locally-built RPMs + repo (rebuild with build-repo.sh; published via COPR later).
+output/
+repo/
