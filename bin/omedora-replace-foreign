@@ -1,0 +1,221 @@
+#!/bin/bash
+
+# omarchy:summary=Replace foreign-repo Hyprland packages with omedora's pinned builds (dnf swap/distro-sync).
+# omarchy:args=[--dry-run] [--yes] [--ensure-copr <owner/project>]
+# omarchy:examples=omedora doctor --fix
+
+# The replacement engine behind `omedora doctor --fix` and the install gate's
+# "Replace" choice. It:
+#   1. detects foreign-repo owned packages          (omarchy-doctor --list)
+#   2. resolves each to omedora's install target(s) (owned_packages.py --map):
+#        - SAME name (waybar -> waybar):    distro-sync that name with the
+#          foreign repo disabled, so dnf moves provenance off the foreign COPR.
+#        - RENAMED (hyprland -> hyprland-omedora): dnf swap (atomic remove+install,
+#          required because the two names own the same files).
+#   3. shows the exact package transaction (what is removed / installed)
+#   4. asks for ONE confirmation (gum, else read)
+#   5. applies it (via $OMEDORA_DNF_CMD, default `sudo dnf`), foreign repo(s)
+#      disabled for the transaction.
+#
+# Flags:
+#   --dry-run            print the plan and exit; change nothing, never prompt.
+#   --yes | -y           skip the confirmation (assume yes). REQUIRED for a
+#                        non-interactive run (no TTY) to actually apply.
+#   --ensure-copr <id>   `dnf copr enable <id>` first, so the omedora targets
+#                        resolve (the install gate passes the omedora COPR here).
+#
+# Test / automation seams:
+#   OMEDORA_DNF_CMD       the dnf driver (default "sudo dnf"); tests inject a fake.
+#   OMEDORA_REPOQUERY_CMD passed through to omarchy-doctor to mock detection.
+#
+# Exit: 0 applied or nothing to do; 2 usage error; 3 declined / refused
+# (no TTY and no --yes); non-zero dnf code on a failed transaction.
+
+set -uo pipefail
+
+DNF="${OMEDORA_DNF_CMD:-sudo dnf}"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+dry_run=0
+assume_yes=0
+ensure_copr=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run)     dry_run=1; shift ;;
+    --yes | -y)    assume_yes=1; shift ;;
+    --ensure-copr) ensure_copr="${2:-}"; shift 2 ;;
+    -h | --help)   grep '^# ' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "omedora-replace-foreign: unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
+
+# --- 1. detect foreign-repo conflicts (name<TAB>repo) ------------------------
+# omarchy-doctor --list exits 1 when conflicts exist; keep going regardless.
+conflicts="$(omarchy-doctor --list 2>/dev/null || true)"
+
+if [[ -z ${conflicts//[$' \t\n']/} ]]; then
+  echo -e "\033[32momedora: no foreign-repo packages to replace.\033[0m"
+  exit 0
+fi
+
+# --- 2. base -> omedora target(s) map ----------------------------------------
+declare -A TARGET=()
+while IFS=$'\t' read -r base names; do
+  [[ -n $base ]] && TARGET["$base"]="$names"
+done < <(python3 "$script_dir/fedora/owned_packages.py" --map 2>/dev/null)
+
+# --- 3. build the transaction plan -------------------------------------------
+declare -a swaps=()             # "foreign target1 target2 ..."
+declare -a syncs=()             # same-name foreign packages
+declare -A disable_repos=()     # foreign repo ids to disable for the transaction
+declare -a unknown=()           # detected but no omedora target (shouldn't happen)
+
+while IFS=$'\t' read -r name repo; do
+  [[ -n $name ]] || continue
+  [[ -n $repo ]] && disable_repos["$repo"]=1
+  targets="${TARGET[$name]:-}"
+  if [[ -z $targets ]]; then
+    unknown+=("$name")
+  elif [[ $targets == "$name" ]]; then
+    syncs+=("$name")
+  else
+    swaps+=("$name ${targets//,/ }")
+  fi
+done <<<"$conflicts"
+
+# Build --disablerepo args ONLY for repos that are actually enabled. A package's
+# recorded from_repo can be a historical id that is not a currently-enabled repo
+# (e.g. base packages baked into a container image carry a hash id) — and dnf5
+# hard-errors on --disablerepo for an unknown id. For a same-name distro-sync the
+# disable is what moves provenance off a foreign COPR; when the source repo isn't
+# even enabled there's nothing to disable and the sync simply moves the package
+# to whatever enabled repo provides it.
+declare -A enabled_repos=()
+while read -r rid _; do
+  [[ -n $rid ]] && enabled_repos["$rid"]=1
+done < <($DNF -q repolist --enabled 2>/dev/null)
+
+disable_args=()
+for r in "${!disable_repos[@]}"; do
+  [[ -n ${enabled_repos[$r]:-} ]] && disable_args+=("--disablerepo=$r")
+done
+
+# --- show the plan -----------------------------------------------------------
+echo
+echo -e "\033[1mForeign-repo package replacement plan\033[0m"
+for s in "${swaps[@]}"; do
+  read -ra parts <<<"$s"
+  echo "  swap        remove ${parts[0]}  ->  install ${parts[*]:1}  (from omedora)"
+done
+if [[ ${#syncs[@]} -gt 0 ]]; then
+  echo "  distro-sync ${syncs[*]}  ->  omedora's build (foreign repo disabled)"
+fi
+for r in "${!disable_repos[@]}"; do
+  echo "  (foreign repo disabled for this transaction: $r)"
+done
+if [[ ${#unknown[@]} -gt 0 ]]; then
+  echo -e "\033[33m  (no omedora target known — left untouched: ${unknown[*]})\033[0m"
+fi
+echo
+
+if [[ ${#swaps[@]} -eq 0 && ${#syncs[@]} -eq 0 ]]; then
+  echo "omedora: nothing actionable to replace."
+  exit 0
+fi
+
+# --- 4. dry-run / confirm ----------------------------------------------------
+if [[ $dry_run -eq 1 ]]; then
+  echo "omedora: --dry-run, no changes made."
+  exit 0
+fi
+
+interactive=1
+{ [[ ! -t 0 ]] || [[ ! -t 1 ]]; } && interactive=0
+
+if [[ $assume_yes -ne 1 ]]; then
+  if [[ $interactive -eq 0 ]]; then
+    echo -e "\033[33momedora: refusing to modify packages without confirmation (no TTY and no --yes). Re-run with --yes to apply.\033[0m" >&2
+    exit 3
+  fi
+  if command -v gum >/dev/null 2>&1; then
+    gum confirm "Apply this package transaction now?" || { echo "omedora: declined; no changes made."; exit 3; }
+  else
+    read -r -p "Apply this package transaction now? [y/N] " reply
+    case "$reply" in [yY] | [yY][eE][sS]) ;; *) echo "omedora: declined; no changes made."; exit 3 ;; esac
+  fi
+fi
+
+# --- 5. apply ----------------------------------------------------------------
+# Enable the omedora COPR first if asked, so the targets resolve.
+if [[ -n $ensure_copr ]]; then
+  echo "omedora: enabling COPR $ensure_copr ..."
+  $DNF -y copr enable "$ensure_copr" || {
+    echo -e "\033[31momedora: failed to enable COPR $ensure_copr; aborting replacement.\033[0m" >&2
+    exit 1
+  }
+fi
+
+rc=0
+
+# THE ATOMIC, CRITICAL STEP — `dnf swap` (one RPM transaction: it fully applies
+# or rolls back). This is what removes the foreign `hyprland` (it owns the same
+# /usr/bin/Hyprland as omedora's hyprland-no-session; a plain `install
+# --allowerasing` will NOT erase a package over a *file* conflict) and installs
+# omedora's compositor in its place. If it fails, rc is non-zero and we abort —
+# leaving the system untouched by the (rolled-back) transaction.
+#
+# dnf5 has no way to fold the same-name cross-grades into this one transaction
+# (it dropped both the `pkg-` remove syntax and the built-in `shell`), so those
+# happen in best-effort follow-up steps below — see the comment there.
+for s in "${swaps[@]}"; do
+  read -ra parts <<<"$s"
+  foreign="${parts[0]}"
+  targets=("${parts[@]:1}")
+  if [[ ${#targets[@]} -eq 1 ]]; then
+    $DNF -y "${disable_args[@]}" swap "$foreign" "${targets[0]}" || rc=$?
+  else
+    $DNF -y "${disable_args[@]}" remove "$foreign" || rc=$?
+    $DNF -y "${disable_args[@]}" install "${targets[@]}" || rc=$?
+  fi
+done
+
+# BEST-EFFORT RECONCILIATION — NOT atomic with the swap, and deliberately NOT
+# allowed to fail the replacement. A swap above can cascade-remove a same-name
+# dependent (e.g. xdg-desktop-portal-hyprland needs the foreign hyprland); we
+# re-`install` those from omedora and `distro-sync` to move provenance. If either
+# hiccups it must NOT abort the install: the critical swap already gave you a
+# working omedora compositor, the foreign COPR is about to be disabled, and the
+# packaging stage (which installs the full omedora set) plus any re-run will
+# reconcile the rest. So these warn instead of setting rc.
+if [[ $rc -eq 0 && ${#syncs[@]} -gt 0 ]]; then
+  $DNF -y "${disable_args[@]}" install "${syncs[@]}" \
+    || echo -e "\033[33momedora: note: couldn't re-pull ${syncs[*]} now; the packaging stage will install them.\033[0m" >&2
+  $DNF -y "${disable_args[@]}" distro-sync "${syncs[@]}" \
+    || echo -e "\033[33momedora: note: provenance sync of ${syncs[*]} deferred (harmless).\033[0m" >&2
+fi
+
+# Now that the foreign packages are replaced, DISABLE the foreign COPR(s) we
+# pulled them from — otherwise the rest of the install (and future `dnf upgrade`)
+# would keep pulling a foreign/omedora MIX of the Hyprland stack (e.g. hypridle
+# from the foreign COPR), and a foreign `hyprland` could re-appear and re-conflict
+# with omedora's hyprland-no-session. "Replace" means stop using that source.
+# Best-effort; only the enabled COPR repos we actually acted on.
+if [[ $rc -eq 0 ]]; then
+  for r in "${!disable_repos[@]}"; do
+    [[ -n ${enabled_repos[$r]:-} ]] || continue
+    # copr:copr.fedorainfracloud.org:OWNER:PROJECT -> OWNER/PROJECT
+    if [[ $r =~ ^copr:[^:]+:([^:]+):([^:]+)$ ]]; then
+      echo "omedora: disabling the replaced foreign COPR ${BASH_REMATCH[1]}/${BASH_REMATCH[2]} ..."
+      $DNF -y copr disable "${BASH_REMATCH[1]}/${BASH_REMATCH[2]}" >/dev/null 2>&1 || true
+    fi
+  done
+fi
+
+echo
+if [[ $rc -eq 0 ]]; then
+  echo -e "\033[32momedora: foreign-repo packages replaced with omedora's builds.\033[0m"
+else
+  echo -e "\033[31momedora: replacement finished with errors (dnf exit $rc). Run 'omedora doctor' to re-check.\033[0m" >&2
+fi
+exit $rc
