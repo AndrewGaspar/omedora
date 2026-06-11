@@ -1,0 +1,214 @@
+#!/bin/bash
+
+# omarchy:summary=Seed omedora's config/* into ~/.config without clobbering user data (backup-then-write).
+# omarchy:args=[--plan] [--source <dir>] [--dest <dir>] [<relative-path>...]
+# omarchy:examples=omedora seed-config
+# omarchy:hidden=true
+
+# Backup-then-write config seeding for omedora (coexistence MVP).
+#
+# Installs each file from the source tree (default: omarchy's config/) into the
+# destination tree (default: ~/.config), applying this per-file policy:
+#
+#   - Destination missing            -> write omedora's file.
+#   - Destination byte-identical      -> no-op (idempotent; no churn on re-run).
+#   - Destination exists and differs  -> back it up to <path>.pre-omedora-<ts>,
+#                                        THEN write omedora's file.
+#
+# This reuses the omarchy-refresh-config idiom (timestamped backup + `cmp -s`
+# skip-if-identical) but applies it across the whole config payload on the
+# install path, so installing onto a lived-in machine never silently destroys
+# user data.
+#
+# Certain destinations are NEVER written by omedora on Fedora (the user's own
+# identity files); they are skipped entirely. The skip list is the set of
+# relative paths in $OMEDORA_SEED_SKIP (newline-separated). By default it
+# contains `git/config` (the user's git identity).
+#
+# --plan (DRY RUN): classify every destination exactly as the apply path would,
+# but write NOTHING. Emits one machine-parseable, tab-separated line per file to
+# stdout:
+#     create<TAB><rel>      destination missing       -> would write omedora's
+#     backup<TAB><rel>      exists & differs           -> would back up + replace
+#     identical<TAB><rel>   byte-identical             -> would skip
+#     protected<TAB><rel>   on the skip list           -> never touched
+# plus a one-line human summary to stderr. This is what install/preflight/
+# fedora-plan.sh consumes to drive the up-front "here's what I'll back up" gate
+# BEFORE any change. Without --plan the default is to apply.
+#
+# Env / flags:
+#   --plan           Dry run: classify + report, write nothing (see above).
+#   --source <dir>   Source config tree (default: $OMARCHY_PATH/config or
+#                    ~/.local/share/omarchy/config).
+#   --dest   <dir>   Destination tree (default: ~/.config).
+#   OMEDORA_SEED_SKIP  Newline-separated relative paths to never write.
+#                      Default: "git/config".
+#
+# Any trailing positional args restrict seeding to those relative paths
+# (useful for tests); absent, the whole source tree is walked.
+
+set -euo pipefail
+
+mode="apply"   # apply | plan (--plan)
+source_dir=""
+dest_dir="${HOME}/.config"
+
+# Resolve a sensible default source: prefer $OMARCHY_PATH/config, then the
+# installed payload location.
+default_source() {
+  if [[ -n ${OMARCHY_PATH:-} && -d "${OMARCHY_PATH}/config" ]]; then
+    printf '%s\n' "${OMARCHY_PATH}/config"
+  else
+    printf '%s\n' "${HOME}/.local/share/omarchy/config"
+  fi
+}
+
+# Parse flags.
+positional=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --plan)   mode="plan";     shift ;;
+    --source) source_dir="$2"; shift 2 ;;
+    --dest)   dest_dir="$2";   shift 2 ;;
+    --) shift; while [[ $# -gt 0 ]]; do positional+=("$1"); shift; done ;;
+    -*) echo "omedora-seed-config: unknown flag: $1" >&2; exit 2 ;;
+    *)  positional+=("$1"); shift ;;
+  esac
+done
+
+[[ -n $source_dir ]] || source_dir="$(default_source)"
+
+if [[ ! -d $source_dir ]]; then
+  echo "omedora-seed-config: source dir not found: $source_dir" >&2
+  exit 1
+fi
+
+# Skip list (relative paths under the dest tree we must never write).
+skip_list="${OMEDORA_SEED_SKIP-git/config}"
+
+is_skipped() {
+  local rel="$1" entry
+  while IFS= read -r entry; do
+    [[ -z $entry ]] && continue
+    [[ $rel == "$entry" ]] && return 0
+  done <<<"$skip_list"
+  return 1
+}
+
+# Build the list of relative file paths to seed.
+rel_paths=()
+if [[ ${#positional[@]} -gt 0 ]]; then
+  rel_paths=("${positional[@]}")
+else
+  while IFS= read -r -d '' f; do
+    rel_paths+=("${f#"$source_dir"/}")
+  done < <(find "$source_dir" -type f -print0)
+fi
+
+# Byte-identical comparison. Prefer cmp (diffutils, like omarchy-refresh-config);
+# fall back to cmp on file size + sha256/md5 if cmp is unavailable, so the
+# skip-if-identical guard still holds in a minimal environment.
+files_identical() {
+  local a="$1" b="$2"
+  if command -v cmp >/dev/null 2>&1; then
+    cmp -s "$a" "$b"
+    return
+  fi
+  # Size first (cheap), then a content digest.
+  local sa sb
+  sa=$(wc -c <"$a") || return 1
+  sb=$(wc -c <"$b") || return 1
+  [[ $sa == "$sb" ]] || return 1
+  local ha hb
+  if command -v sha256sum >/dev/null 2>&1; then
+    ha=$(sha256sum <"$a" | cut -d' ' -f1)
+    hb=$(sha256sum <"$b" | cut -d' ' -f1)
+  elif command -v md5sum >/dev/null 2>&1; then
+    ha=$(md5sum <"$a" | cut -d' ' -f1)
+    hb=$(md5sum <"$b" | cut -d' ' -f1)
+  else
+    # No comparison tool at all: be safe and treat as differing so we back up.
+    return 1
+  fi
+  [[ $ha == "$hb" ]]
+}
+
+ts="$(date +%s)"
+written=0
+created=0
+backed_up=0
+skipped_identical=0
+skipped_protected=0
+backed_up_paths=()
+
+for rel in "${rel_paths[@]}"; do
+  src="$source_dir/$rel"
+  dst="$dest_dir/$rel"
+
+  if [[ ! -f $src ]]; then
+    echo "omedora-seed-config: source file missing, skipping: $rel" >&2
+    continue
+  fi
+
+  if is_skipped "$rel"; then
+    skipped_protected=$((skipped_protected + 1))
+    [[ $mode == plan ]] && printf 'protected\t%s\n' "$rel"
+    continue
+  fi
+
+  if [[ ! -e $dst ]]; then
+    # Missing destination -> would create / create omedora's file.
+    created=$((created + 1))
+    if [[ $mode == plan ]]; then
+      printf 'create\t%s\n' "$rel"
+    else
+      mkdir -p "$(dirname "$dst")"
+      cp -f "$src" "$dst"
+      written=$((written + 1))
+    fi
+    continue
+  fi
+
+  if files_identical "$src" "$dst"; then
+    # Byte-identical — no-op (idempotent re-run).
+    skipped_identical=$((skipped_identical + 1))
+    [[ $mode == plan ]] && printf 'identical\t%s\n' "$rel"
+    continue
+  fi
+
+  # Exists and differs: back up the user's file, then write omedora's.
+  backed_up=$((backed_up + 1))
+  backed_up_paths+=("$rel")
+  if [[ $mode == plan ]]; then
+    printf 'backup\t%s\n' "$rel"
+  else
+    mkdir -p "$(dirname "$dst")"
+    backup="$dst.pre-omedora-$ts"
+    cp -f "$dst" "$backup"
+    cp -f "$src" "$dst"
+    written=$((written + 1))
+  fi
+done
+
+# --- summary ---------------------------------------------------------------
+if [[ $mode == plan ]]; then
+  # Dry run: machine lines already went to stdout; the human summary goes to
+  # stderr so stdout stays clean for parsing.
+  printf 'omedora-seed-config (plan): would create %d, back up %d, leave %d unchanged, protect %d\n' \
+    "$created" "$backed_up" "$skipped_identical" "$skipped_protected" >&2
+  exit 0
+fi
+
+# Concise one-line summary.
+summary="omedora-seed-config: wrote $written, backed up $backed_up, unchanged $skipped_identical"
+if [[ $skipped_protected -gt 0 ]]; then
+  summary+=", protected $skipped_protected"
+fi
+echo -e "\033[32m$summary\033[0m"
+
+if [[ ${#backed_up_paths[@]} -gt 0 ]]; then
+  echo "  backed up (saved as <file>.pre-omedora-$ts):"
+  for p in "${backed_up_paths[@]}"; do
+    echo "    $p"
+  done
+fi
