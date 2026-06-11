@@ -1,0 +1,6 @@
+#!/bin/bash
+# Mock sudo — runs the command without privilege escalation.
+# This lets tests exercise `sudo dnf install` etc. against the dnf mock
+# without needing actual sudo.
+printf 'sudo %s\n' "$*" >>"${MOCK_LOG:-/tmp/mock.log}"
+exec "$@"

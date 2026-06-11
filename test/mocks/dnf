@@ -1,0 +1,11 @@
+#!/bin/bash
+# Mock dnf — records invocation into $MOCK_LOG and exits 0.
+# Used by test/pkg-helper-test.sh and omedora/test/fedora/integration.sh.
+#
+# Test-time controls (env vars):
+#   MOCK_LOG       Path to append the invocation log (default: /tmp/mock.log)
+#   MOCK_DNF_EXIT  Exit code (default: 0)
+#   MOCK_DNF_OUT   Stdout to emit (default: empty)
+printf 'dnf %s\n' "$*" >>"${MOCK_LOG:-/tmp/mock.log}"
+[[ -n ${MOCK_DNF_OUT:-} ]] && printf '%s\n' "$MOCK_DNF_OUT"
+exit "${MOCK_DNF_EXIT:-0}"
