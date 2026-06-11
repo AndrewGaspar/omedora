@@ -256,13 +256,18 @@ install -pm644 etc/udev/rules.d/*.rules %{buildroot}%{_sysconfdir}/udev/rules.d/
 ( cd etc/systemd && find . -type f | while read -r f; do
     install -Dpm644 "$f" "%{buildroot}%{_sysconfdir}/systemd/${f#./}"
   done )
-# docker daemon defaults + system gnupg dirmngr keyservers (both unowned on
-# Fedora 44 — verified with dnf repoquery --file).
-install -Dpm644 etc/docker/daemon.json %{buildroot}%{_sysconfdir}/docker/daemon.json
-install -Dpm644 etc/gnupg/dirmngr.conf %{buildroot}%{_sysconfdir}/gnupg/dirmngr.conf
+# docker daemon defaults + system gnupg dirmngr keyservers: NOT installed to
+# /etc. Both paths are unowned on Fedora 44 but are generic, user-editable
+# locations (a pre-existing /etc/docker/daemon.json — registry mirrors, cgroup
+# options — would be shunted to .rpmorig and silently replaced, breaking the
+# user's setup). Coexistence contract: ship as reference copies; the install's
+# docker setup applies daemon.json only-if-absent (disclosed at the plan gate).
+install -Dpm644 etc/docker/daemon.json %{buildroot}%{_datadir}/omarchy/etc-overrides/docker/daemon.json
+install -Dpm644 etc/gnupg/dirmngr.conf %{buildroot}%{_datadir}/omarchy/etc-overrides/gnupg/dirmngr.conf
 # DELIBERATELY NOT INSTALLED from etc/: mkinitcpio.conf.d/, limine-entry-tool.d/,
 # sddm.conf.d/ (Arch / sddm-only), nsswitch.conf, security/faillock.conf,
-# cups/, plymouth/ (never-touch; reference copies in etc-overrides/ above).
+# cups/, plymouth/ (never-touch; reference copies in etc-overrides/ above),
+# docker/daemon.json + gnupg/dirmngr.conf (reference copies, see above).
 
 # ---------------------------------------------------------------------------
 # Live-ISO debug trio (per the map: needed before the omedora package lands)
@@ -355,10 +360,6 @@ desktop-file-validate %{buildroot}%{_datadir}/wayland-sessions/omedora.desktop
 %config(noreplace) %{_sysconfdir}/systemd/system/plocate-updatedb.service.d/ac-only.conf
 %dir %{_sysconfdir}/systemd/system/user@.service.d
 %config(noreplace) %{_sysconfdir}/systemd/system/user@.service.d/10-faster-shutdown.conf
-%dir %{_sysconfdir}/docker
-%config(noreplace) %{_sysconfdir}/docker/daemon.json
-%dir %{_sysconfdir}/gnupg
-%config(noreplace) %{_sysconfdir}/gnupg/dirmngr.conf
 
 %changelog
 * Thu Jun 11 2026 omedora <noreply@omedora> - 0.2.0~alpha.0-1
