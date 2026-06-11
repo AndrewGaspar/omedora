@@ -9,6 +9,22 @@ if (( EUID == 0 )); then
   exit 1
 fi
 
+# Fedora dispatch — same resync, but backup-then-write instead of destructive
+# (coexistence contract; see omedora/architecture.md). Limine/plymouth refresh
+# don't apply on Fedora; the nvim refresh mirrors the upstream tail.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora)
+    echo "Resetting Omedora user configs to shipped defaults (existing files are backed up)..."
+    omedora-adopt-user --reset
+    if omarchy-cmd-present omarchy-nvim-refresh; then
+      exec omarchy-nvim-refresh
+    elif omarchy-cmd-present omarchy-nvim-setup; then
+      exec omarchy-nvim-setup --force
+    fi
+    exit 0
+    ;;
+esac
+
 echo "Resetting Omarchy user configs to shipped defaults..."
 
 # /etc/skel is the same tree useradd -m copies to seed a fresh user's $HOME.
