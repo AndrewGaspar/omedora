@@ -3,6 +3,11 @@
 # omarchy:summary=Show a fuzzy-finder TUI for picking packages installed on the system to be removed.
 # omarchy:requires-sudo=true
 
+# Fedora dispatch — dnf-backed picker sibling. Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora) exec "$(dirname -- "${BASH_SOURCE[0]}")/fedora/pkg-remove" "$@" ;;
+esac
+
 fzf_args=(
   --multi
   --preview 'yay -Qi {1}'
