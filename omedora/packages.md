@@ -341,3 +341,22 @@ This validator runs as part of the rebase verification step (see [`rebase-workfl
 - **It doesn't model dependencies.** dnf and dnf-copr resolve dependencies themselves; same for Flatpak. omedora-repo RPMs declare their deps via `Requires:` in the spec, which dnf then resolves — the map still doesn't list them.
 - **It doesn't try to match Arch's optional-vs-required taxonomy.** Omarchy decides what to install via the install scripts; the map only handles translation, not policy.
 - **It doesn't override upstream package selection.** If Omarchy adds a package to `omarchy-base.packages`, the map can route it to a tier, but only `source = "skip"` can prevent the install entirely — and skipping should have a clear, durable reason.
+
+---
+
+## 10. Omarchy 4 dependency triage (P1 spike results, 2026-06-11)
+
+Verified live before committing to the port (spike container: `omedora-test:fedora44-session`
+\+ the omarchy-4 tree mounted at `/repo`):
+
+| Dependency | Verdict | Evidence / disposition |
+| --- | --- | --- |
+| `quickshell` | **GO — use Fedora's package** | Fedora 44 ships `quickshell-0.2.1^git20260209.dacfa9d`. All 14 Quickshell QML modules `shell/` imports are present. The full omarchy-4 shell ran under the nested Hyprland session: `omarchy-shell shell ping` → ok, `omarchy-bar` layer rendered, notifications worked, **zero QML errors** (only environmental D-Bus warnings: polkit/bluez/UPower absent in the container). No fallback quickshell spec needed unless upstream pins a newer rev later. |
+| hyprland 0.55.2 (our RPM) + Lua config | **GO, with a re-check note** | `Hyprland --config .../hyprland.lua` (full omarchy-4 lua tree, `OMARCHY_PATH` set) boots on our existing 0.55.2 spec — 189 binds registered from Lua. One `configerrors` entry: a config-load shell-out in `config/hypr/bindings.lua` hit Hyprland's Lua execution timeout in the slow container; re-verify on a real install (not a Lua-capability gap). |
+| `dua-cli` | **dnf tier** | In Fedora proper (source package `rust-dua-cli`). |
+| `aether`, `cliamp`, `tobi-try` | **skip (existing entries stand)** | 37signals/AUR-world tools; the 3.8.2-era skip reasons hold for 4.x. `cliamp` is bound to SUPER+SHIFT+ALT+M — degrades gracefully. |
+| `tzupdate` | **skip (existing entry stands)** | Fedora has `timedatectl set-timezone`; only referenced by a sudoers `--overwrite` in `omarchy-update-system-pkgs` (pacman path). Optional tiny spec later if wanted. |
+| `voxtype` / `voxtype-bin` | **skip initially; map entries needed at P3 regen** | Not in `omarchy-base.packages` — installed on demand by `omarchy-voxtype-install` (`omarchy-pkg-add wtype voxtype-bin`). Map `wtype` → dnf (in Fedora), `voxtype-bin` → skip with graceful degradation (the voxtype post-update hook install is gated). |
+| `foot`, `wtype`, `udiskie`, `yt-dlp` | **dnf tier** | All in Fedora proper. |
+| `moonlight-qt` | **RPM Fusion tier** (Flathub fallback) | Not in Fedora proper. |
+| `NetworkManager`, `bluez*` | **dnf tier — simplification** | Omarchy 4 dropped iwd/impala/bluetui for NetworkManager/bluez, which is exactly Fedora's stack: the gazelle-tui divergence disappears on the 4.x line. |
