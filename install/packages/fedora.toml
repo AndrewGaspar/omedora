@@ -1,0 +1,399 @@
+# Package map: Arch package name -> Fedora install source.
+#
+# Absence from this file means the Arch name resolves identically on Fedora's
+# main repos. Add an entry only when:
+#   - The Fedora package name differs from the Arch name, OR
+#   - The package isn't in Fedora main repos (needs RPM Fusion, COPR, Flathub,
+#     or source), OR
+#   - The package should be deliberately skipped on Fedora (with a reason).
+#
+# Schema and tier rules are documented in omedora/packages.md.
+# Validate this file with `omarchy dev validate-fedora-packages`.
+
+# --- Renamed packages (different name, in Fedora main) -------------------
+
+[ttf-jetbrains-mono-nerd]
+source = "dnf"
+names = ["omedora-nerd-fonts"]
+reason = "Fedora's plain jetbrains-mono-fonts-all lacks the Nerd Font icon glyphs (waybar/terminal tofu). The omedora-nerd-fonts RPM (omedora/packaging/copr/) bundles the patched CascadiaCode + JetBrainsMono families; served from the omedora repo (local now, COPR later). Covers ttf-cascadia-mono-nerd too."
+
+[ttf-cascadia-mono-nerd]
+source = "dnf"
+names = ["omedora-nerd-fonts"]
+reason = "Same omedora-nerd-fonts RPM as ttf-jetbrains-mono-nerd (it bundles both families)."
+
+[woff2-font-awesome]
+source = "dnf"
+names = ["fontawesome-fonts-all"]
+reason = "On Fedora 44 the FontAwesome metapackage is 'fontawesome-fonts-all' (pulls all variants). 'fontawesome-fonts' is unavailable."
+
+[noto-fonts]
+source = "dnf"
+names = ["google-noto-fonts-common", "google-noto-sans-fonts"]
+
+[noto-fonts-cjk]
+source = "dnf"
+names = ["google-noto-sans-cjk-fonts", "google-noto-serif-cjk-fonts"]
+
+[noto-fonts-emoji]
+source = "dnf"
+names = ["google-noto-emoji-fonts"]
+
+[nvim]
+source = "dnf"
+names = ["neovim"]
+
+[github-cli]
+source = "dnf"
+names = ["gh"]
+
+[qt5-wayland]
+source = "dnf"
+names = ["qt5-qtwayland"]
+
+[python-gobject]
+source = "dnf"
+names = ["python3-gobject"]
+
+[python-poetry-core]
+source = "dnf"
+names = ["python3-poetry-core"]
+
+[fd]
+source = "dnf"
+names = ["fd-find"]
+
+[dust]
+source = "dnf"
+names = ["du-dust"]
+
+[mariadb-libs]
+source = "dnf"
+names = ["mariadb-connector-c"]
+
+[postgresql-libs]
+source = "dnf"
+names = ["libpq"]
+
+[docker]
+source = "dnf"
+names = ["moby-engine", "docker-cli"]
+reason = "Fedora ships moby-engine + docker-cli in main repos as the libre Docker stack. Docker CE from Docker's own repo is also an option but adds a third-party repo we don't need."
+
+[libreoffice-fresh]
+source = "dnf"
+names = ["libreoffice"]
+reason = "Fedora ships LibreOffice (no -fresh/-still split); 'libreoffice' resolves to the current stable."
+
+[signal-desktop]
+source = "flathub"
+app_id = "org.signal.Signal"
+reason = "Not in Fedora main repos; Flathub is the upstream-blessed install path."
+
+# Case-sensitive rename: ImageMagick on Fedora vs imagemagick on Arch.
+[imagemagick]
+source = "dnf"
+names = ["ImageMagick"]
+
+# polkit-gnome isn't on Fedora; polkit-kde is the agent variant in repos.
+# This is a tentative mapping — we may want to skip and let the user pick.
+[polkit-gnome]
+source = "dnf"
+names = ["polkit-kde"]
+reason = "polkit-gnome not in Fedora repos; polkit-kde provides the polkit auth agent. TODO: validate against omedora's actual polkit usage."
+
+[qemu-user-static-binfmt]
+source = "dnf"
+names = ["qemu-user-static"]
+reason = "On Fedora it's qemu-user-static (the package includes the binfmt setup)."
+
+[tesseract-data-eng]
+source = "dnf"
+names = ["tesseract-langpack-eng"]
+
+# --- Flathub apps (currently unmapped) -----------------------------------
+
+[localsend]
+source = "flathub"
+app_id = "org.localsend.localsend_app"
+
+# --- Source-installed (no Fedora repo + no Flathub) ----------------------
+
+# Currently no source installers shipped (install/packages/installers/ has
+# only README.md). Marking these as `skip` for now so the install transaction
+# completes; revisit with real source installers in a follow-up.
+
+[mise]
+source = "dnf"
+names = ["mise"]
+reason = "Not in Fedora repos or RPM Fusion. Upstream ships a prebuilt linux-x64 tarball; binary-repackaged by omedora/packaging/copr/mise.spec (binary + man page + fish activation snippet)."
+
+[claude-code]
+source = "skip"
+reason = "Anthropic's CLI is a proprietary self-contained Bun binary (downloads.claude.ai), not an npm/distro package. Users install via Anthropic's official installer; enterprises via their own deployment. An omedora RPM exists (omedora/packaging/copr/claude-code.spec, mirrors omarchy) but is deliberately parked — excluded from build-repo.sh — pending a redistribution-licensing decision before any public COPR."
+
+[omarchy-nvim]
+source = "skip"
+reason = "Not packaged as an RPM on Fedora: the omarchy-nvim build bakes its plugin cache via a headless `:Lazy! sync` that fetches ~50 plugins from GitHub, which fails in COPR's offline mock build. Nothing Requires it (it's just user-level Neovim config + a setup script). Instead install/packaging/nvim.sh bootstraps the same commit-pinned config (omacom-io/omarchy-pkgs) directly on the user's networked machine and runs Lazy sync there. The retired spec/sources remain in omedora/packaging/copr/ (dropped from build-repo.sh) for reference."
+
+[omarchy-walker]
+source = "dnf"
+names = ["walker", "elephant"]
+reason = "AUR meta pulling walker + elephant; neither is in Fedora repos. Both are packaged as RPMs in omedora/packaging/copr/ (walker pulls gtk4-layer-shell, elephant pulls qalculate for the calc provider's qalc CLI + ships its providers and user service) and served from the omedora repo (local now, COPR later)."
+
+[starship]
+source = "dnf"
+names = ["starship"]
+reason = "Not in Fedora repos or RPM Fusion. Upstream ships a prebuilt x86_64 binary; binary-repackaged by omedora/packaging/copr/starship.spec."
+
+[lazygit]
+source = "dnf"
+names = ["lazygit"]
+reason = "Not in Fedora main or RPM Fusion; atim/lazygit COPR not on the allowlist. Binary-repackaged from upstream's prebuilt release tarball (omedora/packaging/copr/lazygit.spec); resolves to the omedora-repo RPM."
+
+[lazydocker]
+source = "dnf"
+names = ["lazydocker"]
+reason = "Not in Fedora main or RPM Fusion; atim/lazydocker COPR not on the allowlist. Binary-repackaged from upstream's prebuilt release tarball (omedora/packaging/copr/lazydocker.spec)."
+
+[swayosd]
+source = "dnf"
+names = ["swayosd"]
+reason = "Not in Fedora main repos and ships no prebuilt binaries, so the omedora swayosd RPM (omedora/packaging/copr/swayosd.spec) builds it from source via meson+cargo. Served from the omedora repo (local now, COPR later). Provides swayosd-server/-client (omedora drives them via its own user unit + ~/.config/swayosd theme) plus the libinput backend glue; fixes the swayosd-server.service 203/EXEC crash-loop."
+
+[satty]
+source = "dnf"
+names = ["satty"]
+reason = "Wayland screenshot annotation (Rust/GTK4). Not in Fedora repos/RPM Fusion, and — despite being a GUI — NOT on Flathub (verified against Flathub appstream+search). Built from source by omedora/packaging/copr/satty.spec."
+
+[bluetui]
+source = "dnf"
+names = ["bluetui"]
+reason = "Bluetooth TUI (Rust). Not in Fedora repos/RPM Fusion; a TUI is not a Flathub fit. Built from source by omedora/packaging/copr/bluetui.spec (Requires bluez)."
+
+[gazelle-tui]
+source = "dnf"
+names = ["gazelle-tui"]
+reason = "NetworkManager wifi TUI; omedora's Fedora stand-in for impala (whose iwd backend Fedora doesn't use — see [impala]). Not in Fedora repos/RPM Fusion. Packaged from source by omedora/packaging/copr/gazelle-tui.spec (pure Python; Requires python3-textual/python3-dbus/NetworkManager) and served from the omedora repo (local now, COPR later). Installed by install/packaging/fedora-baseline.sh; launched by omarchy-launch-wifi on Fedora."
+
+[impala]
+source = "skip"
+reason = "Open-source iwd wifi TUI (pythops/impala) — NOT a 37signals tool. Skipped on Fedora because it requires iwd, and Fedora Workstation rides NetworkManager (no iwd; install/config/hardware/network.sh that enables iwd.service is Arch-gated). omedora installs gazelle-tui instead (see [gazelle-tui]) and omarchy-launch-wifi launches that on Fedora. Listed in omarchy-base.packages, so it reaches omarchy-pkg-add on Fedora as a harmless skip."
+
+[hyprland-preview-share-picker]
+source = "dnf"
+names = ["hyprland-preview-share-picker"]
+reason = "Rust (edition 2024) GTK4 xdph share picker. Not in Fedora main/RPM Fusion or the allowlisted lionheartp/Hyprland COPR. Built from source by omedora/packaging/copr/hyprland-preview-share-picker.spec (hyprland-protocols submodule fetched at a pinned commit). Runtime dep xdg-desktop-portal-hyprland comes from lionheartp/Hyprland."
+
+[ttf-ia-writer]
+source = "skip"
+reason = "TODO: source installer (proprietary iA Writer font; vendored from upstream). Not in Fedora main repos."
+
+[python-terminaltexteffects]
+source = "dnf"
+names = ["python3-terminaltexteffects"]
+reason = "The `tte` terminal-effects CLI; not in Fedora main repos. Packaged from-source as an RPM in omedora/packaging/copr/ (pure Python, no runtime deps; ships /usr/bin/tte) and served from the omedora repo (local now, COPR later)."
+
+[tzupdate]
+source = "skip"
+reason = "TODO: pip install. Fedora has timedatectl set-timezone for the same purpose."
+
+[usage]
+source = "dnf"
+names = ["usage"]
+reason = "Not in Fedora repos or RPM Fusion. jdx/usage (mise companion) ships a prebuilt x86_64 binary; binary-repackaged by omedora/packaging/copr/usage.spec (binary + man page)."
+
+# --- 37signals / Basecamp internal tools (skip on Fedora) ----------------
+
+[aether]
+source = "skip"
+reason = "37signals internal tool; not on Fedora (and likely Arch-AUR-only upstream). Out of omedora's portable scope."
+
+[tobi-try]
+source = "skip"
+reason = "37signals internal tool; not on Fedora. Out of omedora's portable scope."
+
+[cliamp]
+source = "skip"
+reason = "TUI audio mixer (AUR-only on Arch). Not on Fedora; revisit if user demand surfaces."
+
+# --- Arch-specific tools without a Fedora analog -------------------------
+
+[1password-cli]
+source = "skip"
+reason = "Proprietary; would require adding 1Password's RPM repo. Skip until we decide to take on that third-party repo dependency."
+
+[asdcontrol]
+source = "skip"
+reason = "Apple Studio Display brightness control; AUR-only. Hardware-specific; out of omedora's scope on Fedora."
+
+[qmk-hid]
+source = "skip"
+reason = "QMK firmware tool (Framework 16 conditional). Not in Fedora main repos. Users with Framework 16 keyboards can install via cargo / from upstream releases separately."
+
+[dell-xps-touchpad-haptics]
+source = "skip"
+reason = "Dell XPS-specific touchpad haptics package (AUR-only on Arch). Hardware-specific; out of omedora's portable scope on Fedora."
+
+[asusctl]
+source = "skip"
+reason = "ASUS ROG laptop control daemon. Available on rogdrv/asusctl COPR; not yet in our allowlist. Skip until we vet that COPR."
+
+[expac]
+source = "skip"
+reason = "Pacman database query tool; nonsensical on Fedora (dnf-query is the analog and packagers don't typically need it)."
+
+[gnome-themes-extra]
+source = "skip"
+reason = "Fedora's GNOME theming differs; adw-gtk3-theme is the modern equivalent for Adwaita-like styling. Skip until omedora has a GTK theming story on Fedora."
+
+[inetutils]
+source = "skip"
+reason = "Provides telnet/ftp/whois on Arch; Fedora splits into separate packages (telnet, ftp, whois) that users install à la carte. Skip — no single mapping."
+
+[yay]
+source = "skip"
+reason = "AUR helper; AUR doesn't exist on Fedora. omedora-pkg-aur-add on Fedora handles tier fallback via the package map."
+
+# --- Hyprland ecosystem (vendored omedora RPMs, served from the omedora repo) -
+# The whole hyprwm stack is now packaged under omedora/packaging/copr/ and
+# resolved via source = "dnf" from the omedora repo (the walker/elephant model).
+# This replaces the dropped third-party lionheartp/Hyprland COPR (task #66). The
+# foundational libs (hyprutils/hyprlang/hyprcursor/hyprgraphics/aquamarine/
+# hyprwire/hyprtoolkit/hyprwayland-scanner/hyprland-protocols/glaze) come in
+# transitively as dependencies, so only the user-facing names are mapped here.
+
+[hyprland]
+source = "dnf"
+names = ["hyprland-omedora"]
+reason = "Hyprland not in Fedora 44 main repos. Vendored as omedora/packaging/copr/hyprland.spec (0.55.2, from the release source tarball), replacing the dropped lionheartp/Hyprland COPR (task #66). On Fedora we install hyprland-omedora (omedora/packaging/copr/hyprland-omedora.spec), which ships omedora's own uwsm wayland-session entry and Requires hyprland-no-session + uwsm — so the compositor binaries (hyprland-no-session, formerly the visible-session bundle) plus the vendored aquamarine/hyprutils/hyprlang/hyprcursor/hyprgraphics/hyprwire libs come in transitively, WITHOUT the visible plain/uwsm session entries. (Arch still installs the real `hyprland` — see install/omarchy-base.packages; this remap is Fedora-only.)"
+
+[hyprland-no-session]
+source = "dnf"
+names = ["hyprland-no-session"]
+reason = "The Hyprland compositor binaries without any wayland-sessions/*.desktop entry (omedora/packaging/copr/hyprland.spec subpackage). Not referenced by name in install/omarchy-base.packages — listed here for the validator + clarity, since it is what hyprland-omedora (the [hyprland] remap target) pulls in to provide the compositor. Served from the omedora repo."
+
+[hypridle]
+source = "dnf"
+names = ["hypridle"]
+reason = "Vendored as omedora/packaging/copr/hypridle.spec (0.1.7); served from the omedora repo. Replaces lionheartp/Hyprland."
+
+[hyprlock]
+source = "dnf"
+names = ["hyprlock"]
+reason = "Vendored as omedora/packaging/copr/hyprlock.spec (0.9.5); served from the omedora repo. Replaces lionheartp/Hyprland."
+
+[hyprland-guiutils]
+source = "dnf"
+names = ["hyprland-guiutils"]
+reason = "Referenced by name in install/omarchy-base.packages but previously unmapped (latent gap). The hyprtoolkit-based GUI helpers (successor to hyprland-qtutils); vendored as omedora/packaging/copr/hyprland-guiutils.spec (0.2.1) and served from the omedora repo."
+
+[hyprpicker]
+source = "dnf"
+names = ["hyprpicker"]
+reason = "Vendored as omedora/packaging/copr/hyprpicker.spec (0.4.7); served from the omedora repo. Replaces lionheartp/Hyprland."
+
+[hyprsunset]
+source = "dnf"
+names = ["hyprsunset"]
+reason = "Vendored as omedora/packaging/copr/hyprsunset.spec (0.3.3); served from the omedora repo. Replaces lionheartp/Hyprland."
+
+[xdg-desktop-portal-hyprland]
+source = "dnf"
+names = ["xdg-desktop-portal-hyprland"]
+reason = "Vendored as omedora/packaging/copr/xdg-desktop-portal-hyprland.spec (1.3.12); served from the omedora repo. Replaces lionheartp/Hyprland."
+
+[uwsm]
+source = "dnf"
+names = ["uwsm"]
+reason = "Universal Wayland Session Manager — omedora's session launches through `uwsm start`. Not in Fedora main/RPM Fusion; it was implicitly provided by the dropped lionheartp/Hyprland COPR. Vendored as omedora/packaging/copr/uwsm.spec (0.23.3, noarch, adapted from solopasha/hyprlandRPM); served from the omedora repo. Without an entry it falls through to plain dnf and aborts the base install (No match for argument: uwsm)."
+
+[gpu-screen-recorder]
+source = "skip"
+reason = "GPU screen recorder (NVENC/VAAPI); was implicitly provided by the dropped lionheartp/Hyprland COPR, not Fedora main or RPM Fusion. Not session-critical, and building it needs RPM Fusion ffmpeg BuildRequires the build container doesn't enable. Skipped for now; TODO: vendor it (needs RPM Fusion build deps) or document a manual install for screen recording."
+
+# --- Flathub (proprietary or unpackaged GUI apps) ------------------------
+
+[obsidian]
+source = "flathub"
+app_id = "md.obsidian.Obsidian"
+
+[spotify]
+source = "flathub"
+app_id = "com.spotify.Client"
+reason = "Proprietary; Flathub is the canonical install path on Fedora."
+
+[typora]
+source = "flathub"
+app_id = "io.typora.Typora"
+reason = "Proprietary; Flathub is the canonical install path on Fedora."
+
+[1password-beta]
+source = "skip"
+reason = "Proprietary. Adding 1Password's own RPM repo is the right answer; skip until we take on that third-party repo dependency."
+
+# --- Explicitly skipped (out of omedora scope on Fedora) -----------------
+
+[ufw]
+source = "skip"
+reason = "Fedora ships firewalld; omedora does not replace the firewall."
+
+[ufw-docker]
+source = "skip"
+reason = "Companion to ufw; not needed under firewalld."
+
+[limine]
+source = "skip"
+reason = "Bootloader; omedora does not own the boot stack on Fedora."
+
+[limine-mkinitcpio-hook]
+source = "skip"
+reason = "Limine + mkinitcpio integration; out of scope on Fedora (uses dracut + GRUB)."
+
+[limine-snapper-sync]
+source = "skip"
+reason = "Limine + Snapper snapshot integration; bootloader territory, out of scope."
+
+[snapper]
+source = "skip"
+reason = "Snapshot integration relies on Limine on Arch; out of scope on Fedora."
+
+[plymouth]
+source = "skip"
+reason = "Fedora ships its own Plymouth; omedora does not replace it."
+
+[power-profiles-daemon]
+source = "skip"
+reason = "Fedora Workstation ships tuned-ppd as its ppd-service provider; the two mutually Conflict (both Provide ppd-service), so installing power-profiles-daemon aborts the dnf transaction. Keep Fedora's default. Omarchy's only hard dependency is the powerprofilesctl CLI (shipped by p-p-d, NOT by tuned-ppd), so omedora installs a Fedora-gated shim (install/config/powerprofilesctl-shim-fedora.sh) that drives the same PowerProfiles D-Bus API tuned-ppd implements."
+
+[mkinitcpio]
+source = "skip"
+reason = "Arch initramfs tool; Fedora uses dracut. Out of scope."
+
+[archlinux-keyring]
+source = "skip"
+reason = "Arch package signing keyring; not applicable on Fedora."
+
+[base]
+source = "skip"
+reason = "Arch base metapackage; not applicable on Fedora."
+
+[base-devel]
+source = "skip"
+reason = "Arch build group; Fedora uses 'dnf group install development-tools' which the user can opt into separately."
+
+[linux-firmware-marvell]
+source = "skip"
+reason = "Surface-specific Marvell firmware; users on Surface devices install via Fedora's own channels."
+
+[intel-ipu7-camera]
+source = "skip"
+reason = "Intel IPU7 camera kernel module; users opt into akmod-ipu7 separately. Out of omedora scope."
+
+[intel-lpmd]
+source = "skip"
+reason = "Intel Low Power Mode Daemon; not packaged on Fedora; users with Intel hardware can build separately."
+
+[kernel-modules-hook]
+source = "skip"
+reason = "Pacman hook for kernel module cleanup; Fedora's dnf has equivalent behavior built-in."

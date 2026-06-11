@@ -1,0 +1,164 @@
+#!/bin/bash
+
+# omarchy:summary=Validate install/packages/fedora.toml against the schema and allowlist
+# omarchy:examples=omarchy dev validate-fedora-packages | omarchy dev validate-fedora-packages --json
+
+set -eu
+
+PATH_TO_MAP="${OMARCHY_FEDORA_MAP:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/install/packages/fedora.toml}"
+INSTALLERS_DIR="${OMARCHY_FEDORA_INSTALLERS:-$(dirname "$PATH_TO_MAP")/installers}"
+
+emit_json=false
+for arg in "$@"; do
+  case "$arg" in
+    --json) emit_json=true ;;
+    --help|-h)
+      cat <<EOF
+Usage:
+  omarchy dev validate-fedora-packages [--json]
+
+Validates install/packages/fedora.toml against the schema documented in
+omedora/packages.md. Reports unknown source values, missing required keys
+per source, un-allowlisted COPRs, missing source installers, and invalid
+since/until ranges.
+
+Honors:
+  \$OMARCHY_FEDORA_MAP         path to the map file (default: install/packages/fedora.toml)
+  \$OMARCHY_FEDORA_INSTALLERS  path to installer scripts dir (default: <map_dir>/installers)
+EOF
+      exit 0
+      ;;
+  esac
+done
+
+if [[ ! -f $PATH_TO_MAP ]]; then
+  echo "validate-fedora-packages: map not found at $PATH_TO_MAP" >&2
+  exit 1
+fi
+
+export PATH_TO_MAP INSTALLERS_DIR EMIT_JSON=$emit_json
+
+exec python3 - <<'PY'
+import json
+import os
+import sys
+import tomllib
+
+map_path     = os.environ["PATH_TO_MAP"]
+inst_dir     = os.environ["INSTALLERS_DIR"]
+emit_json    = os.environ.get("EMIT_JSON", "false") == "true"
+
+# Allowed COPR identifiers — must match the documented allowlist in
+# omedora/packages.md §6. Adding a new COPR requires a separate PR that
+# updates this list AND the doc.
+COPR_ALLOWLIST = {
+    "lionheartp/Hyprland",
+}
+
+VALID_SOURCES = {"dnf", "copr", "flathub", "source", "skip"}
+
+with open(map_path, "rb") as f:
+    data = tomllib.load(f)
+
+errors = []
+warnings = []
+
+def err(pkg, msg):
+    errors.append({"package": pkg, "level": "error", "message": msg})
+
+def warn(pkg, msg):
+    warnings.append({"package": pkg, "level": "warning", "message": msg})
+
+for pkg, entry in data.items():
+    if not isinstance(entry, dict):
+        err(pkg, f"entry is not a table (got {type(entry).__name__})")
+        continue
+
+    source = entry.get("source")
+    if source is None:
+        err(pkg, "missing required key: source")
+        continue
+    if source not in VALID_SOURCES:
+        err(pkg, f"invalid source '{source}' (must be one of: {sorted(VALID_SOURCES)})")
+        continue
+
+    if source == "dnf":
+        names = entry.get("names")
+        if not isinstance(names, list) or not names:
+            err(pkg, "source='dnf' requires non-empty 'names' array")
+        elif not all(isinstance(n, str) and n for n in names):
+            err(pkg, "source='dnf' 'names' must be non-empty strings")
+
+    elif source == "copr":
+        copr = entry.get("copr")
+        names = entry.get("names")
+        if not isinstance(copr, str) or not copr:
+            err(pkg, "source='copr' requires 'copr' string (owner/repo format)")
+        elif "/" not in copr:
+            err(pkg, f"source='copr' 'copr' must be owner/repo format (got '{copr}')")
+        elif copr not in COPR_ALLOWLIST:
+            err(pkg, f"COPR '{copr}' is not in the allowlist; see omedora/packages.md §6")
+        if not isinstance(names, list) or not names:
+            err(pkg, "source='copr' requires non-empty 'names' array")
+
+    elif source == "flathub":
+        app_id = entry.get("app_id")
+        if not isinstance(app_id, str) or not app_id:
+            err(pkg, "source='flathub' requires 'app_id' string")
+        elif "." not in app_id:
+            err(pkg, f"source='flathub' 'app_id' must be reverse-DNS (got '{app_id}')")
+
+    elif source == "source":
+        installer = entry.get("installer")
+        if not isinstance(installer, str) or not installer:
+            err(pkg, "source='source' requires 'installer' string (filename)")
+        else:
+            full_path = os.path.join(inst_dir, installer)
+            if not os.path.isfile(full_path):
+                err(pkg, f"installer '{installer}' not found at {full_path}")
+
+    elif source == "skip":
+        reason = entry.get("reason")
+        if not isinstance(reason, str) or not reason:
+            err(pkg, "source='skip' requires 'reason' string")
+
+    # since / until range validation (independent of source)
+    since = entry.get("since")
+    until = entry.get("until")
+    for fld, val in (("since", since), ("until", until)):
+        if val is not None and not isinstance(val, str):
+            err(pkg, f"'{fld}' must be a string (got {type(val).__name__})")
+    if isinstance(since, str) and isinstance(until, str):
+        try:
+            if int(since) >= int(until):
+                err(pkg, f"'since' ({since}) must be < 'until' ({until})")
+        except ValueError:
+            err(pkg, f"'since'/'until' must be numeric strings (got {since!r}/{until!r})")
+
+    # Unknown keys (typo catcher)
+    known_keys = {"source", "names", "copr", "app_id", "installer", "reason", "since", "until"}
+    extra = set(entry.keys()) - known_keys
+    for k in sorted(extra):
+        warn(pkg, f"unknown key '{k}' (ignored)")
+
+if emit_json:
+    print(json.dumps({
+        "ok": not errors,
+        "package_count": len(data),
+        "errors": errors,
+        "warnings": warnings,
+    }, indent=2))
+else:
+    for w in warnings:
+        print(f"warn: {w['package']}: {w['message']}", file=sys.stderr)
+    for e in errors:
+        print(f"error: {e['package']}: {e['message']}", file=sys.stderr)
+    if errors:
+        print(f"\nvalidate-fedora-packages: {len(errors)} error(s), "
+              f"{len(warnings)} warning(s) across {len(data)} package(s)", file=sys.stderr)
+        sys.exit(1)
+    print(f"validate-fedora-packages: {len(data)} package(s) ok, "
+          f"{len(warnings)} warning(s)")
+
+sys.exit(0 if not errors else 1)
+PY
