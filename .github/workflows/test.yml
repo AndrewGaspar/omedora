@@ -1,0 +1,61 @@
+name: Test
+
+# P0 scope: only the ported L1 foundation tests + the upstream CLI suite run
+# here. The rest of the pyramid returns phase by phase as the omarchy-4 port
+# lands (pkg helpers/L2 in P3, install smoke/L3 in P4, update flow in P5).
+
+on:
+  push:
+    branches: [omarchy-4-omedora]
+  pull_request:
+    branches: [omarchy-4-omedora]
+  workflow_dispatch:
+
+# Cancel in-progress runs when a new commit lands on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shell-unit:
+    name: L1 shell unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install prereqs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq python3
+
+      - name: Verify Python 3.11+ (needs tomllib)
+        run: python3 -c 'import sys, tomllib; assert sys.version_info >= (3, 11)'
+
+      - name: Run distro detection test
+        run: bash test/distro-test.sh
+
+      - name: Run pkg map test
+        run: bash test/pkg-map-test.sh
+
+      - name: Validate the real fedora.toml
+        run: bin/omarchy-dev-validate-fedora-packages
+
+  arch-contract:
+    name: Upstream CLI suite (dual-distro contract)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run upstream test/cli in Arch container
+        run: |
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/repo" \
+            -w /repo \
+            archlinux:latest bash -c '
+              pacman -Sy --noconfirm --needed jq python git gum >/dev/null
+              # Upstream CLI behavior must hold byte-for-byte on Arch even
+              # with the omedora bins present on the tree.
+              bash test/cli
+            '
