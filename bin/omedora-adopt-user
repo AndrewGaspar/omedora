@@ -1,0 +1,70 @@
+#!/bin/bash
+
+# omarchy:summary=Adopt an existing user into omedora's shipped defaults without clobbering their files (backup-then-write).
+# omarchy:args=[--plan] [--reset] [--skel <dir>]
+# omarchy:examples=omedora adopt-user --plan
+# omarchy:hidden=true
+
+# Fedora's answer to /etc/skel only firing at useradd: on Arch/the ISO, a brand
+# new user's $HOME is seeded from /etc/skel by `useradd -m`, and upstream's
+# only mechanism for an EXISTING user is omarchy-reinstall-configs — a
+# destructive `cp -af /etc/skel/. ~/`. Omedora installs onto lived-in Fedora
+# machines, so adoption must follow the coexistence contract instead:
+#
+#   - missing file        -> write the shipped default
+#   - byte-identical file -> no-op
+#   - differing file      -> back up to <path>.pre-omedora-<ts>, then write
+#   - protected file      -> never touched (OMEDORA_SEED_SKIP)
+#
+# That classification engine already exists (bin/omedora-seed-config); this
+# command points it at the omedora-settings package's /etc/skel payload and
+# replays it over $HOME. One pass covers everything skel would have seeded:
+# .config/**, .local/share/applications, nautilus-python extensions, hypr
+# toggles, branding, and the shipped user-migration markers (so a freshly
+# adopted user is not prompted to run migrations that predate their adoption).
+#
+# --plan   Dry run: emit the per-file classification (create/backup/identical/
+#          protected) the apply pass would perform, write nothing. This is what
+#          the install plan gate shows the user up front.
+# --reset  Same operation, named for the omarchy-reinstall-configs gate: under
+#          backup-then-write, "reset to shipped defaults" and "adopt" are the
+#          same pass — existing files still get backed up, never destroyed.
+# --skel   Override the skel source tree (tests).
+#
+# Deliberately NOT here: omarchy-finalize-user / omarchy-first-run. The
+# bootstrap sequences those separately (adopt -> finalize -> first-run), and
+# the reinstall gate runs the nvim refresh itself to mirror upstream.
+
+set -euo pipefail
+
+if (( EUID == 0 )); then
+  echo "Error: This script should not be run as root" >&2
+  exit 1
+fi
+
+plan=false
+skel="/etc/skel"
+while (($#)); do
+  case "$1" in
+    --plan) plan=true; shift ;;
+    --reset) shift ;;   # alias: same backup-then-write pass (see header)
+    --skel) skel="${2:?--skel needs a directory}"; shift 2 ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+
+if [[ ! -d $skel ]]; then
+  echo "Error: skel tree not found at $skel (is omedora-settings installed?)" >&2
+  exit 1
+fi
+
+# Protect the user's own identity/credential files wherever they'd collide
+# with shipped defaults. Paths are relative to the skel root. Callers may
+# extend via OMEDORA_SEED_SKIP (newline-separated).
+default_skip='.config/git/config'
+export OMEDORA_SEED_SKIP="${OMEDORA_SEED_SKIP:-$default_skip}"
+
+seed=(omedora-seed-config --source "$skel" --dest "$HOME")
+$plan && seed+=(--plan)
+
+exec "${seed[@]}"
