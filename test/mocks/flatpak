@@ -1,0 +1,19 @@
+#!/bin/bash
+# Mock flatpak — records invocation into $MOCK_LOG.
+#
+# Test-time controls (env vars):
+#   MOCK_LOG                  Path to append the invocation log
+#   MOCK_FLATPAK_INSTALLED    Space-separated list of "installed" app IDs
+#                             (used by `flatpak info <id>` checks)
+printf 'flatpak %s\n' "$*" >>"${MOCK_LOG:-/tmp/mock.log}"
+
+if [[ ${1:-} == "info" && -n ${2:-} ]]; then
+  for app in ${MOCK_FLATPAK_INSTALLED:-}; do
+    if [[ $app == "$2" ]]; then
+      exit 0
+    fi
+  done
+  exit 1
+fi
+
+exit "${MOCK_FLATPAK_EXIT:-0}"

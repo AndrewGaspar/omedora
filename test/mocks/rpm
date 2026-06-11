@@ -1,0 +1,32 @@
+#!/bin/bash
+# Mock rpm — records invocation into $MOCK_LOG.
+#
+# Test-time controls (env vars):
+#   MOCK_LOG              Path to append the invocation log
+#   MOCK_RPM_INSTALLED    Space-separated list of "installed" package names
+#                         (used by `rpm -q <name>` checks)
+printf 'rpm %s\n' "$*" >>"${MOCK_LOG:-/tmp/mock.log}"
+
+# Implement enough of `rpm -q <name>` semantics for tests to work.
+if [[ ${1:-} == "-q" && -n ${2:-} ]]; then
+  for pkg in ${MOCK_RPM_INSTALLED:-}; do
+    if [[ $pkg == "$2" ]]; then
+      printf '%s-1.0-1.fc44.x86_64\n' "$2"
+      exit 0
+    fi
+  done
+  printf 'package %s is not installed\n' "$2" >&2
+  exit 1
+fi
+
+# Implement `rpm -qf <path>` for kernel-update detection tests.
+if [[ ${1:-} == "-qf" && -n ${2:-} ]]; then
+  if [[ -n ${MOCK_RPM_KERNEL_OWNER:-} ]]; then
+    printf '%s\n' "$MOCK_RPM_KERNEL_OWNER"
+    exit 0
+  fi
+  printf 'file %s is not owned by any package\n' "$2" >&2
+  exit 1
+fi
+
+exit "${MOCK_RPM_EXIT:-0}"
