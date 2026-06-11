@@ -24,11 +24,16 @@ REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
 COPR_DIR="$REPO/omedora/packaging/copr"
 IMAGE="${OMEDORA_RPMBUILD_IMAGE:-registry.fedoraproject.org/fedora:44}"
 
+# Omarchy 4 spec set. The 3.8.2-era specs retired here (deleted from this
+# branch; omedora-3 keeps them): walker, elephant, swayosd, bluetui,
+# gazelle-tui, hypridle, hyprlock, hyprshot — all replaced by the Quickshell
+# shell/ (idle/lock/OSD/launcher/notifications) or by NetworkManager/bluez,
+# and verified unreferenced by any omarchy-4 bin (see omedora/packages.md §10).
 SPECS=(
-  walker.spec elephant.spec omedora-nerd-fonts.spec swayosd.spec terminaltexteffects.spec
+  omedora-nerd-fonts.spec terminaltexteffects.spec
   # task #59 back-fill (all build-tested):
   lazygit.spec lazydocker.spec mise.spec starship.spec usage.spec
-  satty.spec bluetui.spec gazelle-tui.spec hyprland-preview-share-picker.spec
+  satty.spec hyprland-preview-share-picker.spec
   # omarchy-nvim.spec is intentionally NOT built: its %build bakes the plugin
   # cache via a headless `:Lazy! sync` that fetches ~50 plugins from GitHub,
   # which fails in COPR's offline mock build. Nothing Requires it, so instead
@@ -40,8 +45,8 @@ SPECS=(
   # builds). Replaces the dropped third-party lionheartp/Hyprland COPR.
   glaze.spec hyprland-protocols.spec hyprutils.spec hyprwayland-scanner.spec
   hyprlang.spec hyprgraphics.spec hyprwire.spec hyprcursor.spec aquamarine.spec
-  hyprtoolkit.spec hyprland.spec hyprland-guiutils.spec hyprlock.spec
-  hypridle.spec hyprpicker.spec hyprsunset.spec hyprshot.spec
+  hyprtoolkit.spec hyprland.spec hyprland-guiutils.spec
+  hyprpicker.spec hyprsunset.spec
   xdg-desktop-portal-hyprland.spec
   # uwsm (the session manager omedora launches through) was ALSO provided by
   # the dropped lionheartp/Hyprland COPR, not Fedora — so it's vendored too.
@@ -49,6 +54,7 @@ SPECS=(
   # omedora's own wayland-session entry (noarch). Runtime-Requires
   # hyprland-no-session + uwsm (both built above); no build-time deps. Ships
   # /usr/share/wayland-sessions/omedora.desktop (was a Fedora-gated sudo-cp).
+  # TODO(P3): likely superseded by omedora-settings' wayland-session payload.
   hyprland-omedora.spec
   # claude-code.spec is intentionally NOT built here — parked pending a
   # redistribution-licensing decision before any public COPR (proprietary binary).
