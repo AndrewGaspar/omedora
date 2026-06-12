@@ -1,0 +1,74 @@
+#!/bin/bash
+#
+# Fedora sibling of bin/omarchy-update-available (exec'd by its distro
+# dispatch). Same contract as upstream so the shell update widget works
+# unchanged:
+#   - writes  ~/.local/state/omarchy/updates/{packages,aur,available,checked-at}
+#     (+ error on failure, removed on success)
+#   - exit 0  -> updates available, stdout is the list
+#   - exit !0 -> up to date ("System is up to date" on stdout)
+#
+# The checker is `dnf check-upgrade` (exit 100 = updates available, 0 = none,
+# anything else = error). The aur file is always empty on Fedora — kept so the
+# widget's file set is identical. Override the dnf invocation with
+# OMEDORA_DNF_CMD for tests.
+
+set -euo pipefail
+
+CHECK_TIMEOUT="${OMARCHY_UPDATE_CHECK_TIMEOUT:-60}"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/updates"
+DNF="${OMEDORA_DNF_CMD:-dnf}"
+
+mkdir -p "$STATE_DIR"
+
+tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/omedora-update-available.XXXXXX")
+trap 'rm -rf "$tmp_dir"' EXIT
+
+packages_tmp="$tmp_dir/packages"
+errors_tmp="$tmp_dir/errors"
+: >"$packages_tmp"
+: >"$errors_tmp"
+
+status=0
+# --refresh so a stale metadata cache can't hide (or invent) updates; the
+# output is "name arch version repo" lines plus headers we strip to package
+# lines only. dnf5's check-upgrade prints nothing when current.
+timeout "$CHECK_TIMEOUT" $DNF -q check-upgrade --refresh \
+  >"$tmp_dir/raw" 2>"$tmp_dir/err" || status=$?
+
+case "$status" in
+  0 | 100)
+    # Strip ANSI + blank lines; keep "pkg version repo"-shaped lines.
+    sed -E 's/\x1B\[[0-9;]*m//g' "$tmp_dir/raw" | sed '/^[[:space:]]*$/d' >"$packages_tmp"
+    ;;
+  124)
+    echo "System package update check timed out" >>"$errors_tmp"
+    ;;
+  *)
+    echo "System package update check failed" >>"$errors_tmp"
+    sed '/^[[:space:]]*$/d' "$tmp_dir/err" >>"$errors_tmp" || true
+    ;;
+esac
+
+cp "$packages_tmp" "$STATE_DIR/packages"
+: >"$STATE_DIR/aur"
+cp "$packages_tmp" "$STATE_DIR/available"
+date --iso-8601=seconds >"$STATE_DIR/checked-at"
+
+if [[ -s $errors_tmp ]]; then
+  cp "$errors_tmp" "$STATE_DIR/error"
+else
+  rm -f "$STATE_DIR/error"
+fi
+
+if [[ -s "$STATE_DIR/available" ]]; then
+  cat "$STATE_DIR/available"
+  exit 0
+fi
+
+if [[ -s "$STATE_DIR/error" ]]; then
+  cat "$STATE_DIR/error" >&2
+fi
+
+echo "System is up to date"
+exit 1

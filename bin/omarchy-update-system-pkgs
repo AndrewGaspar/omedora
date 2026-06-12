@@ -3,6 +3,16 @@
 # omarchy:summary=Update system packages with pacman
 # omarchy:requires-sudo=true
 
+# Fedora dispatch — dnf upgrade; none of the pacman transition --overwrite
+# entries apply (those paths are RPM-owned or deliberately unpackaged on
+# Fedora). See omedora/architecture.md §3. Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora)
+    echo -e "\e[32m\nUpdate system packages\e[0m"
+    exec sudo dnf upgrade --refresh -y
+    ;;
+esac
+
 set -e
 
 echo -e "\e[32m\nUpdate system packages\e[0m"
