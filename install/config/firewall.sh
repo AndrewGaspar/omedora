@@ -1,3 +1,12 @@
+# omedora: Fedora dispatches to the firewall-fedora.sh sibling (firewalld —
+# Fedora's stock firewall; ufw is skipped in the package map). The Arch body
+# below is byte-identical to upstream. See omedora/architecture.md
+# §"Omarchy 4 setup-system gating map".
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  source "${BASH_SOURCE[0]%/*}/firewall-fedora.sh"
+  return 0 2>/dev/null || exit 0
+fi
+
 # Allow nothing in, everything out.
 ufw default deny incoming
 ufw default allow outgoing
