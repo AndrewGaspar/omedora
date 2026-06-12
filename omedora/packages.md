@@ -351,7 +351,7 @@ Verified live before committing to the port (spike container: `omedora-test:fedo
 
 | Dependency | Verdict | Evidence / disposition |
 | --- | --- | --- |
-| `quickshell` | **GO — use Fedora's package** | Fedora 44 ships `quickshell-0.2.1^git20260209.dacfa9d`. All 14 Quickshell QML modules `shell/` imports are present. The full omarchy-4 shell ran under the nested Hyprland session: `omarchy-shell shell ping` → ok, `omarchy-bar` layer rendered, notifications worked, **zero QML errors** (only environmental D-Bus warnings: polkit/bluez/UPower absent in the container). No fallback quickshell spec needed unless upstream pins a newer rev later. |
+| `quickshell` | **VENDORED 0.3.0 — see §11** | The P1 spike loaded the shell on Fedora's `0.2.1^git20260209.dacfa9d` snapshot with zero load-time QML errors, but P7 surfaced a runtime break: the QsWindow `updatesEnabled` property (added upstream after Feb 2026) is absent, so the wallpaper/Background component fails to map. Fedora's snapshot is stalled across all branches (incl. rawhide) and omarchy develops against rolling, so we vendor upstream's 0.3.0 instead of patching `shell/`. |
 | hyprland 0.55.2 (our RPM) + Lua config | **GO, with a re-check note** | `Hyprland --config .../hyprland.lua` (full omarchy-4 lua tree, `OMARCHY_PATH` set) boots on our existing 0.55.2 spec — 189 binds registered from Lua. One `configerrors` entry: a config-load shell-out in `config/hypr/bindings.lua` hit Hyprland's Lua execution timeout in the slow container; re-verify on a real install (not a Lua-capability gap). |
 | `dua-cli` | **dnf tier** | In Fedora proper (source package `rust-dua-cli`). |
 | `aether`, `cliamp`, `tobi-try` | **skip (existing entries stand)** | 37signals/AUR-world tools; the 3.8.2-era skip reasons hold for 4.x. `cliamp` is bound to SUPER+SHIFT+ALT+M — degrades gracefully. |
@@ -360,3 +360,17 @@ Verified live before committing to the port (spike container: `omedora-test:fedo
 | `foot`, `wtype`, `udiskie`, `yt-dlp` | **dnf tier** | All in Fedora proper. |
 | `moonlight-qt` | **RPM Fusion tier** (Flathub fallback) | Not in Fedora proper. |
 | `NetworkManager`, `bluez*` | **dnf tier — simplification** | Omarchy 4 dropped iwd/impala/bluetui for NetworkManager/bluez, which is exactly Fedora's stack: the gazelle-tui divergence disappears on the 4.x line. |
+
+---
+
+## 11. Vendored-because-Fedora-is-too-old (version-driven vendor decisions)
+
+Distinct from §10's "not in Fedora" triage: some packages omarchy-4 adopts ARE in
+Fedora but at a version too old to satisfy the new desktop. These get vendored into
+`omedora/packaging/copr/` like the Hyprland stack and routed via `source = "dnf"` from
+the omedora repo, so the version we ship — not Fedora's — wins (a higher upstream
+version resolves over Fedora's automatically).
+
+| Package | omedora version | Fedora 44 version | Decision |
+| --- | --- | --- | --- |
+| `quickshell` | **0.3.0** (vendored, `quickshell.spec`) | 0.2.1^git20260209.dacfa9d (stalled Feb-2026 snapshot, identical across stable/updates/testing/rawhide) | **Vendor 0.3.0.** The omarchy-4 Quickshell desktop adopts APIs absent from Fedora's stalled snapshot — notably the QsWindow `updatesEnabled` property, whose absence breaks the wallpaper/Background component. Upstream released 0.3.0 (2026-05-04: networking service + polkit integration); we ship it. Recipe adapted from Fedora's own `quickshell.spec`; built with `-DCRASH_HANDLER=OFF` because its `cpptrace` dep is not in Fedora 44 (the only alternative, `-DVENDOR_CPPTRACE=ON`, fetches at build time and would fail COPR's offline mock build). See `install/packages/fedora.toml` `[quickshell]`. |

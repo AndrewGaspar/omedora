@@ -30,6 +30,12 @@ IMAGE="${OMEDORA_RPMBUILD_IMAGE:-registry.fedoraproject.org/fedora:44}"
 # shell/ (idle/lock/OSD/launcher/notifications) or by NetworkManager/bluez,
 # and verified unreferenced by any omarchy-4 bin (see omedora/packages.md §10).
 SPECS=(
+  # quickshell: vendored because Fedora 44 ships only a STALLED Feb-2026 snapshot
+  # (0.2.1^git20260209.dacfa9d) that lacks omarchy-4-needed APIs (the QsWindow
+  # `updatesEnabled` property -> broken wallpaper). We ship upstream's real 0.3.0
+  # release (2026-05-04). No intra-stack BuildRequires on our other specs (it's a
+  # Qt6 build), so order is flexible — kept near the top for visibility.
+  quickshell.spec
   omedora-nerd-fonts.spec terminaltexteffects.spec
   # task #59 back-fill (all build-tested):
   lazygit.spec lazydocker.spec mise.spec starship.spec usage.spec
