@@ -261,6 +261,13 @@ reason = "Universal Wayland Session Manager — omedora's session launches throu
 source = "skip"
 reason = "GPU screen recorder (NVENC/VAAPI); was implicitly provided by the dropped lionheartp/Hyprland COPR, not Fedora main or RPM Fusion. Not session-critical, and building it needs RPM Fusion ffmpeg BuildRequires the build container doesn't enable. Skipped for now; TODO: vendor it (needs RPM Fusion build deps) or document a manual install for screen recording."
 
+# --- quickshell (vendored omedora RPM, served from the omedora repo) ----------
+
+[quickshell]
+source = "dnf"
+names = ["quickshell"]
+reason = "QtQuick desktop-shell toolkit used by the omarchy-4 Quickshell desktop (e.g. the image selector). Fedora 44 ships only a STALLED Feb-2026 git snapshot (0.2.1^git20260209.dacfa9d, identical on stable/updates/testing/rawhide) that lacks omarchy-4-needed APIs — notably the QsWindow `updatesEnabled` property (its absence breaks the wallpaper/Background component). Vendored as omedora/packaging/copr/quickshell.spec (upstream 0.3.0 release, 2026-05-04) and served from the omedora repo."
+
 # --- Flathub (proprietary or unpackaged GUI apps) ------------------------
 
 [obsidian]
