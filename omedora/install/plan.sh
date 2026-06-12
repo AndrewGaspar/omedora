@@ -79,7 +79,8 @@ if [[ -z ${OMEDORA_PLAN_SKIP_PKGS:-} ]]; then
   while IFS= read -r line; do
     line="${line%%#*}"; line="${line//[[:space:]]/}"
     [[ -n $line ]] && base_pkgs+=("$line")
-  done <"$OMEDORA_REPO_ROOT/install/omarchy-base.packages"
+  done < <(cat "$OMEDORA_REPO_ROOT/install/omarchy-base.packages" \
+               "$OMEDORA_REPO_ROOT/omedora/install/fedora-baseline.packages")
 
   pkg_out="$(OMARCHY_PKG_DRY_RUN=1 \
     python3 "$OMEDORA_REPO_ROOT/bin/fedora/pkg.py" add "${base_pkgs[@]}" 2>&1 |
@@ -167,6 +168,8 @@ omedora_plan_summary() {
   echo "      • set HEY as the mailto handler — only if you have none set"
   echo "      • back up an existing ~/.XCompose before writing omedora's"
   echo "      • GTK bookmarks, xdg user dirs, default keyring (only created if absent)"
+  echo "      • a ~/.local/bin/chromium wrapper + chromium.desktop, so omarchy's"
+  echo "        Wayland flags apply to Fedora's chromium-browser binary"
   echo
   echo -e "\033[1m  System files (root):\033[0m"
   echo "      • omarchy-namespaced /etc drop-ins shipped by the omedora-settings RPM:"
