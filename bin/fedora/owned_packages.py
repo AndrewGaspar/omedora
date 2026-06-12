@@ -35,6 +35,23 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DEFAULT_MAP = REPO_ROOT / "install" / "packages" / "fedora.toml"
 DEFAULT_BASE = REPO_ROOT / "install" / "omarchy-base.packages"
+DEFAULT_SPEC_DIR = REPO_ROOT / "omedora" / "packaging" / "copr"
+
+
+def read_spec_names(path: Path) -> set[str] | None:
+    """Names of the packages omedora's COPR actually builds (spec filenames).
+
+    "Owned" should mean PINNED — provided by omedora's own COPR — not merely
+    "installed via dnf": a base package like libyaml is plain Fedora, and
+    flagging it as foreign (e.g. a container image's synthetic repo id) is a
+    false positive. When the spec dir isn't available (an installed system
+    without the packaging tree), return None and the caller skips the filter —
+    the doctor's friendly-repo check alone is sufficient there.
+    """
+    if not path.is_dir():
+        return None
+    names = {p.stem for p in path.glob("*.spec")}
+    return names or None
 
 
 def read_base_packages(path: Path) -> list[str]:
@@ -52,7 +69,9 @@ def load_map(path: Path) -> dict[str, dict]:
         return tomllib.load(fp)
 
 
-def resolve_owned(base: list[str], pkg_map: dict[str, dict]) -> list[str]:
+def resolve_owned(
+    base: list[str], pkg_map: dict[str, dict], spec_names: set[str] | None = None
+) -> list[str]:
     owned: list[str] = []
     seen: set[str] = set()
     for pkg in base:
@@ -65,6 +84,13 @@ def resolve_owned(base: list[str], pkg_map: dict[str, dict]) -> list[str]:
             source = str(raw.get("source", "dnf"))
             names = [str(n) for n in raw.get("names", [pkg])]
         if source not in ("dnf", "copr"):
+            continue
+        # Owned means PINNED by omedora's COPR: when the spec set is known,
+        # only entries that resolve to (or collide with) one of our own
+        # packages count. Plain Fedora packages (libyaml, jq, ...) are not
+        # ours to police — the doctor would false-positive on them wherever
+        # repo provenance is unusual (container images, local mirrors).
+        if spec_names is not None and not ({pkg, *names} & spec_names):
             continue
         # Include the upstream/base name (the map key) alongside omedora's
         # possibly-renamed package(s), so conflict detection catches a foreign
@@ -123,7 +149,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{pkg}\t{','.join(names)}")
         return 0
 
-    for name in resolve_owned(base, pkg_map):
+    spec_dir = Path(os.environ.get("OMEDORA_SPEC_DIR", DEFAULT_SPEC_DIR))
+    for name in resolve_owned(base, pkg_map, read_spec_names(spec_dir)):
         print(name)
     return 0
 
