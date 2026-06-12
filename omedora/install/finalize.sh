@@ -21,3 +21,6 @@ if [[ -n ${OMEDORA_SETUP_FROM_REPO:-} ]]; then
 fi
 
 "${finalize_cmd[@]}" --force --first-install
+
+# Fedora chromium naming/flags bridge (user-level; see the file header).
+source "$OMEDORA_REPO_ROOT/omedora/install/chromium-bridge.sh"
