@@ -3,5 +3,16 @@
 # omarchy:summary=Restart system time synchronization
 # omarchy:requires-sudo=true
 
+# Fedora dispatch — Fedora rides chronyd, not systemd-timesyncd (which is not
+# installed; restarting it would fail). Tolerate the service being absent.
+# See omedora/architecture.md §3. Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora)
+    echo "Updating time..."
+    sudo systemctl restart chronyd 2>/dev/null || true
+    exit 0
+    ;;
+esac
+
 echo "Updating time..."
 sudo systemctl restart systemd-timesyncd
