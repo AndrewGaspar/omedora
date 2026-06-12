@@ -32,7 +32,29 @@ import sys
 import tomllib
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+def _resolve_tree_root() -> Path:
+    """Root of the omarchy tree this helper belongs to.
+
+    Three homes, in precedence order:
+      1. the script's own checkout (bin/fedora/ -> repo root) when the map
+         exists there — dev checkouts and the install bootstrap;
+      2. $OMARCHY_PATH — the live tree on an installed system;
+      3. /usr/share/omarchy — the packaged default (the omedora RPM installs
+         this helper at /usr/bin/fedora/, so script-relative resolution lands
+         at /usr, which is wrong on installed systems).
+    """
+    script_root = Path(__file__).resolve().parent.parent.parent
+    candidates = [script_root]
+    if os.environ.get("OMARCHY_PATH"):
+        candidates.append(Path(os.environ["OMARCHY_PATH"]))
+    candidates.append(Path("/usr/share/omarchy"))
+    for root in candidates:
+        if (root / "install" / "packages" / "fedora.toml").is_file():
+            return root
+    return script_root
+
+
+REPO_ROOT = _resolve_tree_root()
 DEFAULT_MAP = REPO_ROOT / "install" / "packages" / "fedora.toml"
 DEFAULT_BASE = REPO_ROOT / "install" / "omarchy-base.packages"
 DEFAULT_SPEC_DIR = REPO_ROOT / "omedora" / "packaging" / "copr"
