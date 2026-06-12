@@ -53,7 +53,7 @@ fi
 # --- package layer ---------------------------------------------------------------
 check "omedora RPM installed" rpm -q omedora
 check "omedora-settings RPM installed" rpm -q omedora-settings
-check "hyprland installed from the omedora COPR" rpm -q hyprland
+check "hyprland compositor installed from the omedora COPR" rpm -q hyprland-no-session
 check "quickshell installed" rpm -q quickshell
 check "foot installed" rpm -q foot
 check "uwsm installed" rpm -q uwsm
