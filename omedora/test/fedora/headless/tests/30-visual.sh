@@ -24,22 +24,24 @@
 # DYNAMIC EXCLUSION ZONES (x,y,w,h in logical px; masked in ref AND candidate).
 # The headless output is 1920x1080 at scale 1 (monitors.lua scale "auto"
 # resolves to 1 on this output). The v4 bar (shell/plugins/bar) is the top
-# band; its default layout (config/omarchy/shell.json) clusters the
-# time/state-dependent content left / center / right, and each cluster below
-# masks the full band height so glyph ascenders/descenders are covered:
+# band; the shell sizes it from the font/scale — measured ~51px tall on this
+# output (rows 0..50 are the solid bar band, row 52+ is wallpaper). Its default
+# layout (config/omarchy/shell.json) clusters the time/state-dependent content
+# left / center / right, and each cluster below masks the FULL band height
+# (52px) so glyph ascenders/descenders are covered even as the clock rolls over:
 #
-#   0,0,420,44      LEFT cluster: omarchy.menu glyph + omarchy.workspaces.
+#   0,0,420,52      LEFT cluster: omarchy.menu glyph + omarchy.workspaces.
 #                   The focused-workspace pill and which workspaces exist are
 #                   STATE-dependent. Excluded.
-#   700,0,520,44    CENTER cluster: omarchy.clock ("dddd HH:mm" — changes every
+#   700,0,520,52    CENTER cluster: omarchy.clock ("dddd HH:mm" — changes every
 #                   minute) + weather / system-update / indicators. Excluded.
-#   1500,0,420,44   RIGHT cluster: tray + bluetooth + network + audio + the
+#   1500,0,420,52   RIGHT cluster: tray + bluetooth + network + audio + the
 #                   battery/cpu tail. All state-dependent. Excluded.
 #
 # What's left UNMASKED and therefore actually asserted:
-#   - the bar's background band across the rest of the top 44px (proves the
-#     bar is DRAWN — if it's missing, these rows show wallpaper/black), and
-#   - the entire wallpaper region (rows 44..1079) — proves the shell's
+#   - the bar's solid background band across the rest of the top ~51px (proves
+#     the bar is DRAWN — if it's missing, these rows show wallpaper/black), and
+#   - the entire wallpaper region (rows 52..1079) — proves the shell's
 #     background service painted the real theme wallpaper, not a black fill.
 #
 # THRESHOLD: 1.0% of pixels may differ. Empirically (v4 shell, GPU-rendered):
@@ -74,9 +76,9 @@ REFERENCE="$(dirname -- "${BASH_SOURCE[0]}")/../fixtures/30-visual-reference.png
 
 # Dynamic exclusion zones — see the header for what/why of each.
 EXCLUSIONS=(
-  "0,0,420,44"      # left: menu glyph + workspaces (focused pill is state-dependent)
-  "700,0,520,44"    # center: clock (changes every minute) + weather/update/indicators
-  "1500,0,420,44"   # right: tray + bluetooth/network/audio tail (state-dependent)
+  "0,0,420,52"      # left: menu glyph + workspaces (focused pill is state-dependent)
+  "700,0,520,52"    # center: clock (changes every minute) + weather/update/indicators
+  "1500,0,420,52"   # right: tray + bluetooth/network/audio tail (state-dependent)
 )
 
 # The bar + background layers can come up slightly after Hyprland IPC; give the
@@ -85,6 +87,19 @@ EXCLUSIONS=(
 wait_for_shell_ping 30 || true
 wait_for_layer omarchy-bar 15 || true
 wait_for_layer omarchy-background 15 || true
+
+# Dismiss the IDLE SCREENSAVER if it fired. The session's idle hook launches a
+# fullscreen TTE screensaver (foot --app-id=org.omarchy.screensaver) after a few
+# minutes of no input; in a long-lived/--keep container the suite can reach this
+# test after that timeout, and the screensaver covers the whole output (a ~96%
+# diff that is NOT a wallpaper regression). Kill it + nudge the cursor to reset
+# the idle timer so we capture the real static desktop, not the screensaver.
+# (The background layer keeps its buffer underneath — Fedora 44's quickshell
+# never parks window updates — so the wallpaper is intact once it's uncovered.)
+pkill -f omarchy-screensaver >/dev/null 2>&1 || true
+hyprctl dispatch movecursor 100 540 >/dev/null 2>&1 || true
+hyprctl dispatch movecursor 960 540 >/dev/null 2>&1 || true
+wait_for_layer_gone org.omarchy.screensaver 5 >/dev/null 2>&1 || true
 
 # Clear any first-run notifications before capturing. They fire once at
 # session start and linger as a toast stack over the wallpaper — which this
