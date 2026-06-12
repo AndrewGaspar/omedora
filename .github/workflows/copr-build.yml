@@ -26,6 +26,20 @@ on:
       - 'omedora/packaging/copr/**.sources'
       - 'version'
       - 'omedora/version'
+      # Payload of the self-source omedora/omedora-settings packages (built
+      # from git archive HEAD): any change here IS a package change — without
+      # a rebuild, installed systems keep running the stale snapshot.
+      - 'bin/**'
+      - 'install/**'
+      - 'config/**'
+      - 'default/**'
+      - 'themes/**'
+      - 'shell/**'
+      - 'migrations/**'
+      - 'applications/**'
+      - 'omedora/install/**'
+      - 'omedora/install-4.sh'
+      - 'omedora/boot.sh'
   workflow_dispatch:
     inputs:
       packages:
@@ -78,6 +92,18 @@ jobs:
             fi
             list="$(git diff --name-only "$before" "${{ github.sha }}" -- 'omedora/packaging/copr/*.spec' \
                     | xargs -r -n1 basename | sed 's/\.spec$//' | sort -u | tr '\n' ' ')"
+            # Payload changes rebuild the self-source packages (their content
+            # is git archive HEAD, not a remote tarball). Settings first —
+            # omedora Requires it.
+            if git diff --name-only "$before" "${{ github.sha }}" -- \
+                 'bin/**' 'install/**' 'config/**' 'default/**' 'themes/**' \
+                 'shell/**' 'migrations/**' 'applications/**' \
+                 'omedora/install/**' 'omedora/install-4.sh' 'omedora/boot.sh' \
+                 'version' 'omedora/version' | grep -q .; then
+              for selfpkg in omedora-settings omedora; do
+                [[ " $list " == *" $selfpkg "* ]] || list="$list $selfpkg"
+              done
+            fi
           fi
           echo "list=$list" >> "$GITHUB_OUTPUT"
           echo "Packages to build: ${list:-<none>}"
