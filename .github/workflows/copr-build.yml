@@ -53,7 +53,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2   # need the push's parent to diff changed specs
+          # Full history: the changed-spec diff is against the push's `before`
+          # commit, which a shallow clone can't reach when a push lands more
+          # than a couple of commits at once (git diff -> exit 128).
+          fetch-depth: 0
 
       - name: Gate on the COPR token secret
         id: gate
