@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Launch the Omedora graphical session inside the systemd container, nesting
+# Launch the Omedora v4 graphical session inside the systemd container, nesting
 # Hyprland into the developer's HOST Wayland compositor (the socket the runner
 # bind-mounted at /tmp/host-wayland). For the self-contained headless variant
 # see session-launch-headless.sh; the shared uwsm-launch setup both use is in
@@ -8,12 +8,15 @@
 #
 # Runs AS the omedora user INSIDE a real logind session (entered via
 # `machinectl shell` by run-session.sh) and launches the session through
-# `uwsm start` — exactly as the omarchy.desktop session entry does on bare
-# metal. uwsm sets up the user environment, activates graphical-session.target,
-# and runs the autostart chain in proper `systemd --user` scopes, so the
-# container session behaves like a real one (PATH propagated, env in
-# systemd/dbus, uwsm-app apps render). See session-launch-common.sh for how
-# `uwsm start` is made to work in a container (seat/VT gate + the nesting env).
+# `uwsm start` — exactly as the packaged omedora.desktop session entry does on
+# bare metal. uwsm sets up the user environment (incl. OMARCHY_PATH via
+# /usr/share/uwsm/env.d/10-omarchy), activates graphical-session.target, and
+# Hyprland boots the Lua config (~/.config/hypr/hyprland.lua), whose autostart
+# (config/hypr/autostart.lua + default/hypr/autostart.lua) starts the
+# Quickshell shell (`quickshell -n -p $OMARCHY_PATH/shell`) — the v4 desktop:
+# bar, launcher, notifications, OSD all live in that one process. See
+# session-launch-common.sh for how `uwsm start` is made to work in a container
+# (seat/VT gate + the nesting env).
 
 set -uo pipefail
 
@@ -30,10 +33,11 @@ omedora_uwsm_prepare /tmp/host-wayland
 echo "Starting Omedora via uwsm (nested into host compositor; session=${XDG_SESSION_ID:-?})"
 echo "  Close the host window to end the session."
 
-# Drive Hyprland directly via uwsm (no resolver .desktop) — matches
-# omedora/packaging/copr/omedora.desktop. We run `start-hyprland` (the upstream
-# watchdog launcher that supervises Hyprland and passes --watchdog-fd; running
-# the bare `Hyprland` binary triggers its "started without start-hyprland"
-# warning). -N/-D supply the session metadata a .desktop would otherwise provide;
-# the uwsm unit instance becomes wayland-wm@start\x2dhyprland.service.
+# Drive Hyprland directly via uwsm (no resolver .desktop) — matches the
+# packaged /usr/share/wayland-sessions/omedora.desktop. We run `start-hyprland`
+# (the upstream watchdog launcher that supervises Hyprland and passes
+# --watchdog-fd; running the bare `Hyprland` binary triggers its "started
+# without start-hyprland" warning). -N/-D supply the session metadata a
+# .desktop would otherwise provide; the uwsm unit instance becomes
+# wayland-wm@start\x2dhyprland.service.
 exec uwsm start -g -1 -e -N Hyprland -D Hyprland -- start-hyprland
