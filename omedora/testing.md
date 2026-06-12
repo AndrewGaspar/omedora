@@ -217,27 +217,46 @@ Two non-obvious bring-up fixes live in `Dockerfile.base`: install `systemd-pam` 
 
 Profiling a warm build showed the install wall-time is dominated by **one stage**: `install/packaging/base.sh` (`dnf install` of the whole package set) is **~93%** of it (~3 min, even with the dnf cache warm), while the config stages you actually iterate on are **~10 s combined**. Re-running the whole install to test a one-line config change therefore paid the full ~3 min package cost for nothing.
 
-`build-session.sh` now splits the install into **two committed layers**, sourcing the *same* real install `all.sh` files in the *same* order as `install.sh` (via `omedora-session/staged-install.sh` — `install.sh` itself is untouched, so zero added rebase surface):
+`build-session.sh` splits the install into **two committed layers**, sourcing the *same* `omedora/install/*.sh` steps in the *same* order as **`omedora/install-4.sh`** (via `omedora-session/staged-install-4.sh` — `install-4.sh` itself is untouched, so zero added rebase surface). On the v4 line the image tag carries a `-4` suffix:
 
-| Image | Built from | Stages |
+| Image | Built from | Steps |
 | --- | --- | --- |
-| `omedora-test:fedora44-session-base` | `Dockerfile.base` | Fedora + systemd + the omedora tree |
-| `omedora-test:fedora44-session-pkgs` | base | `preflight/all.sh` + `packaging/all.sh` (the slow `dnf install`) |
-| `omedora-test:fedora44-session` | **pkgs** | `config/all.sh` (the fast, idempotent config) |
+| `omedora-test:fedora44-session-4-base` | `Dockerfile.base` | Fedora + systemd + the omedora tree |
+| `omedora-test:fedora44-session-4-pkgs` | base | `plan` + `snapshot` + `repos` + `packages` (the slow `dnf install` + Flatpaks) |
+| `omedora-test:fedora44-session-4` | **pkgs** | `system` + `adopt` + `finalize` + `first-run` (the fast, idempotent config) |
+
+The phase split is the same boundary the omedora RPM install crosses: everything after `packages` runs from the **installed** payload. `--local-repo` and `--workstation` get their own image lineages (`…-4-local`, `…-4-workstation`).
 
 Build modes:
 
-| Command | What it does | Wall time (this dev box) |
-| --- | --- | --- |
-| `build-session.sh` | base (if missing) → **pkgs (if missing)** → config → session | full first time; **~9 s** (config-only) if the pkgs image already exists |
-| `build-session.sh --rebuild` | clean: base + pkgs + config (force-repackage); rebuilds the RPM repo **only if a spec changed** | packages phase + config |
-| `build-session.sh --rebuild-repo` | as `--rebuild`'s default path but also force-rebuilds the local RPM repo | + ~3–4 min repo build |
-| `build-session.sh --fast` (alias `--config-only`) | boot the **existing** pkgs image, re-run **only** the config stages, recommit session | **~9 s** (boot ~3 s + config ~3 s + commit ~3 s) |
-| `build-session.sh --packages-only` | build/refresh just the pkgs image, no session | packages phase only |
+| Command | What it does |
+| --- | --- |
+| `build-session.sh` | base (if missing) → **pkgs (if missing)** → config → session |
+| `build-session.sh --rebuild` | clean: base + pkgs + config (force-repackage) |
+| `build-session.sh --fast` (alias `--config-only`) | boot the **existing** pkgs image, re-run **only** the config steps, recommit session — seconds |
+| `build-session.sh --packages-only` | build/refresh just the pkgs image, no session |
+| `build-session.sh --local-repo` | **hermetic / branch-payload** mode — see below |
 
-So the common loop — *edit one config script, rebuild* — is `build-session.sh --fast` (or just `build-session.sh`, which now skips straight to the config phase whenever the pkgs image is present): **~9 s** measured, versus the **~14 min** a full single-stage install paid before. It re-applies config against the already-installed packages instead of re-installing them. `--rebuild` is unchanged in fidelity: a clean, full repackage. The fast path is **opt-in for fidelity-critical cases** — if you changed a *package* (added/removed a dnf package, edited a spec), use a plain rebuild or `--rebuild` so the pkgs image is regenerated; `--fast` deliberately does not touch packages.
+So the common loop — *edit one config script, rebuild* — is `build-session.sh --fast` (or just `build-session.sh`, which skips straight to the config phase whenever the pkgs image is present). It re-applies config against the already-installed packages instead of re-installing them. The fast path is **opt-in for fidelity-critical cases** — if you changed a *package* (added/removed a dnf package, edited a spec, or changed shell/installer payload that ships in an RPM), regenerate the pkgs image (a plain rebuild, `--rebuild`, or the `--local-repo` flow below); `--fast` deliberately does not touch packages.
 
-The config stages are safe to re-run on top of an already-packaged filesystem because they're idempotent (`mkdir -p`, symlink, copy). `staged-install.sh`'s `config` phase re-seeds the install-log start marker (the packaging phase that normally prints it ran in a previous container) so `run_logged`/the error handler still behave.
+##### `--local-repo`: testing unpublished payload (shell/, bins, specs) without a COPR round-trip
+
+By default the install resolves omedora's packages from the **live COPR** — the real from-COPR path a user gets. But that means an uncommitted/unpublished change to `shell/`, `bin/`, an installer step, or a spec **isn't in the running image** until it's published. `--local-repo` closes that loop: it builds the omedora RPMs from **this checkout** into a local dnf repo (`omedora/packaging/copr/repo`, via `build-repo.sh`/`build-local.sh`) and injects it as `/etc/yum.repos.d/omedora-local.repo`, which makes `repos.sh` skip the COPR enable so dnf resolves omedora from the local overlay.
+
+**Important:** `build-local.sh`/`build-repo.sh` archive **`git HEAD`**, not the working tree — so **commit your payload change first**, then rebuild the affected spec(s) and the repo, then build the session image with `--local-repo`. The fast-iteration loop for a shell/ or bin/ change is:
+
+```bash
+export TMPDIR=/var/tmp/podman-tmp
+git commit -am "…"                                   # build-local archives HEAD
+omedora/packaging/copr/build-local.sh omedora.spec   # rebuild just the omedora RPM (~40 s)
+omedora/packaging/copr/build-repo.sh                 # (re)assemble the local repo from output/
+omedora/test/fedora/build-session.sh --local-repo    # pkgs (from local repo) → config → session-4-local
+omedora/test/fedora/headless/run-tests.sh            # verify (uses the -4 image; OMEDORA_SYSTEMD_SESSION_IMAGE to point at -local)
+```
+
+(`build-repo.sh` only rebuilds *dirty* specs; if a non-omedora spec changed shape — e.g. the `hyprland` subpackage split — force that one with `build-repo.sh hyprland.spec`. `--rebuild-repo` forces the whole repo.)
+
+The config steps are safe to re-run on top of an already-packaged filesystem because they're idempotent (`mkdir -p`, symlink, backup-then-write). `staged-install-4.sh`'s `config` phase re-seeds the install-log start marker (the packaging phase that normally prints it ran in a previous container) so `run_logged`/the error handler still behave.
 
 **dnf cache actually persists now (dnf5 path fix).** Fedora 44 ships **dnf5**, whose package cache lives under `/var/cache/libdnf5` — *not* the dnf4 path `/var/cache/dnf`. The build previously mounted the persistent cache volume (and the `Dockerfile.base` BuildKit cache) at `/var/cache/dnf`, so despite `keepcache=True` the volume stayed **empty** (measured: 0 RPMs after a full install, while `/var/cache/libdnf5` held **1.9 GB / 1153 RPMs** that were discarded with the container). Every cold/`--rebuild` packages phase therefore re-downloaded the entire package set (~14 min). Mounting the volume + BuildKit cache at `/var/cache/libdnf5` makes the cache stick, so repeat package builds reuse the downloaded RPMs.
 
@@ -322,18 +341,27 @@ omedora/test/fedora/headless/
 ├── run-tests.sh        # host orchestrator: boot one session, run the suite, report
 ├── lib.sh              # sourced by every test (in-container): session env + assertions
 ├── tests/
-│   ├── 00-session.sh   # smoke: Hyprland IPC, ≥1 monitor, waybar/mako/swaybg up
-│   ├── 10-walker.sh    # #56 guard: omarchy-launch-walker --dmenu renders a walker layer, ≥20×
+│   ├── 00-session.sh   # smoke: Hyprland IPC, ≥1 monitor, quickshell proc + shell ping,
+│   │                   #   omarchy-bar + omarchy-background layers mapped
+│   ├── 10-launcher.sh  # drive `omarchy-shell shell toggle omarchy.launcher` (Super+Space);
+│   │                   #   the omarchy-launcher layer maps+unmaps over N cycles
 │   ├── 20-portals.sh   # xdg-desktop-portal frontend + hyprland/gtk backends active
-│   ├── 30-visual.sh    # visual diff: waybar + wallpaper are actually DRAWN (not just running)
-│   ├── 40-menu.sh      # golden-image: omarchy control menu (Super+Alt+Space) renders
-│   └── 50-launcher.sh  # golden-image: walker app launcher (Super+Space) renders
+│   ├── 30-visual.sh    # visual diff: the shell bar band + wallpaper are actually DRAWN
+│   ├── 40-menu.sh      # drive `omarchy-menu toggle/summon/close`; omarchy-menu layer maps/unmaps
+│   └── 90-workstation.sh  # Workstation-base coexistence (SKIP-gated on non-Workstation bases)
 ├── fixtures/
-│   ├── 30-visual-reference.png    # committed known-good screenshot (1920×1080) 30-visual diffs against
-│   ├── 40-menu-reference.png      # committed golden baseline (1920×1080) 40-menu diffs against
-│   └── 50-launcher-reference.png  # committed golden baseline (1920×1080) 50-launcher diffs against
+│   └── 30-visual-reference.png    # committed known-good screenshot (1920×1080) 30-visual diffs against
 └── .gitignore          # ignores artifacts/
 ```
+
+> **v4 note.** The 3.8.2-era client/golden tests (`10-walker`, `40-menu`/`50-launcher`
+> walker goldens, `60-wifi`) are retired. On the v4 line the bar, launcher, menu,
+> notifications, OSD and wallpaper all live inside **one long-running quickshell
+> process** started by the Hyprland Lua autostart; they're summoned/hidden over
+> IPC (`omarchy-shell shell …`, `omarchy-menu …`), not by spawning client
+> windows. So the new tests assert **layer-surface presence** driven by the exact
+> bind commands, and `30-visual` is the sole pixel-golden (the static desktop:
+> bar band + wallpaper). The readiness signal is `omarchy-shell shell ping → ok`.
 
 **Run it**
 
@@ -353,93 +381,66 @@ The orchestrator prints a TAP plan (`1..N`), one `ok`/`not ok` per test, and a `
 ```bash
 #!/bin/bash
 source "$(dirname -- "${BASH_SOURCE[0]}")/../lib.sh"
-headless_session_env                       # attach: IPC sig + WAYLAND_DISPLAY + uwsm/env PATH
-# ... drive the session, then assert (each emits a TAP line):
-wait_for_layer walker 5
-assert_layer walker "omarchy-menu renders a walker surface"
+headless_session_env                       # attach: IPC sig + WAYLAND_DISPLAY + OMARCHY_PATH
+# ... wait for the shell, drive it over IPC, then assert (each emits a TAP line):
+wait_for_shell_ping 30                      # the v4 readiness signal
+omarchy-shell shell toggle omarchy.launcher "{}"
+wait_for_layer omarchy-launcher 10
+assert_layer omarchy-launcher "summon maps the launcher layer"
 ```
 
-`lib.sh` provides, on top of the shared TAP helpers (`pass`, `fail`, `assert_equals`, `assert_output_contains`, …): `headless_session_env`, `assert_layer`/`wait_for_layer`, `assert_client`/`wait_for_client`, `assert_monitor`, `assert_proc`, `screenshot`, `dump_state`. A failed `assert_*` auto-captures a `grim` screenshot + `hyprctl layers/clients/monitors` dumps + failed-unit list before exiting non-zero.
+`lib.sh` provides, on top of the shared TAP helpers (`pass`, `fail`, `assert_equals`, `assert_output_contains`, …): `headless_session_env`, the **v4 shell-IPC helpers** `wait_for_shell_ping`/`assert_shell_ping` (poll `omarchy-shell shell ping` → `ok`), `assert_layer`/`wait_for_layer`/`wait_for_layer_gone`, `assert_client`/`wait_for_client`, `assert_monitor`, `assert_proc`, `assert_unit_active`/`assert_dbus_name`, `screenshot`, `dump_state`, and the geometry-aware `assert_screenshot_matches`. A failed `assert_*` auto-captures a `grim` screenshot + `hyprctl layers/clients/monitors` dumps + failed-unit list before exiting non-zero.
 
 **Artifacts.** On any failure the orchestrator copies that test's screenshots + state dumps to `omedora/test/fedora/headless/artifacts/<test>/` (git-ignored). A green run writes nothing.
 
 #### `30-visual.sh` — screenshot-diff: the session must *look* right
 
-`00-session.sh` asserts the autostart **processes** are running (`assert_proc waybar/swaybg/mako`). But a process can be alive and **not visually present**: a uwsm app-daemon autostart race has been seen to drop waybar + swaybg from actually *rendering* while the processes (sometimes) still exist — a black screen with no bar and no wallpaper that the process-based test happily passes. `30-visual.sh` exists to catch exactly that **visual-component-missing** class of bug.
+`00-session.sh` asserts the shell is alive and its layers are **registered** (the `quickshell` process, `omarchy-shell shell ping`, and `omarchy-bar`/`omarchy-background` in `hyprctl layers`). But a layer can be mapped and still **paint garbage**: a broken QML bar, a black/fallback wallpaper, a theme regression. `30-visual.sh` closes that gap — it's the one remaining pixel-golden, and it guards the **static** desktop (bar band + wallpaper).
 
-**What it checks.** It `grim`s the whole headless output (fixed 1920×1080 — the launcher's headless monitor) and diffs it against a committed reference (`fixtures/30-visual-reference.png`) using the new `assert_screenshot_matches` helper. The metric is ImageMagick `compare -metric AE -fuzz 5%` normalized to a **differing-pixel fraction**; the test passes if **≤ 1.0 %** of pixels differ. This is deliberately *tolerance-based*, not pixel-perfect — the session renders via llvmpipe and we only want the coarse signal "are the big static structures drawn?" Empirically: two captures of the same good session diff at **0.0 %**; a **missing waybar** diffs at **~2.8 %**; a **black/fallback wallpaper** at **~95 %**; a fully-broken (no bar + no wallpaper) session at **~98 %** — so 1 % sits in a wide, robust gap.
+**What it checks.** It `grim`s the whole headless output (fixed 1920×1080 — the launcher's headless monitor) and diffs it against a committed reference (`fixtures/30-visual-reference.png`) via `assert_screenshot_matches`. The metric is ImageMagick `compare -metric AE -fuzz 5%` normalized to a **differing-pixel fraction**; the test passes if **≤ 1.0 %** of pixels differ. Deliberately *tolerance-based*, not pixel-perfect — we want only the coarse signal "are the big static structures drawn?" A missing bar moves the diff from ~0 % to tens of percent; a black wallpaper to ~95 %. The helper is **geometry-aware**: it first compares reference vs candidate dimensions and (when `SCREENSHOT_GEOMETRY_SKIP` is set, e.g. the L4-VM tier at a different mode) downgrades a mismatch to a TAP SKIP instead of a meaningless diff.
 
-**Exclusion-zone approach.** Most of the waybar is time/state-dependent (clock, workspace marker, network/battery icons), so those regions are **masked to solid black in BOTH the reference and the candidate before diffing**. The exclusion list is a small declarative `x,y,w,h # reason` array at the top of `30-visual.sh`; each rectangle is documented with *what* it is and *why*. They were derived from the **real** waybar layout (`config/waybar/config.jsonc`, top bar, height 26 × monitor scale 2.0 = 52 px band) by scanning the captured band for content clusters — not guessed:
+**Exclusion-zone approach.** The v4 bar (`shell/plugins/bar`, the top 44 px band; layout in `config/omarchy/shell.json`) clusters time/state-dependent content left/center/right, so those regions are **masked to solid black in BOTH the reference and the candidate before diffing**. The exclusion list is a small declarative `x,y,w,h # reason` array at the top of `30-visual.sh`:
 
 | Rectangle (x,y,w,h) | Masked content | Why dynamic |
 |---|---|---|
-| `20,0,272,52` | left: omarchy menu glyph + `hyprland/workspaces` | active-workspace marker (`󱓻`) + which workspaces are occupied are state-dependent |
-| `825,0,285,52` | center: `clock#horizontal` + weather/update/screen-recording/idle/notification-silencing indicators | clock changes every minute; indicators are state-dependent |
-| `1645,0,260,52` | right: tray + bluetooth + network + pulseaudio + cpu + battery | network/battery/bluetooth icons + tray are state-dependent |
+| `0,0,420,44` | left: `omarchy.menu` glyph + `omarchy.workspaces` | the focused-workspace pill + which workspaces exist are state-dependent |
+| `700,0,520,44` | center: `omarchy.clock` (`dddd HH:mm`) + weather / system-update / indicators | clock changes every minute; indicators are state-dependent |
+| `1500,0,420,44` | right: tray + bluetooth + network + audio + battery/cpu tail | all state-dependent |
 
-What's left **unmasked and therefore asserted**: the solid waybar background band across the rest of the top 52 px (proves the bar is drawn — if it's missing, those rows show wallpaper/black) and the **entire** wallpaper region below (proves swaybg painted the real background, not a black fallback).
+What's left **unmasked and therefore asserted**: the bar's background band across the rest of the top 44 px (proves the bar is drawn — if missing, those rows show wallpaper/black), and the **entire** wallpaper region (rows 44..1079) — proves the shell's background service painted the real theme wallpaper, not a black fill. (The wallpaper depends on the **Background.qml `updatesEnabled` guard** landing in the shell payload — without it the background component fails to load on Fedora 44's older quickshell and rows 44+ go black; see that commit.)
 
-**Regenerating the reference** (do this only when the UI *legitimately* changes — waybar height, wallpaper, static layout). Boot a session with `run-tests.sh --keep`, attach as `omedora`, and **confirm the components are truly up** — both the `wallpaper` and `waybar` layers must appear in `hyprctl layers` (the autostart race can drop them). If missing, relaunch them as persistent user units before capturing:
+**Regenerating the reference** (only when the UI *legitimately* changes — bar layout/height, default wallpaper/theme). The procedure is documented inline in the `30-visual.sh` header; in short:
 
 ```bash
-WL=$(hyprctl instances -j | python3 -c 'import sys,json;print(json.load(sys.stdin)[0]["wl_socket"])')
-SIG=$(ls -t "$XDG_RUNTIME_DIR/hypr" | head -1)
-systemd-run --user --unit=ref-swaybg --setenv=WAYLAND_DISPLAY=$WL --setenv=HYPRLAND_INSTANCE_SIGNATURE=$SIG \
-  swaybg -i ~/.config/omarchy/current/background -m fill
-systemd-run --user --unit=ref-waybar --setenv=WAYLAND_DISPLAY=$WL --setenv=HYPRLAND_INSTANCE_SIGNATURE=$SIG waybar
-makoctl dismiss --all      # clear transient notifications
-grim omedora/test/fedora/headless/fixtures/30-visual-reference.png
+export TMPDIR=/var/tmp/podman-tmp
+omedora/test/fedora/headless/run-tests.sh --keep --test '30-*'   # boot a clean 1920×1080 headless session
+CTR=omedora-htest-…        # the container name the runner printed (--keep leaves it up)
+podman exec -it "$CTR" machinectl shell omedora@.host
+  # in-session:
+  source ~/headless-suite/lib.sh && headless_session_env
+  wait_for_shell_ping 30
+  omarchy-shell -q notifications dismissAll; sleep 2   # clear first-run toasts
+  grim /home/omedora/30-visual-reference.png
+# from the host:
+podman cp "$CTR:/home/omedora/30-visual-reference.png" \
+  omedora/test/fedora/headless/fixtures/30-visual-reference.png
+podman rm -f "$CTR"
 ```
 
-The dynamic content (clock, etc.) in the reference is irrelevant because it's masked. After regenerating, re-check the exclusion rectangles still cover every dynamic cluster (re-scan the band if the layout moved). **Note:** on a *fresh* `run-tests.sh` boot the autostart race (being fixed separately) can leave the session visually broken, in which case `30-visual` correctly reports `not ok` — that is the test doing its job, not a flake.
+**Verify the new reference visually shows the bar + wallpaper** (not a black band/black wallpaper — that's a real regression, do NOT regenerate). Re-run `30-*` **twice** to prove the golden is stable (the compare is geometry-aware and the static desktop should diff at ~0 %), then commit it with a message noting the change it was regenerated for, and re-check the exclusion rectangles still cover every dynamic cluster.
 
-> **Runner note.** `run-tests.sh` copies `fixtures/` into the container alongside `lib.sh` + `tests/`, so committed reference images are available to the in-container test at `../fixtures/`.
+> **Runner note.** `run-tests.sh` copies `fixtures/` into the container alongside `lib.sh` + `tests/`, so the committed reference is available to the in-container test at `../fixtures/`.
 
-#### `40-menu.sh` / `50-launcher.sh` — golden-image tests for the menus
+#### `10-launcher.sh` / `40-menu.sh` — shell-IPC layer tests (no goldens)
 
-`40-menu.sh` and `50-launcher.sh` are **golden-image** screenshot tests for the two main walker surfaces:
+The v4 launcher and menu are **in-process quickshell plugins**, summoned/hidden over IPC — not client windows. So these tests drive the **exact bind command** and assert **layer-surface presence**, not a golden image:
 
-| Test | Trigger (exactly what the keybind runs) | Bind |
+| Test | Drives (exactly what the bind runs) | Asserts |
 |---|---|---|
-| `40-menu.sh` | `setsid uwsm-app -- omarchy-menu` (no arg → `show_main_menu` → `omarchy-launch-walker --dmenu`) | `SUPER + ALT + SPACE` (`o.bind_menu(…, "Omarchy menu", nil)` → `omarchy-menu`) |
-| `50-launcher.sh` | `setsid uwsm-app -- omarchy-launch-walker` (no `--dmenu` → the app launcher) | `SUPER + SPACE` (`o.bind(…, { omarchy = "walker" })` → `omarchy-launch-walker`) |
+| `10-launcher.sh` | `omarchy-shell shell toggle omarchy.launcher "{}"` (Super+Space) | `omarchy-launcher` layer maps then unmaps, over `SHELL_TOGGLE_ITERS` (default 5) cycles; `summon`/`hide` idempotency |
+| `40-menu.sh` | `omarchy-menu toggle/summon/close` (Super+Alt+Space) | `omarchy-menu` layer maps/unmaps; a non-root route (`system`) resolves; `omarchy-menu ping` answers |
 
-Both are walker layer-surfaces (gtk4-layer-shell, same render path as `10-walker`). Each test triggers the menu the way its bind does, waits for the `walker` layer to map (`wait_for_layer walker 10`), `grim`s the live 1920×1080 output, and diffs it against a committed baseline (`fixtures/40-menu-reference.png`, `fixtures/50-launcher-reference.png`) via `assert_screenshot_matches`. After capturing, each test closes the menu (`walker --close` + kill) and waits for the layer to tear down so it can't leak into a later test — they're idempotent and re-runnable.
-
-**Why golden-image (and a lenient threshold).** These menus are deliberately **high-entropy**: the omarchy menu's option list and the launcher's installed-app list both change legitimately across upstream versions. We accept that on **one explicit condition** — the baseline is **affirmatively regenerated** when a rebase onto a new upstream version changes a menu. So these are golden-image gates, **not** bulletproof pixel diffs: the threshold is **25 %** of pixels (`-fuzz 5%` AE, same metric as `30-visual`), tuned to catch **structural** regressions (menu didn't open / blank or black panel / wrong menu / no walker layer) while tolerating llvmpipe software-render noise **and** the row-by-row churn of menu/app text across versions. Empirically: when the menu renders, two captures of the same good session diff at **~0 %** (verified: 40-menu **0.0000 %**, 50-launcher **0.0126 %**); a plain desktop with **no menu open** diffs at **~95–97 %** (verified: **97.34 %** vs the menu baseline, **95.22 %** vs the launcher baseline). 25 % sits in that wide gap.
-
-**Exclusion zones.** Only the genuinely-nondeterministic bit is masked: each menu's search field carries a **blinking text cursor**, so the one search-field row is masked to black in both ref and candidate (`690,55,320,65` for 40-menu's "Go…" field; `360,180,1000,70` for 50-launcher's "Search…" field — both located by cropping the committed baseline, both well inside the panel). Per the golden-image contract we lean on the **threshold** for the rest of the content variance rather than masking every row.
-
-**Regenerating a baseline — this is the whole point of these tests.** When a rebase changes a menu, `40-menu`/`50-launcher` will go **red on purpose**. That is the test asking a human to look. Do this, in order:
-
-1. **Eyeball the failure.** Open the failed run's artifacts:
-   `omedora/test/fedora/headless/artifacts/40-menu/40-menu-candidate.png` (+ `-diff.png`), or the `50-launcher/` equivalents. Confirm the menu **actually rendered** and the change is the expected upstream change. **A blank/black panel is a real regression — do NOT regenerate; fix the regression.**
-2. **Confirm the change is intended** (e.g. upstream added/renamed a menu entry, or the installed-app set changed) — i.e. the new look is what you *want* to be the new known-good.
-3. **Regenerate + commit the new baseline** from a known-good headless session (never your live desktop — use the headless container):
-
-   ```bash
-   export TMPDIR=/var/tmp/podman-tmp
-   omedora/test/fedora/headless/run-tests.sh --keep --test '00-*'   # boot a clean 1920×1080 headless session
-   CTR=omedora-htest-$(…)   # the container name the runner printed (--keep leaves it up)
-   podman exec "$CTR" su - omedora -c '
-     export XDG_RUNTIME_DIR=/run/user/1000
-     [[ -f $HOME/.config/uwsm/env ]] && source $HOME/.config/uwsm/env
-     export HYPRLAND_INSTANCE_SIGNATURE=$(ls -t $XDG_RUNTIME_DIR/hypr | head -1)
-     export WAYLAND_DISPLAY=$(hyprctl instances -j | python3 -c "import sys,json;print(json.load(sys.stdin)[0][\"wl_socket\"])")
-     # 40-menu: setsid uwsm-app -- omarchy-menu          (50-launcher: omarchy-launch-walker)
-     setsid uwsm-app -- omarchy-menu >/dev/null 2>&1 &
-     for i in $(seq 1 50); do hyprctl layers -j | grep -q "\"namespace\": \"walker\"" && break; sleep 0.2; done
-     sleep 1
-     hyprctl layers -j | grep -q "\"namespace\": \"walker\"" || { echo "walker layer MISSING — do not commit"; exit 1; }
-     grim /home/omedora/40-menu-reference.png'
-   podman cp "$CTR:/home/omedora/40-menu-reference.png" \
-     omedora/test/fedora/headless/fixtures/40-menu-reference.png
-   podman rm -f "$CTR"
-   ```
-
-   **Verify the new baseline visually shows the menu** (not a blank/black panel) before committing it. Commit with a message noting the upstream version it was regenerated for, then re-run `run-tests.sh --test '40-*'` (or `'50-*'`) to confirm green. If the search-field cursor moved (panel geometry changed upstream), re-locate the exclusion rectangle by cropping the new baseline.
-
-> The same affirmative-regenerate procedure is documented inline in each test's header comment, so a contributor who hits the red test sees it at the point of failure.
+A screenshot of each open surface is kept as a **debugging artifact** (not a gate) — `30-visual` owns the pixel-level gate for the static desktop. This is strictly more robust than the retired walker goldens: there's no daemon-forwarded render race, and the assertion ("the surface maps and unmaps on the exact bind") is exactly the user-visible contract.
 
 **CI notes.** Same requirement as `--headless`: a DRM render node (`--device /dev/dri`). This rules out standard GitHub-hosted runners — they have no render node and no software substitute (see "GPU vs software rendering" above; proven 2026-06-09). Running L4 in CI needs a **self-hosted runner with a GPU** (or a paid GPU-enabled hosted runner); build-once-then-run on a scheduled/on-demand job (the image build is ~15–30 min).
 
