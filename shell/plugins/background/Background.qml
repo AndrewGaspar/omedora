@@ -199,7 +199,18 @@ Item {
       // leaving a black desktop until omarchy-shell is restarted. The wallpaper
       // itself is static, so this favors correctness over a small render-loop
       // optimization.
-      updatesEnabled: true
+      //
+      // omedora: set imperatively, not declaratively. Fedora 44's quickshell
+      // (0.2.1^git20260209 snapshot) predates the QsWindow updatesEnabled
+      // property, and a declarative assignment to a non-existent property
+      // aborts the whole component load — which silently killed the entire
+      // background service (no wallpaper) on Fedora. The guarded imperative
+      // form is identical in effect on current quickshell and a graceful
+      // no-op on the older snapshot (whose windows never park updates, so the
+      // buffer-loss bug above can't bite there anyway).
+      Component.onCompleted: {
+        if ("updatesEnabled" in panel) panel.updatesEnabled = true
+      }
 
       property bool maskReady: false
 
