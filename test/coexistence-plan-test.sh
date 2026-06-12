@@ -39,6 +39,12 @@
 # and gum/findmnt are shimmed on PATH — so this runs identically on the Arch
 # host, in CI, and inside a Fedora container.
 
+# KNOWN WATCH-ITEM (2026-06-12): this suite intermittently failed (~1 in 4)
+# in LOCAL full-suite sweeps run while podman containers were active on the
+# host, but has never failed solo (60+ iterations), in paired runs with its
+# predecessors (25 iterations), or in CI. Suspected host-load timing
+# sensitivity. If it ever fails in CI, capture the log and dig in earnest.
+
 set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)

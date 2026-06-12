@@ -60,6 +60,14 @@ if grep -qE '^Source0:[[:space:]]*omedora-self\.tar\.gz[[:space:]]*$' "$spec_dir
   echo "==> Self-source spec: git archive HEAD -> omedora-self.tar.gz (prefix omedora-$self_version/)"
   git -C "$repo_root" archive --format=tar.gz --prefix="omedora-${self_version}/" \
     -o "$TOPDIR/SOURCES/omedora-self.tar.gz" HEAD
+  # Stamp the Release with the commit date + sha (deterministic per commit,
+  # monotonic across commits): the payload is git archive HEAD, so EVERY
+  # commit that changes it must produce a higher NEVRA or installed systems
+  # never see the rebuild as an upgrade. "2%{?dist}" -> "2.<stamp>git<sha>%{?dist}".
+  self_stamp=$(git -C "$repo_root" log -1 --format=%cd --date=format:%Y%m%d%H%M HEAD)
+  self_sha=$(git -C "$repo_root" rev-parse --short=7 HEAD)
+  sed -i -E "s/^(Release:[[:space:]]*[0-9]+)(%\{\?dist\})/\1.${self_stamp}git${self_sha}\2/" \
+    "$TOPDIR/SPECS/$spec_base"
 fi
 
 # Stage local (non-URL) Source siblings — spectool -g only fetches URL sources,
