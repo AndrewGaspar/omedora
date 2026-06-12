@@ -1,3 +1,11 @@
+# omedora: Fedora dispatches to the theme-system-fedora.sh sibling; the Arch
+# body below is byte-identical to upstream. See omedora/architecture.md
+# §"Omarchy 4 setup-system gating map".
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  source "${BASH_SOURCE[0]%/*}/theme-system-fedora.sh"
+  return 0 2>/dev/null || exit 0
+fi
+
 # Set links for Nautilus action icons
 mkdir -p /usr/share/icons/Yaru/scalable/actions
 ln -snf /usr/share/icons/Adwaita/symbolic/actions/go-previous-symbolic.svg \
