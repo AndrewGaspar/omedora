@@ -41,11 +41,15 @@ mkdir -p "$COPR_DIR/output"
 # remote (these specs ship no .sources pin file). Remote-source specs keep the
 # pin verification untouched. NOTE: archives HEAD — uncommitted payload changes
 # are not picked up (the spec itself IS, since it's staged straight from /copr).
+SELF_STAMP=""
 if grep -qE '^Source0:[[:space:]]*omedora-self\.tar\.gz[[:space:]]*$' "$COPR_DIR/$spec"; then
   self_version=$(grep -E '^Version:' "$COPR_DIR/$spec" | head -n1 | awk '{print $2}')
   echo "==> Self-source spec: git archive HEAD -> omedora-self.tar.gz (prefix omedora-$self_version/)"
   git -C "$REPO" archive --format=tar.gz --prefix="omedora-${self_version}/" \
     -o "$COPR_DIR/omedora-self.tar.gz" HEAD
+  # Release stamp (commit date + sha): keeps every payload rebuild a higher
+  # NEVRA. Mirrors .copr/srpm.sh — keep the two in sync.
+  SELF_STAMP="$(git -C "$REPO" log -1 --format=%cd --date=format:%Y%m%d%H%M HEAD)git$(git -C "$REPO" rev-parse --short=7 HEAD)"
 fi
 
 echo "Building $spec in $IMAGE ..."
@@ -83,6 +87,10 @@ EOF
     # Standard ~/rpmbuild/{SPECS,SOURCES,RPMS,SRPMS,BUILD} tree.
     rpmdev-setuptree
     cp "/copr/'"$spec"'" ~/rpmbuild/SPECS/
+    # Self-source Release stamping (see host-side SELF_STAMP above).
+    if [[ -n "'"$SELF_STAMP"'" ]]; then
+      sed -i -E "s/^(Release:[[:space:]]*[0-9]+)(%\{\?dist\})/\1.'"$SELF_STAMP"'\2/" ~/rpmbuild/SPECS/'"$spec"'
+    fi
 
     # Stage any LOCAL (non-URL) Source files the spec references — e.g.
     # hyprland.spec ships macros.hyprland as a sibling Source. spectool -g only
