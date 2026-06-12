@@ -127,6 +127,12 @@ cp -a shell %{buildroot}%{_datadir}/omarchy/shell
 install -pm644 version %{buildroot}%{_datadir}/omarchy/version
 install -Dpm644 omedora/version %{buildroot}%{_datadir}/omarchy/omedora/version
 
+# omedora helper binaries that live under the payload (not /usr/bin) because
+# they're sourced/copied by install steps via $OMARCHY_PATH, not run as
+# omarchy-* commands. powerprofilesctl-shim: copied to ~/.local/bin by
+# install/user/powerprofilesctl-shim-fedora.sh (tuned-ppd has no CLI).
+install -Dpm755 omedora/bin/powerprofilesctl-shim %{buildroot}%{_datadir}/omarchy/omedora/bin/powerprofilesctl-shim
+
 # /etc/skel: pre-applied user-migration markers (per the map's `version` row).
 # A NEW user starts at the shipped migration level — omarchy-migrate-user
 # treats a missing state file as "pending", and useradd -m copies these
@@ -178,6 +184,8 @@ fi
 %{_datadir}/omarchy/version
 %dir %{_datadir}/omarchy/omedora
 %{_datadir}/omarchy/omedora/version
+%dir %{_datadir}/omarchy/omedora/bin
+%{_datadir}/omarchy/omedora/bin/powerprofilesctl-shim
 # Pre-applied user-migration markers for new users.
 /etc/skel/.local/
 
