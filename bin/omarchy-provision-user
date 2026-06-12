@@ -108,8 +108,16 @@ done
 source "$OMARCHY_INSTALL/user/all.sh"
 
 omarchy-refresh-applications
-env -u BROWSER xdg-settings set default-web-browser chromium.desktop
-xdg-mime default HEY.desktop x-scheme-handler/mailto
+# Fedora coexistence: claim the default browser / mailto handler only when the
+# user has none set (an existing installed default is respected) — see
+# install/user/default-apps-fedora.sh. The Arch branch is byte-identical to
+# upstream. Documented in omedora/architecture.md.
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  source "$OMARCHY_INSTALL/user/default-apps-fedora.sh"
+else
+  env -u BROWSER xdg-settings set default-web-browser chromium.desktop
+  xdg-mime default HEY.desktop x-scheme-handler/mailto
+fi
 
 if (( first_install )); then
   mkdir -p "$state_dir/migrations"
