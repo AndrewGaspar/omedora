@@ -14,12 +14,16 @@ echo -e "\n\e[32mOmedora: installing the omedora packages\e[0m"
 sudo dnf install -y omedora
 
 # Resolve the base set through the package map. pkg.py batches all dnf names
-# into a single transaction and verifies each installed afterwards.
+# into a single transaction and verifies each installed afterwards. The
+# Fedora desktop baseline (omedora/install/fedora-baseline.packages — runtime
+# Arch gets transitively but Fedora doesn't guarantee) rides the same
+# transaction.
 base_pkgs=()
 while IFS= read -r line; do
   line="${line%%#*}"; line="${line//[[:space:]]/}"
   [[ -n $line ]] && base_pkgs+=("$line")
-done <"$OMEDORA_REPO_ROOT/install/omarchy-base.packages"
+done < <(cat "$OMEDORA_REPO_ROOT/install/omarchy-base.packages" \
+             "$OMEDORA_REPO_ROOT/omedora/install/fedora-baseline.packages")
 
 echo -e "\e[32mOmedora: installing the base package set (${#base_pkgs[@]} packages before mapping)\e[0m"
 python3 "$OMEDORA_REPO_ROOT/bin/fedora/pkg.py" add "${base_pkgs[@]}"
