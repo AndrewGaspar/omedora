@@ -2,51 +2,79 @@
 
 # Omedora Fedora bootstrap — the curl-able installer entry point.
 #
-#   curl -fsSL https://omedora.org/boot.sh | bash      # (or the raw GitHub URL)
+#   curl -fsSL https://raw.githubusercontent.com/AndrewGaspar/omedora/omarchy-4-omedora/omedora/boot.sh | bash
 #
-# This is the Fedora counterpart of the Arch-only top-level boot.sh (which is
-# pacman/mirror based and left byte-identical to upstream). It installs the
-# bootstrap prerequisites with dnf, clones omedora into the path the installer
-# hardcodes (~/.local/share/omarchy), and runs install.sh.
+# Omarchy 4 ships as packages (the omedora/omedora-settings RPMs from the
+# omedora COPR own /usr/share/omarchy and /usr/bin/omarchy-*), so this
+# bootstrap does NOT install omedora into ~/.local/share. It clones the repo
+# shallowly into a cache dir ONLY to get the plan gate + installer scripts —
+# the plan gate must run and get your consent BEFORE any package lands — then
+# hands off to omedora/install-4.sh, after which the installed
+# /usr/share/omarchy payload takes over.
 #
-# CHANNELS (set OMEDORA_REF):
-#   stable  (default)  the repository's DEFAULT branch — the maintainer keeps
-#                      that pointed at the current stable release line, and
-#                      `omedora-release` cuts annotated vX.Y.Z tags on it, so a
-#                      fresh install lands on stable and update detection
-#                      (omarchy-update-available) compares those tags.
-#   dev                the dev branch (latest, unstable).
-#   rc                 the rc branch (release candidates), if present.
-#   <branch|tag>       any explicit git ref.
-#
-# The omedora COPR that serves the RPMs is resolved later by bin/omedora-copr
-# (version-scoped per Omarchy base) — nothing version-specific is hard-coded here.
+# CHANNELS (set OMEDORA_REF): a branch or tag; default omarchy-4-omedora.
 
-set -e
+set -eEo pipefail
 
-REPO="${OMEDORA_REPO:-AndrewGaspar/omedora}"
-REF="${OMEDORA_REF:-stable}"
-DEST="$HOME/.local/share/omarchy"
+export OMARCHY_BRAND="${OMARCHY_BRAND:-omedora}"
+OMEDORA_REPO="${OMEDORA_REPO:-AndrewGaspar/omedora}"
+OMEDORA_REF="${OMEDORA_REF:-omarchy-4-omedora}"
 
-echo -e "\n\e[32mOmedora bootstrap\e[0m (repo: $REPO, channel: $REF)\n"
+# Omedora wordmark — byte-for-byte copy of omedora/branding/logo.txt, inlined
+# because the banner prints before the repo is cloned.
+ANSI_ART_OMEDORA='                 ▄▄▄
+ ▄█████▄    ▄███████████▄    ▄███████  ████████▄   ▄█████▄    ▄███████   ▄███████
+███   ███  ███   ███   ███  ███        ███   ███  ███   ███  ███   ███  ███   ███
+███   ███  ███   ███   ███  ███        ███   ███  ███   ███  ███   ███  ███   ███
+███   ███  ███   ███   ███  ▄███▄▄▄    ███   ███  ███   ███  ███▄▄▄██▀ ▄███▄▄▄███
+███   ███  ███   ███   ███  ▀███▀▀▀    ███   ███  ███   ███  ███▀▀▀▀   ▀███▀▀▀███
+███   ███  ███   ███   ███  ███        ███   ███  ███   ███  █████████  ███   ███
+███   ███  ███   ███   ███  ███        ███   ███  ███   ███  ███   ███  ███   ███
+ ▀█████▀    ▀█   ███   █▀    ████████  ████████▀   ▀█████▀   ███   ███  ███   █▀
+                                                             ███   █▀'
 
-if [[ ! -r /etc/os-release ]] || ! grep -q '^ID=fedora' /etc/os-release; then
-  echo -e "\e[31mThis bootstrap is for Fedora. On Arch, use the top-level boot.sh.\e[0m" >&2
+echo -e "\n\e[32m${ANSI_ART_OMEDORA}\e[0m"
+echo -e "\nOmedora bootstrap (repo: $OMEDORA_REPO, ref: $OMEDORA_REF)\n"
+
+# --- guards (ported from 3.8.2 guard.sh's Fedora arm) -------------------------
+if (( EUID == 0 )); then
+  echo -e "\e[31mOmedora install must run as a regular user (not root)\e[0m" >&2
   exit 1
 fi
+if [[ ! -r /etc/os-release ]] || ! grep -q '^ID=fedora' /etc/os-release; then
+  echo -e "\e[31mThis bootstrap is for Fedora. On Arch, use Omarchy's ISO.\e[0m" >&2
+  exit 1
+fi
+if [[ $(uname -m) != "x86_64" ]]; then
+  echo -e "\e[31mOmedora install requires x86_64 (got $(uname -m))\e[0m" >&2
+  exit 1
+fi
+if ! command -v sudo >/dev/null 2>&1; then
+  echo -e "\e[31mOmedora install requires sudo\e[0m" >&2
+  exit 1
+fi
+if ! sudo -v; then
+  echo -e "\e[31mOmedora install requires working sudo for this user\e[0m" >&2
+  exit 1
+fi
+echo "Fedora guards: OK"
 
-# Bootstrap prerequisites: git to clone, gum for the installer's styled prompts,
-# dnf-plugins-core for `dnf copr` (the preflight enables the omedora COPR).
-sudo dnf install -y git gum dnf-plugins-core
-
-rm -rf "$DEST"
-if [[ $REF == "stable" ]]; then
-  echo -e "Cloning omedora (stable = default branch) ...\n"
-  git clone "https://github.com/${REPO}.git" "$DEST" >/dev/null
-else
-  echo -e "Cloning omedora ($REF) ...\n"
-  git clone --branch "$REF" "https://github.com/${REPO}.git" "$DEST" >/dev/null
+# --- get the installer (local checkout, or a shallow clone to a cache dir) ----
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
+if [[ -n $SCRIPT_DIR && -f "$SCRIPT_DIR/install-4.sh" && -d "$SCRIPT_DIR/../bin" ]]; then
+  # Running from a checkout (dev / re-run): use it directly.
+  exec bash "$SCRIPT_DIR/install-4.sh"
 fi
 
-echo -e "\nInstallation starting...\n"
-bash "$DEST/install.sh"
+# Bootstrap prerequisites: git to clone; gum is optional (the plan gate falls
+# back to a plain read prompt when it's absent).
+command -v git >/dev/null 2>&1 || sudo dnf install -y git
+
+CLONE_DIR="${OMEDORA_BOOT_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/omedora/bootstrap}"
+rm -rf "$CLONE_DIR"
+mkdir -p "$(dirname "$CLONE_DIR")"
+echo -e "Cloning omedora ($OMEDORA_REF) ...\n"
+git clone --depth 1 --branch "$OMEDORA_REF" \
+  "https://github.com/${OMEDORA_REPO}.git" "$CLONE_DIR"
+
+exec bash "$CLONE_DIR/omedora/install-4.sh"
