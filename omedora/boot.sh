@@ -53,7 +53,8 @@ if ! command -v sudo >/dev/null 2>&1; then
   echo -e "\e[31mOmedora install requires sudo\e[0m" >&2
   exit 1
 fi
-if ! sudo -v; then
+# tty-aware sudo probe (see omedora/install-4.sh sudo_ok for rationale)
+if ! { if [[ -t 0 ]]; then sudo -v; else sudo -n true; fi; }; then
   echo -e "\e[31mOmedora install requires working sudo for this user\e[0m" >&2
   exit 1
 fi
