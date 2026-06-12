@@ -122,6 +122,9 @@ omarchy-refresh-applications
 # upstream. Documented in omedora/architecture.md.
 if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
   source "$OMARCHY_INSTALL/user/default-apps-fedora.sh"
+  # tuned-ppd has the PowerProfiles D-Bus API but not the powerprofilesctl CLI
+  # omarchy shells out to; install omedora's shim into ~/.local/bin only-if-absent.
+  source "$OMARCHY_INSTALL/user/powerprofilesctl-shim-fedora.sh"
 else
   env -u BROWSER xdg-settings set default-web-browser chromium.desktop
   xdg-mime default HEY.desktop x-scheme-handler/mailto
