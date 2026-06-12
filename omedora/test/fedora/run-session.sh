@@ -1,11 +1,13 @@
 #!/bin/bash
 #
-# Host-side runner for the L4-nested Omedora session — systemd edition.
+# Host-side runner for the L4-nested Omedora v4 session — systemd edition.
 #
-# Boots the committed session image (omedora-test:fedora44-session)
+# Boots the committed v4 session image (omedora-test:fedora44-session-4)
 # under podman with real PID-1 systemd, waits for systemd-logind + the omedora
 # user manager, then logs in as omedora via `machinectl shell` and launches the
-# session.
+# session: Hyprland 0.55 with the Lua config, whose autostart starts the
+# Quickshell shell (`quickshell -n -p $OMARCHY_PATH/shell`) — the v4 desktop
+# (bar/launcher/notifications/OSD in one process).
 #
 # Two nesting modes:
 #   (default) HOST-NESTED — Hyprland nests into the developer's *host*
@@ -20,6 +22,9 @@
 #   omedora/test/fedora/run-session.sh             # host-nested (needs a Wayland desktop)
 #   omedora/test/fedora/run-session.sh --headless  # self-contained headless session
 #   omedora/test/fedora/run-session.sh --rebuild   # rebuild the session image first
+#   omedora/test/fedora/run-session.sh --local-repo  # use the "-local" image lineage (built from
+#                                            #   the locally-built RPM repo, not the live COPR;
+#                                            #   see build-session.sh --local-repo)
 #   omedora/test/fedora/run-session.sh --shell     # boot, then machinectl shell (no compositor)
 #   omedora/test/fedora/run-session.sh --keep      # don't remove the container on exit
 #   omedora/test/fedora/run-session.sh --workstation           # run on a Fedora Workstation base
@@ -47,7 +52,7 @@ LAUNCH_DIR_IN_IMAGE=/home/omedora/.local/share/omarchy/omedora/test/fedora/omedo
 LAUNCH_IN_IMAGE="$LAUNCH_DIR_IN_IMAGE/session-launch.sh"
 LAUNCH_HEADLESS_IN_IMAGE="$LAUNCH_DIR_IN_IMAGE/session-launch-headless.sh"
 
-rebuild=false; shell_only=false; keep=false; headless=false; workstation=false; gnome=false
+rebuild=false; shell_only=false; keep=false; headless=false; workstation=false; gnome=false; local_repo=false
 for arg in "$@"; do
   case "$arg" in
     --rebuild)     rebuild=true ;;
@@ -55,6 +60,7 @@ for arg in "$@"; do
     --keep)        keep=true ;;
     --headless)    headless=true ;;
     --workstation) workstation=true ;;
+    --local-repo)  local_repo=true ;;
     # --gnome nests GNOME instead of Hyprland to show the GNOME fallback on the
     # Workstation base. The nested-GNOME path lives in the headless launcher and
     # needs gnome-shell (Workstation image), so it implies --workstation + --headless.
@@ -64,11 +70,12 @@ for arg in "$@"; do
   esac
 done
 
-# Resolve image + container names (after parsing, so --workstation applies). An
-# explicit OMEDORA_SYSTEMD_SESSION_IMAGE / OMEDORA_SESSION_CTR still wins.
+# Resolve image + container names (after parsing, so --workstation/--local-repo
+# apply). An explicit OMEDORA_SYSTEMD_SESSION_IMAGE / OMEDORA_SESSION_CTR still wins.
 variant=""; $workstation && variant="-workstation"
-SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session${variant}}"
-RUN_CTR="${OMEDORA_SESSION_CTR:-omedora-session${variant}}"
+local_variant=""; $local_repo && local_variant="-local"
+SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session-4${variant}${local_variant}}"
+RUN_CTR="${OMEDORA_SESSION_CTR:-omedora-session-4${variant}${local_variant}}"
 
 # --- preconditions -----------------------------------------------------------
 if ! $headless; then
@@ -80,8 +87,9 @@ fi
 
 # --- build the session image if needed ---------------------------------------
 if $rebuild || ! podman image exists "$SESSION_IMAGE"; then
-  echo "Building session image (this runs install.sh inside a systemd container)..."
+  echo "Building session image (this runs the v4 bootstrap inside a systemd container)..."
   build_flags=(); $rebuild && build_flags+=(--rebuild); $workstation && build_flags+=(--workstation)
+  $local_repo && build_flags+=(--local-repo)
   "$REPO/omedora/test/fedora/build-session.sh" "${build_flags[@]}"
 fi
 
@@ -105,7 +113,8 @@ podman rm -f "$RUN_CTR" >/dev/null 2>&1 || true
 run_args=(
   -d --name "$RUN_CTR" --systemd=always
   # GPU: the render node is world-rw, so no group juggling. /dev/rfkill keeps
-  # waybar's rfkill module quiet. Whole /dev/dri so Mesa can pick a device.
+  # rfkill consumers (the shell's network widget) quiet. Whole /dev/dri so
+  # Mesa can pick a device.
   --device /dev/dri
 )
 if ! $headless; then
