@@ -23,6 +23,12 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        # Full history + tags: the byte-identity audit diffs every modified
+        # upstream file against the omarchy-4 pin TAG, which isn't reachable
+        # from a shallow (depth-1) checkout. Other L1 tests don't need this, but
+        # it's cheap for this repo and keeps the audit a real gate (not a SKIP).
+        with:
+          fetch-depth: 0
 
       - name: Install prereqs
         run: |
@@ -61,6 +67,9 @@ jobs:
 
       - name: Run upgrade-to-4 test
         run: bash test/upgrade-to-4-test.sh
+
+      - name: Run byte-identity audit (upstream files are additive-only)
+        run: bash test/byte-identity-test.sh
 
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
