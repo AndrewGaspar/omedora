@@ -176,6 +176,7 @@ package_path="$payload/bin:/usr/local/bin:/usr/bin:/bin:$HOME/.local/bin"
 
 v4_kept_packages=(
   omedora omedora-settings
+  quickshell
   omedora-nerd-fonts python3-terminaltexteffects
   lazygit lazydocker mise starship usage satty
   hyprland-preview-share-picker
