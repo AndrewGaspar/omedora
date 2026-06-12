@@ -51,11 +51,9 @@ SPECS=(
   # uwsm (the session manager omedora launches through) was ALSO provided by
   # the dropped lionheartp/Hyprland COPR, not Fedora — so it's vendored too.
   uwsm.spec
-  # omedora's own wayland-session entry (noarch). Runtime-Requires
-  # hyprland-no-session + uwsm (both built above); no build-time deps. Ships
-  # /usr/share/wayland-sessions/omedora.desktop (was a Fedora-gated sudo-cp).
-  # TODO(P3): likely superseded by omedora-settings' wayland-session payload.
-  hyprland-omedora.spec
+  # hyprland-omedora (the 3.8.2-era session-entry shim) is RETIRED on the 4.x
+  # line: omedora-settings ships the omedora.desktop session entry and
+  # Obsoletes it. The published 1.0.0 stays on the COPR for upgrade paths.
   # claude-code.spec is intentionally NOT built here — parked pending a
   # redistribution-licensing decision before any public COPR (proprietary binary).
   # omedora's two core packages, built from THIS repo via build-local.sh's

@@ -21,7 +21,7 @@ Name:           omedora
 # Version is normally read from the repo's omedora/version file; hardcoded here
 # for now — a follow-up wires .copr/srpm.sh to substitute it at SRPM-gen time.
 Version:        0.2.0~alpha.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Omedora runtime: omarchy commands, installer, migrations, themes, Quickshell desktop
 
 License:        MIT
@@ -60,7 +60,7 @@ Requires:       bash
 Requires:       jq
 Requires:       gum
 Requires:       python3
-Requires:       hyprland
+Requires:       hyprland-no-session
 Requires:       uwsm
 Requires:       quickshell
 Requires:       foot
