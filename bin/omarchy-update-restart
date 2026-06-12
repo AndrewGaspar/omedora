@@ -11,8 +11,16 @@ confirm_reboot() {
 running_kernel=$(uname -r)
 kernel_updated=true
 
+# Fedora dispatch for the package-ownership probe only — rpm owns kernels
+# there. The loop below is unchanged; the Arch definition is the upstream
+# pacman call verbatim. See omedora/architecture.md §3.
+pkg_owns_file() { pacman -Qo "$1" &>/dev/null; }
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  pkg_owns_file() { rpm -qf "$1" &>/dev/null; }
+fi
+
 for kernel in /usr/lib/modules/*/vmlinuz; do
-  if [[ -f $kernel ]] && pacman -Qo "$kernel" &>/dev/null; then
+  if [[ -f $kernel ]] && pkg_owns_file "$kernel"; then
     installed_kernel=$(basename "$(dirname "$kernel")")
 
     if [[ $installed_kernel == $running_kernel ]]; then

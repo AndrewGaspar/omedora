@@ -3,6 +3,13 @@
 # omarchy:summary=Review and optionally remove orphaned system packages after updates
 # omarchy:requires-sudo=true
 
+# Fedora dispatch — deliberately a no-op: dnf autoremove is too aggressive for
+# an overlay on the user's own Fedora install (it reasons about packages
+# omedora never touched). See omedora/architecture.md §3. Arch path unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora) exit 0 ;;
+esac
+
 set -e
 
 mapfile -t orphans < <(pacman -Qtdq 2>/dev/null || true)
