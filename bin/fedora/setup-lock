@@ -1,0 +1,75 @@
+#!/bin/bash
+#
+# Fedora sibling of bin/omarchy-setup-lock (exec'd by its distro dispatch).
+#
+# Writes the same NEW, omarchy-namespaced PAM services the Quickshell lock
+# screen authenticates against (/etc/pam.d/omarchy-lock-password and, when a
+# fingerprint is enrolled, omarchy-lock-fingerprint) — but built on Fedora's
+# PAM stack: `include system-auth` instead of Arch's hand-rolled faillock
+# lines + `system-local-login` (which doesn't exist on Fedora and would break
+# the whole stack). Fedora's authselect-managed system-auth already provides
+# faillock with the distro's limits, so lockout policy stays Fedora's.
+#
+# Coexistence: these are ADDITIVE files under omarchy-* names. No existing
+# Fedora PAM file is ever modified (that whole class is on omedora's
+# never-touch list). Disclosed at the install plan gate.
+#
+# TODO(P4-review): confirm the never-touch "pam.d" rule is intended to mean
+# "never modify Fedora-owned pam.d files" (this script's reading) rather than
+# "never create any file under /etc/pam.d" — without omarchy-lock-password the
+# lock screen refuses to lock (shell/plugins/lock reports missing-pam).
+
+set -e
+
+target_user=${OMARCHY_INSTALL_USER:-${SUDO_USER:-}}
+if [[ -z $target_user && -n ${PKEXEC_UID:-} ]]; then
+  target_user=$(getent passwd "$PKEXEC_UID" | cut -d: -f1)
+fi
+target_user=${target_user:-$USER}
+
+as_root() {
+  if (( EUID == 0 )); then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
+tee_root() {
+  local path="$1"
+
+  if (( EUID == 0 )); then
+    tee "$path"
+  else
+    sudo tee "$path"
+  fi
+}
+
+echo "Configuring lock screen password authentication (Fedora PAM stack)..."
+
+tee_root /etc/pam.d/omarchy-lock-password >/dev/null <<'EOF'
+#%PAM-1.0
+# Omedora lock screen (Quickshell) password auth — additive, omarchy-namespaced.
+# Delegates to Fedora's authselect-managed stack (incl. its faillock policy).
+auth       include      system-auth
+account    include      system-auth
+EOF
+
+if omarchy-cmd-present fprintd-list && fprintd-list "$target_user" 2>/dev/null | grep -qi finger; then
+  echo "Configuring lock screen fingerprint authentication..."
+  tee_root /etc/pam.d/omarchy-lock-fingerprint >/dev/null <<'EOF'
+#%PAM-1.0
+# Omedora lock screen (Quickshell) fingerprint auth — additive, omarchy-namespaced.
+auth       required     pam_fprintd.so
+account    include      system-auth
+EOF
+else
+  as_root rm -f /etc/pam.d/omarchy-lock-fingerprint
+fi
+
+# omarchy-shell can't reach a running shell during a TTY install. The echo is
+# just confirmation, so swallow the failure rather than letting it become the
+# script's exit code.
+if omarchy-shell lock status >/dev/null 2>&1; then
+  echo "Lock screen authentication configured."
+fi

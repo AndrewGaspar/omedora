@@ -1,3 +1,12 @@
+# omedora: Fedora dispatches to the enable-services-fedora.sh sibling (only
+# enables what omedora installed and what isn't already on; never touches the
+# display manager or power daemon). The Arch body below is byte-identical to
+# upstream. See omedora/architecture.md §"Omarchy 4 setup-system gating map".
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  source "${BASH_SOURCE[0]%/*}/enable-services-fedora.sh"
+  return 0 2>/dev/null || exit 0
+fi
+
 # Enable services only. Installs are followed by reboot, so don't start/reload
 # daemons mid-install. UFW and hardware-gated services stay in their own scripts.
 systemctl enable cups.service
