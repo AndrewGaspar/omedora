@@ -16,10 +16,11 @@ name: COPR build
 
 on:
   push:
-    # TODO(P2): flip to [omarchy-4-omedora] once the agaspar/omedora-4 COPR
-    # project exists — until then this trigger is intentionally inert on this
-    # branch (bin/omedora-copr would route submissions to a missing project).
-    branches: [3.8.2-omedora]
+    # bin/omedora-copr derives agaspar/omedora-4 from this branch's version
+    # file, so spec pushes here submit to the omedora-4 project (live since
+    # 2026-06-11). version/omedora-version paths rebuild the self-sourced
+    # omedora/omedora-settings packages on release bumps.
+    branches: [omarchy-4-omedora]
     paths:
       - 'omedora/packaging/copr/**.spec'
       - 'omedora/packaging/copr/**.sources'
