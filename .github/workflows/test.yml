@@ -56,6 +56,9 @@ jobs:
       - name: Run finalize-defaults test
         run: bash test/finalize-defaults-test.sh
 
+      - name: Run update-flow test
+        run: bash test/update-flow-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 

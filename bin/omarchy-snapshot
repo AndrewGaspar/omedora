@@ -4,6 +4,22 @@
 # omarchy:args=<create|restore>
 # omarchy:requires-sudo=true
 
+# Fedora dispatch — snapper/limine never ship on Fedora; omedora-snapshot is
+# the raw-btrfs counterpart (same exit-127 "unavailable" contract, which
+# omarchy-update ignores). See omedora/architecture.md §3. Arch path unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora)
+    case "${1:-}" in
+      create) exec omedora-snapshot create "pre-update" ;;
+      restore)
+        echo "On Fedora use: omedora snapshot list / omedora snapshot rollback <name>" >&2
+        exit 1
+        ;;
+      *) echo "Usage: omarchy-snapshot <create|restore>" >&2; exit 1 ;;
+    esac
+    ;;
+esac
+
 set -e
 
 COMMAND="$1"

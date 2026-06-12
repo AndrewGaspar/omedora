@@ -66,6 +66,9 @@ if [[ $mode == "pending" ]]; then
 fi
 
 wait_for_pacman_transaction() {
+  # Fedora: no pacman database lock exists; dnf serializes its own
+  # transactions. See omedora/architecture.md §3. Arch path below unchanged.
+  [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]] && return 0
   local lock_file=/var/lib/pacman/db.lck
 
   [[ -e $lock_file ]] || return 0
