@@ -626,3 +626,64 @@ When you start a rebase or a new patch:
 3. The map is the contract. If reality drifts from it, fix one or the other — don't let them diverge silently.
 
 This is the canonical document the rebase workflow ([`rebase-workflow.md`](rebase-workflow.md)) checks against.
+
+---
+
+## 16. Omarchy 4 setup-system gating map
+
+The Omarchy 4 base replaced `install.sh` with package-backed setup entry
+points (`omarchy-setup-system` → config/hardware/login/post-install scripts,
+`omarchy-finalize-user` → `install/user/**`, `omarchy-first-run` →
+`install/user/first-run/**`). This table records the explicit per-file Fedora
+decision for every script those entry points run. Patch types are the same as
+[§15](#15-patch-stack-map); every "Dispatch"/"Gate" is a top-of-file block and
+the Arch body below it stays byte-identical to upstream.
+
+The Fedora install flow that drives these is omedora-owned and zero-risk:
+`omedora/boot.sh` (bootstrap: banner → guards → shallow clone → hand-off) →
+`omedora/install-4.sh` → `omedora/install/{plan,snapshot,repos,packages,
+system,adopt,finalize,first-run}.sh`. The plan gate runs from the clone BEFORE
+any package lands; after `dnf install omedora` the installed
+`/usr/share/omarchy` payload takes over (`OMEDORA_SETUP_FROM_REPO=1` is the
+dev/test seam that keeps running from the checkout).
+
+### `omarchy-setup-system` (root)
+
+| File | Decision | Why |
+| --- | --- | --- |
+| `install/config/theme-system.sh` | Dispatch → `theme-system-fedora.sh` | Fedora keeps the chromium theme-follow policy dir (user-owned `755`, not `a+rw`); no Yaru symlink surgery (another package's tree); no `/usr/lib/chromium/initial_preferences` (Arch chromium path — TODO(P4-review): seed Fedora's `/usr/lib64/chromium-browser` equivalent?) |
+| `install/config/increase-lockout-limit.sh` | Arch-only gate | `/etc/pam.d/system-auth` is authselect-managed on Fedora and on the never-touch list; `sddm-autologin` doesn't exist. Fedora's faillock policy stays |
+| `install/config/lockscreen-pam.sh` | Unchanged | It only runs `omarchy-setup-lock`, which carries the distro dispatch |
+| `bin/omarchy-setup-lock` | Dispatch → `bin/fedora/setup-lock` | Same NEW omarchy-namespaced PAM services (`omarchy-lock-{password,fingerprint}`) but on `include system-auth` (Arch's `system-local-login` doesn't exist on Fedora). No Fedora-owned PAM file is ever modified. Without these the Quickshell lock refuses to lock (`missing-pam`) |
+| `install/config/fix-powerprofilesctl-shebang.sh` | Unchanged | Self-guarding: no-op when `/usr/bin/powerprofilesctl` is absent (tuned-ppd boxes); the sed is harmless when present |
+| `install/config/docker.sh` | Dispatch → `docker-fedora.sh` | Mirrors the docker group add; additionally applies `/etc/docker/daemon.json` from the `etc-overrides` reference copy ONLY IF ABSENT (the RPM deliberately doesn't package it) |
+| `install/config/enable-services.sh` | Dispatch → `enable-services-fedora.sh` | Enables only units that exist and aren't already enabled (cups, cups-browsed, avahi, docker.socket). Never: sddm (GDM stays), power-profiles-daemon (tuned-ppd), NetworkManager/systemd-resolved (Fedora already runs its network stack), linux-modules-cleanup (Arch artifact) |
+| `install/config/firewall.sh` | Dispatch → `firewall-fedora.sh` | firewalld mirror of upstream's ufw RULES (LocalSend 53317/tcp+udp, docker-DNS rich rules). NOT mirrored: "default deny incoming" (the user's zone policy) and ufw-docker (firewalld≥0.9 + moby integrate natively) |
+| `install/hardware/all.sh` | Stage dispatch → `all-fedora.sh` | Fedora runs the portable subset only: `input-group.sh`, `fix-synaptic-touchpad.sh`, `framework/qmk-hid.sh`. Excluded with reasons in the file: DKMS/firmware/kernel scripts (nvidia, bcm43xx, tuxedo, yt6801, apple/*, surface — RPM Fusion akmods / t2linux are the Fedora paths), limine-cmdline writers (intel/fred, intel/ptl-kernel, asus/fix-asus-ptl-*), pacman.sh, skip-mapped pkg installers (asus-rog, framework16, dell-xps-haptics, vulkan), host-policy mutations (network.sh, bluetooth.sh AutoEnable, set-wireless-regdom, un-namespaced modprobe.d writers fix-fkeys/yoga-bass/wifi7-eht, apple/fix-suspend-nvme) |
+| `install/login/sddm.sh` | Arch-only gate | GDM stays; `/etc/pam.d/sddm` is never-touch |
+| `install/post-install/pacman.sh` | Arch-only gate | pacman.conf/mirrorlist + the cups pacnew dance; `cups-browsed.conf` is never-touch on Fedora |
+| `install/post-install/udev.sh` | Unchanged | `udevadm reload/trigger` is portable and already `|| true` |
+| `install/post-install/localdb.sh` | Unchanged | Guarded by `omarchy-cmd-present updatedb` |
+
+### `omarchy-finalize-user` (user)
+
+| File | Decision | Why |
+| --- | --- | --- |
+| `bin/omarchy-finalize-user` | Fedora branch around the browser/mailto claims | Only-if-unset via `install/user/default-apps-fedora.sh` (3.8.2 mimetypes.sh pattern: `desktop_id_is_installed` + `xdg-settings get` / `xdg-mime query default`); Arch branch byte-identical |
+| `install/user/theme.sh` | Unchanged | `--first-install` selects the headless theme-set path; portable |
+| `install/user/git.sh` | Unchanged | Already guarded on OMARCHY_USER_NAME/EMAIL |
+| `install/user/xcompose.sh` | Fedora gate (backup-then-write) | Backs up an existing, differing `~/.XCompose` to `.pre-omedora-<ts>` first (3.8.2 gate ported); Arch path byte-identical |
+| `install/user/mise-work.sh` | Dispatch → `mise-work-fedora.sh` | The iso-chroot branch hard-requires the Arch ISO's `/opt/packages` Node bundle; the sibling always uses `mise use -g node@latest`, best-effort |
+| `install/user/hardware/*` | Unchanged | Hardware-gated user-space tweaks (wireplumber/amixer/pactl); no-ops elsewhere |
+| `install/user/default-keyring.sh` | Unchanged | Only writes when absent |
+| `install/user/mise.sh` | Unchanged | `omarchy-mise-install` just writes `~/.local/bin` wrappers (no downloads at install time) |
+
+### `omarchy-first-run` (user, autostarted at first session)
+
+| File | Decision | Why |
+| --- | --- | --- |
+| `bin/omarchy-first-run` | Fedora condition around the Voxtype hook | voxtype-bin is skip-mapped (no Fedora build); the hook is only installed when `voxtype` is available. Arch branch byte-identical |
+| `install/user/first-run/enable-user-units.sh` | Unchanged | The shipped user units come from the omedora-settings RPM; `systemctl --user` failures are tolerated by `run_first_run_step` (first-run retries next login) |
+| `install/user/first-run/gnome-theme.sh` | Arch-only gate | Same decision as 3.8.2: the theme system (`omarchy-theme-set-gnome`) owns GNOME appearance on Fedora; fixed dark hardcodes would clobber a coexisting GNOME setup |
+| `install/user/first-run/gtk-primary-paste.sh` | Unchanged | A behavioral (not appearance) setting upstream relies on; runs on both |
+| `install/user/first-run/welcome.sh`, `wifi.sh` | Unchanged | Pure notification UX; degrade silently without a notification server |
