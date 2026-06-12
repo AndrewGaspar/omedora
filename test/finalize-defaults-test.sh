@@ -163,6 +163,10 @@ FIXTURE="$TMP/install"
 mkdir -p "$FIXTURE/user"
 printf '# stub: no user-stage side effects in this test\n' >"$FIXTURE/user/all.sh"
 cp "$POLICY" "$FIXTURE/user/default-apps-fedora.sh"
+# finalize-user's Fedora block also sources the powerprofilesctl shim step;
+# the real script no-ops cleanly here (OMARCHY_PATH has no shim source), but
+# it must EXIST to be sourced.
+cp "$ROOT/install/user/powerprofilesctl-shim-fedora.sh" "$FIXTURE/user/powerprofilesctl-shim-fedora.sh"
 
 run_finalize() {  # $1 distro  $2 browser-get-out  $3 mailto-query-out
   : >"$MOCK_LOG"
