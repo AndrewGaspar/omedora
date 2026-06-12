@@ -17,9 +17,10 @@
 #   #!/bin/bash
 #   source "$(dirname -- "${BASH_SOURCE[0]}")/../lib.sh"
 #   headless_session_env
-#   # ... drive the session (hyprctl dispatch exec ...), then assert:
-#   wait_for_layer walker 5
-#   assert_layer walker "omarchy-menu renders a walker surface"
+#   # ... drive the session (omarchy-shell shell toggle ... / hyprctl dispatch),
+#   # then assert:
+#   wait_for_layer omarchy-launcher 5
+#   assert_layer omarchy-launcher "launcher renders a layer surface"
 # Each assertion emits a TAP line via pass/fail. A failure auto-screenshots +
 # dumps state to $ARTIFACTS and exits non-zero (helpers.sh `fail` does the exit),
 # so the orchestrator sees a non-zero exit and copies artifacts out.
@@ -51,14 +52,19 @@ TEST_NAME="${TEST_NAME:-$(basename -- "${0%.sh}")}"
 # Attach this shell to the running nested Hyprland session:
 #   - HYPRLAND_INSTANCE_SIGNATURE from $XDG_RUNTIME_DIR/hypr (the live instance)
 #   - WAYLAND_DISPLAY from `hyprctl instances` (the nested compositor socket)
-#   - source ~/.config/uwsm/env so omarchy-* / walker / grim are on PATH
+#   - OMARCHY_PATH via the packaged env bootstrap (omarchy-shell needs it to
+#     locate the running quickshell instance; the omarchy-* bins themselves are
+#     in /usr/bin via the omedora RPM on the v4 line)
 # Idempotent: safe to call once per test.
 headless_session_env() {
   : "${XDG_RUNTIME_DIR:?need XDG_RUNTIME_DIR (run via machinectl shell as omedora)}"
 
-  # PATH + session env (omarchy bin dir, GSK_RENDERER, etc.). uwsm/env is what
-  # the session launcher sourced; sourcing it here gives the test the same PATH.
-  [[ -f "$HOME/.config/uwsm/env" ]] && source "$HOME/.config/uwsm/env"
+  # OMARCHY_PATH (+ dev-link PATH adjustments). machinectl shell's `bash -c`
+  # doesn't read /etc/profile.d, so pull the same single source of truth in
+  # directly (what /etc/profile.d/omarchy.sh and uwsm's env.d both source).
+  [[ -r /usr/share/omarchy/default/bash/env-bootstrap ]] &&
+    source /usr/share/omarchy/default/bash/env-bootstrap
+  export OMARCHY_PATH="${OMARCHY_PATH:-/usr/share/omarchy}"
   export GSK_RENDERER="${GSK_RENDERER:-cairo}"
 
   local sig
@@ -92,8 +98,8 @@ screenshot() {
 # llvmpipe (software). In practice two captures of the same good session are
 # byte-identical here, but we still diff with a fuzz + a percentage threshold
 # so trivial AA / theme-noise never flakes the gate. The signal we actually
-# want is coarse: "are the big static structures (the waybar band, the
-# wallpaper) actually DRAWN?" — a missing waybar or a black/fallback wallpaper
+# want is coarse: "are the big static structures (the shell's bar band, the
+# wallpaper) actually DRAWN?" — a missing bar or a black/fallback wallpaper
 # moves the differing-pixel fraction from ~0% to tens of percent, far above any
 # sane threshold.
 #
@@ -230,6 +236,48 @@ wait_for_layer() {
     sleep 0.2
   done
   return 1
+}
+
+# wait_for_layer_gone <ns> <timeout-seconds> — inverse of wait_for_layer: poll
+# until the layer-surface namespace disappears. Returns 0 once gone, 1 on
+# timeout. Emits no TAP line.
+wait_for_layer_gone() {
+  local ns="$1"; local timeout="${2:-5}"
+  local deadline=$(( $(date +%s) + timeout ))
+  while (( $(date +%s) < deadline )); do
+    hyprctl layers -j 2>/dev/null | grep -q "\"namespace\": \"$ns\"" || return 0
+    sleep 0.2
+  done
+  return 1
+}
+
+# --- omarchy-shell (Quickshell) IPC helpers ------------------------------------
+# The v4 desktop is ONE long-running quickshell process hosting the bar,
+# launcher, menu, notifications and OSD as plugins; `omarchy-shell <target>
+# <method> ...` is the canonical IPC into it (docs/omarchy-shell.md).
+
+# wait_for_shell_ping <timeout-seconds> — poll until `omarchy-shell shell ping`
+# answers "ok". Returns 0 when up, 1 on timeout. Emits no TAP line.
+wait_for_shell_ping() {
+  local timeout="${1:-10}"
+  local deadline=$(( $(date +%s) + timeout ))
+  while (( $(date +%s) < deadline )); do
+    [[ "$(omarchy-shell shell ping 2>/dev/null)" == "ok" ]] && return 0
+    sleep 0.5
+  done
+  return 1
+}
+
+# assert_shell_ping [desc] — the Quickshell shell answers ping with "ok".
+assert_shell_ping() {
+  local desc="${1:-omarchy-shell answers ping}"
+  local out
+  out=$(omarchy-shell shell ping 2>/dev/null)
+  if [[ "$out" == "ok" ]]; then
+    pass "$desc"
+  else
+    _fail_with_artifacts "$desc (got: '${out:-<no answer>}')"
+  fi
 }
 
 # assert_client <class> [desc] — a client window with the given class exists.
