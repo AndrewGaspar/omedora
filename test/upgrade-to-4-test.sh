@@ -428,3 +428,25 @@ assert_output_contains "active iwd is left alone with a warning" "$out" "leaving
 
 echo
 echo "# upgrade-to-4-test: all assertions passed"
+
+# ===========================================================================
+echo "# --- spec-set cross-check: v4_kept_packages can't silently desync ---"
+# ===========================================================================
+# Every spec in build-repo.sh's SPECS array (the canonical v4-served set) must
+# appear in the upgrader's v4_kept_packages list — a future spec retirement
+# that forgets the upgrader would otherwise let the upgrade REMOVE a package
+# the COPR still serves (or keep one it retired).
+spec_names=$(sed -n '/^SPECS=(/,/^)/p' "$ROOT/omedora/packaging/copr/build-repo.sh" \
+  | sed 's/#.*//' | grep -oE '[a-zA-Z0-9._-]+\.spec' | sed 's/\.spec$//' | sort -u)
+kept_block=$(sed -n '/^v4_kept_packages=(/,/^)/p' "$ROOT/bin/omedora-upgrade-to-4")
+missing=""
+for s in $spec_names; do
+  # terminaltexteffects builds python3-terminaltexteffects; match either name.
+  grep -qw "$s\|python3-$s" <<<"$kept_block" || missing="$missing $s"
+done
+if [[ -n $missing ]]; then
+  echo "specs served by the v4 COPR but absent from v4_kept_packages:$missing" >&2
+  fail "every build-repo.sh spec is covered by v4_kept_packages"
+else
+  pass "every build-repo.sh spec is covered by v4_kept_packages"
+fi
