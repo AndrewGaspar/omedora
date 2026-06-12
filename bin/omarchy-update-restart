@@ -30,6 +30,18 @@ for kernel in /usr/lib/modules/*/vmlinuz; do
   fi
 done
 
+# Fedora: when NO kernel exists under /usr/lib/modules at all (containers /
+# chroots — omedora doesn't manage kernels there), there is nothing to
+# attribute, so "kernel updated" is a false positive. Without this guard,
+# omarchy-update hangs forever on the reboot prompt in containers: script(1)
+# gives gum a real pty, so gum's no-tty fast-fail never kicks in. Arch
+# behavior is unchanged (a real Arch system always has a package-owned kernel).
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  if ! ls /usr/lib/modules/*/vmlinuz &>/dev/null; then
+    kernel_updated=false
+  fi
+fi
+
 if [[ $kernel_updated == "true" ]]; then
   confirm_reboot "Linux kernel has been updated. Reboot?"
 elif [[ -f $HOME/.local/state/omarchy/reboot-required ]]; then

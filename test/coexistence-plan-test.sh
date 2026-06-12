@@ -39,11 +39,13 @@
 # and gum/findmnt are shimmed on PATH — so this runs identically on the Arch
 # host, in CI, and inside a Fedora container.
 
-# KNOWN WATCH-ITEM (2026-06-12): this suite intermittently failed (~1 in 4)
-# in LOCAL full-suite sweeps run while podman containers were active on the
-# host, but has never failed solo (60+ iterations), in paired runs with its
-# predecessors (25 iterations), or in CI. Suspected host-load timing
-# sensitivity. If it ever fails in CI, capture the log and dig in earnest.
+# RESOLVED FLAKE (2026-06-12): this suite intermittently failed in full-suite
+# sweeps (never solo) because plan.sh's prompt fallback redirected from
+# /dev/stdin explicitly — which fails with "No such device or address" when
+# the inherited stdin is a consumed/closed pipe, sending case A down the
+# abort path. plan.sh now only redirects from a real /dev/tty (prompt_stdin)
+# and otherwise leaves stdin alone. 15 consecutive sweeps green post-fix.
+# The case-A diagnostics below stay: they print PLAN_OUT on unexpected rc.
 
 set -euo pipefail
 
@@ -159,6 +161,10 @@ export OMEDORA_REPOQUERY_CMD="printf ''"     # doctor clean
 export OMEDORA_PLAN_FORCE_INTERACTIVE=1
 export GUM_CALLED="$SCRATCH/A.gum"; rm -f "$GUM_CALLED"
 FAKE_GUM_CONFIRM=0 run_gate
+# Diagnostics for the intermittent rc=1 (see the watch-item in the header):
+# the abort path is only reachable via gum-decline or a doctor error, so the
+# gate's own output says which.
+[[ $PLAN_RC == 0 ]] || { echo "--- A: PLAN_OUT on unexpected rc=$PLAN_RC:" >&2; printf '%s\n' "$PLAN_OUT" | tail -25 >&2; }
 assert_equals "A: interactive proceed exits 0" "$PLAN_RC" "0"
 assert_file_exists "A: gum confirm was invoked" "$GUM_CALLED"
 assert_output_contains "A: plan listed the file to back up" "$PLAN_OUT" "hypr/diff.conf"
