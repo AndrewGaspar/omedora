@@ -1,3 +1,11 @@
+# omedora: Fedora dispatches to the docker-fedora.sh sibling (group add +
+# only-if-absent daemon.json apply); the Arch body below is byte-identical to
+# upstream. See omedora/architecture.md §"Omarchy 4 setup-system gating map".
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  source "${BASH_SOURCE[0]%/*}/docker-fedora.sh"
+  return 0 2>/dev/null || exit 0
+fi
+
 # The Docker daemon runs as root and its socket is root-owned, so membership in
 # the docker group is equivalent to passwordless root: any process in it can
 # `docker run -v /:/host` and rewrite the host as root. We therefore do NOT add
