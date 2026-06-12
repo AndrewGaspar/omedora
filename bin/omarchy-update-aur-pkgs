@@ -2,6 +2,12 @@
 
 # omarchy:summary=Update AUR packages if any are installed
 
+# Fedora dispatch — there is no AUR; foreign-package updates ride the normal
+# dnf transaction. See omedora/architecture.md §3. Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora) exit 0 ;;
+esac
+
 # mise exports GOROOT and GOBIN for its own Go. omarchy-upgrade-to-quattro runs
 # this with the system PATH but the caller's environment, so /usr/bin/go would
 # compile with mise's toolchain and every Go PKGBUILD fails with

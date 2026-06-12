@@ -21,13 +21,21 @@ confirm_reboot() {
   fi
 }
 
+# Fedora dispatch for the package-ownership probe only — rpm owns kernels
+# there. The loop below is unchanged apart from calling it; the Arch
+# definition is the upstream pacman call verbatim. See omedora/architecture.md §3.
+pkg_owns_file() { pacman -Qo "$1" &>/dev/null; }
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  pkg_owns_file() { rpm -qf "$1" &>/dev/null; }
+fi
+
 if [[ $mode != "--services-only" ]]; then
   running_kernel=$(uname -r)
   kernel_updated=true
 
   # Every kernel package owns modules.builtin; Arch Linux ARM's ships no vmlinuz here (#12440).
   for kernel in "$kernel_modules_path"/*/modules.builtin; do
-    if [[ -f $kernel ]] && pacman -Qo "$kernel" &>/dev/null; then
+    if [[ -f $kernel ]] && pkg_owns_file "$kernel"; then
       installed_kernel=$(basename "$(dirname "$kernel")")
 
       if [[ $installed_kernel == $running_kernel ]]; then
@@ -36,6 +44,18 @@ if [[ $mode != "--services-only" ]]; then
       fi
     fi
   done
+
+  # Fedora: when NO kernel exists under the modules path at all (containers /
+  # chroots — omedora doesn't manage kernels there), there is nothing to
+  # attribute, so "kernel updated" is a false positive. Without this guard,
+  # omarchy-update hangs forever on the reboot prompt in containers: script(1)
+  # gives gum a real pty, so gum's no-tty fast-fail never kicks in. Arch
+  # behavior is unchanged (a real Arch system always has a package-owned kernel).
+  if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+    if ! ls "$kernel_modules_path"/*/modules.builtin &>/dev/null; then
+      kernel_updated=false
+    fi
+  fi
 
   if [[ $kernel_updated == "true" ]]; then
     confirm_reboot "$(omarchy-i18n update.kernelReboot)"

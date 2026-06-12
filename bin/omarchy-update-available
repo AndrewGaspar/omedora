@@ -2,6 +2,12 @@
 
 # omarchy:summary=Check whether Omarchy updates are available.
 
+# Fedora dispatch — dnf-backed sibling writes the same state files the shell
+# update widget reads. See omedora/architecture.md §3. Arch path unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora) exec "$(dirname -- "${BASH_SOURCE[0]}")/fedora/update-available" "$@" ;;
+esac
+
 set -euo pipefail
 
 updates=()
