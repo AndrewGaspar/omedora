@@ -235,10 +235,18 @@ echo "# --- PART 3: disclosure content ---"
 # ===========================================================================
 # One full run WITHOUT OMEDORA_PLAN_SKIP_PKGS: the real pkg.py dry-run resolves
 # install/omarchy-base.packages through install/packages/fedora.toml.
+# Hermetic installed-state: stub rpm so NO package counts as installed —
+# otherwise the disclosed transaction shrinks on hosts that already have base
+# packages (the post-install L3 smoke re-runs this suite on a fully installed
+# system, where the btop assertion below would go empty).
+P3_BIN="$SCRATCH/P3-bin"; mkdir -p "$P3_BIN"
+printf '#!/bin/bash\nexit 1\n' >"$P3_BIN/rpm"; chmod +x "$P3_BIN/rpm"
 gate_home P3d
 unset OMEDORA_PLAN_SKIP_PKGS
 export OMEDORA_PLAN_FORCE_NONINTERACTIVE=1 OMEDORA_PLAN_AUTOCONFIRM=1
+_SAVED_PATH="$PATH"; export PATH="$P3_BIN:$PATH"
 run_gate
+export PATH="$_SAVED_PATH"
 export OMEDORA_PLAN_SKIP_PKGS=1
 unset OMEDORA_PLAN_FORCE_NONINTERACTIVE OMEDORA_PLAN_AUTOCONFIRM
 assert_equals "P3: autoconfirmed disclosure run proceeds" "$PLAN_RC" "0"

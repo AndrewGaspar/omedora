@@ -88,7 +88,11 @@ fi
 l1_fails=0
 for t in "$REPO"/test/*.sh; do
   case "$t" in */helpers.sh) continue ;; esac
-  bash "$t" >/dev/null 2>&1 || { echo "  L1 failed: $t" >&2; l1_fails=1; }
+  if ! out=$(bash "$t" 2>&1); then
+    echo "  L1 failed: $t — output tail:" >&2
+    printf '%s\n' "$out" | tail -30 >&2
+    l1_fails=1
+  fi
 done
 [[ $l1_fails == 0 ]] && ok "full L1 suite green post-install" || bad "full L1 suite green post-install"
 
