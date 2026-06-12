@@ -199,11 +199,22 @@ omedora_plan_summary() {
 # --- decide interactivity ------------------------------------------------------
 # Prompt from the CONTROLLING TERMINAL (/dev/tty), not stdin — so the prompt
 # works under `curl ... | bash`, where stdin is the curl pipe.
-PROMPT_TTY=/dev/stdin
+# Prompt source: the controlling terminal when there is one; otherwise leave
+# stdin ALONE (empty PROMPT_TTY -> prompt_stdin adds no redirection). An
+# explicit </dev/stdin is never safe as a fallback: when the inherited stdin
+# is a consumed/closed pipe (test sweeps, nested scripts), opening /dev/stdin
+# fails with "No such device or address" and the prompt path aborts — the
+# intermittent coexistence-plan-test failure this comment memorializes.
+PROMPT_TTY=""
 if { true >/dev/tty; } 2>/dev/null; then PROMPT_TTY=/dev/tty; fi
 
+# Run a prompting command, fed from the tty when we have one.
+prompt_stdin() {
+  if [[ -n $PROMPT_TTY ]]; then "$@" <"$PROMPT_TTY"; else "$@"; fi
+}
+
 interactive=1
-if [[ -n ${OMEDORA_PLAN_AUTOCONFIRM:-} || -n ${OMARCHY_NONINTERACTIVE:-} ]] || [[ $PROMPT_TTY != /dev/tty ]]; then
+if [[ -n ${OMEDORA_PLAN_AUTOCONFIRM:-} || -n ${OMARCHY_NONINTERACTIVE:-} ]] || [[ -z $PROMPT_TTY ]]; then
   interactive=0
 fi
 [[ -n ${OMEDORA_PLAN_FORCE_INTERACTIVE:-} ]] && interactive=1
@@ -218,9 +229,9 @@ if [[ $interactive -eq 1 && -z ${OMEDORA_SNAPSHOT:-} ]] \
   echo "  'omedora snapshot rollback <name>' (your /home is a separate subvolume and"
   echo "  is never touched)."
   if command -v gum >/dev/null 2>&1; then
-    gum confirm "Take a pre-install snapshot first?" <"$PROMPT_TTY" && export OMEDORA_SNAPSHOT=1
+    prompt_stdin gum confirm "Take a pre-install snapshot first?" && export OMEDORA_SNAPSHOT=1
   else
-    read -r -p "  Take a pre-install snapshot first? [Y/n] " reply <"$PROMPT_TTY"
+    prompt_stdin read -r -p "  Take a pre-install snapshot first? [Y/n] " reply
     [[ $reply =~ ^[Nn] ]] || export OMEDORA_SNAPSHOT=1
   fi
   if [[ -n ${OMEDORA_SNAPSHOT:-} ]]; then
@@ -260,11 +271,11 @@ else
     echo
     choice=""
     if command -v gum >/dev/null 2>&1; then
-      choice="$(gum choose --header \
+      choice="$(prompt_stdin gum choose --header \
         "Foreign-repo Hyprland packages detected. What would you like to do?" \
-        "Replace" "Keep" "Abort" <"$PROMPT_TTY")"
+        "Replace" "Keep" "Abort")"
     else
-      read -r -p "  [R]eplace foreign packages, [K]eep them, or [A]bort? [R/k/a] " reply <"$PROMPT_TTY"
+      prompt_stdin read -r -p "  [R]eplace foreign packages, [K]eep them, or [A]bort? [R/k/a] " reply
       case "$reply" in [kK]*) choice="Keep" ;; [aA]*) choice="Abort" ;; *) choice="Replace" ;; esac
     fi
 
@@ -287,9 +298,9 @@ else
   else
     proceed=0
     if command -v gum >/dev/null 2>&1; then
-      gum confirm "Proceed with the omedora install (apply everything listed above)?" <"$PROMPT_TTY" && proceed=1
+      prompt_stdin gum confirm "Proceed with the omedora install (apply everything listed above)?" && proceed=1
     else
-      read -r -p "Proceed with the omedora install (apply everything listed above)? [y/N] " reply <"$PROMPT_TTY"
+      prompt_stdin read -r -p "Proceed with the omedora install (apply everything listed above)? [y/N] " reply
       case "$reply" in [yY] | [yY][eE][sS]) proceed=1 ;; esac
     fi
 
