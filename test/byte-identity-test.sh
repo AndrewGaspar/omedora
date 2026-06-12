@@ -17,8 +17,10 @@
 # relocation is permitted but a NEW, undocumented deletion (e.g. someone quietly
 # dropping an upstream behavior) trips the audit.
 #
-# Background.qml is the one shell/ patch (the guarded updatesEnabled relocation);
-# it's allowlisted too. See its commit + omedora/architecture.md.
+# We deliberately keep ZERO shell/ patches: the one we briefly carried
+# (Background.qml's updatesEnabled guard, for Fedora's old quickshell) was
+# dropped once quickshell 0.3.0 was vendored — vendoring fixed the root cause,
+# so the file is byte-identical to upstream again and isn't in the audit set.
 #
 # Maintenance: when you add a NEW gated relocation that deletes an upstream line,
 # add the deleted line text to ALLOW["<path>"] below with a one-line note. When
@@ -75,7 +77,6 @@ ALLOW["bin/omarchy-update-confirm"]='  "What'"'"'s new: https://github.com/basec
 
 ALLOW["bin/omarchy-update-restart"]='  if [[ -f $kernel ]] && pacman -Qo "$kernel" &>/dev/null; then'
 
-ALLOW["shell/plugins/background/Background.qml"]='      updatesEnabled: true'
 
 # --- the audit ---------------------------------------------------------------
 # Modified upstream files = files that differ from the pin AND exist on the pin
