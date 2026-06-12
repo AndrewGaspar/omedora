@@ -1,7 +1,10 @@
 #!/bin/bash
 #
-# Launch the Omedora graphical session FULLY HEADLESS inside the systemd
-# container — no host Wayland desktop, no host socket bind-mount.
+# Launch the Omedora v4 graphical session FULLY HEADLESS inside the systemd
+# container — no host Wayland desktop, no host socket bind-mount. The session
+# is Hyprland 0.55 booting the Lua config, whose autostart starts the
+# Quickshell shell (`quickshell -n -p $OMARCHY_PATH/shell`) — bar, launcher,
+# notifications and OSD in one process; readiness is `omarchy-shell shell ping`.
 #
 # Runs AS the omedora user INSIDE a real logind session (entered via
 # `machinectl shell` by run-session.sh --headless). Unlike session-launch.sh
@@ -220,7 +223,7 @@ log "Hyprland IPC up (instance $SIG)"
 
 # --- 3. ensure a usable monitor --------------------------------------------
 # The nested aquamarine output doesn't always promote to a Hyprland monitor on
-# its own under this lionheartp v0.55.2 build, so create an explicit headless
+# its own under the COPR 0.55.2 build, so create an explicit headless
 # output. (`hyprctl keyword` is rejected by the Lua parser; `output create`
 # works.)
 sleep 1
@@ -235,19 +238,36 @@ read -r MON MW MH < <(hyprctl monitors -j 2>/dev/null | python3 -c \
   'import sys,json;d=json.load(sys.stdin);print(d[0]["name"],d[0]["width"],d[0]["height"]) if d else print("","0","0")' 2>/dev/null)
 log "monitor: ${MON:-<none>} ${MW}x${MH}"
 
+# --- 3b. wait for the Quickshell shell (the v4 desktop) ----------------------
+# The autostart (config/hypr/autostart.lua) launches `quickshell -n -p
+# $OMARCHY_PATH/shell`; the bar/launcher/notifications/OSD all live inside it.
+# `omarchy-shell shell ping` answering "ok" is the v4 readiness signal — the
+# replacement for the 3.8.2-era `pgrep waybar`.
+SHELL_STATE=down
+if omedora_wait_for_shell 90; then
+  SHELL_STATE=ok
+  log "omarchy-shell is up (shell ping -> ok)"
+else
+  log "WARNING: omarchy-shell never answered ping (quickshell not up?)"
+  journalctl --user --no-pager 2>/dev/null | grep -i quickshell | tail -10 >&2 || true
+fi
+
 HYPR_WL=$(hyprctl instances -j 2>/dev/null | python3 -c 'import sys,json;print(json.load(sys.stdin)[0]["wl_socket"])' 2>/dev/null)
 
 cat <<EOF
 
-================ Omedora headless session is up ================
+================ Omedora v4 headless session is up ================
   labwc (host):      WAYLAND_DISPLAY=$HOST_WL
   Hyprland (nested): WAYLAND_DISPLAY=$HYPR_WL   monitor=$MON
   IPC:               HYPRLAND_INSTANCE_SIGNATURE=$SIG
+  Quickshell shell:  omarchy-shell shell ping -> $SHELL_STATE
 
   Drive it (inside the container, as omedora):
     export HYPRLAND_INSTANCE_SIGNATURE=$SIG
     export WAYLAND_DISPLAY=$HYPR_WL
     hyprctl monitors
+    hyprctl layers                # omarchy-bar / omarchy-background layers
+    omarchy-shell shell toggle omarchy.launcher '{}'
     grim /tmp/shot.png            # capture the whole output
     foot                          # open a terminal into the session
 
@@ -255,6 +275,12 @@ cat <<EOF
     systemctl --user stop $WM_UNIT omedora-labwc
 ================================================================
 EOF
+
+# A session whose shell never came up is not "up" for scripted callers
+# (run-tests.sh) — fail fast instead of letting every test time out.
+if [[ $SHELL_STATE != ok && -n "${OMEDORA_HEADLESS_KEEP:-}" ]]; then
+  exit 1
+fi
 
 # --- 4. block (or return for scripted driving) ------------------------------
 if [[ -n "${OMEDORA_HEADLESS_KEEP:-}" ]]; then
