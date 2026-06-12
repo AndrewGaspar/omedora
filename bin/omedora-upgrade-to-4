@@ -253,7 +253,33 @@ compute_retired_packages() {
   if ((${#retired_packages[@]})); then
     mapfile -t retired_packages < <(printf '%s\n' "${retired_packages[@]}" | sort -u)
   fi
+
+  # Cascade guard: unlike pacman (which refuses), `dnf remove -y` takes
+  # DEPENDENT packages down with it. Never let a retired removal cascade into
+  # something the user installed (e.g. polkit-kde on a machine that also runs
+  # KDE Plasma): if anything OUTSIDE the retired set requires a candidate,
+  # keep the candidate installed and say so.
+  retired_kept_for_dependents=()
+  local candidate dep outside final=()
+  for candidate in ${retired_packages[@]+"${retired_packages[@]}"}; do
+    outside=""
+    while IFS= read -r dep; do
+      [[ -n $dep ]] || continue
+      [[ $dep == "no package requires"* ]] && continue
+      [[ $dep == "$candidate" ]] && continue
+      if ! printf '%s\n' "${retired_packages[@]}" | grep -qxF "$dep"; then
+        outside+="$dep "
+      fi
+    done < <(rpm -q --whatrequires --qf '%{NAME}\n' "$candidate" 2>/dev/null || true)
+    if [[ -n $outside ]]; then
+      retired_kept_for_dependents+=("$candidate (required by: ${outside% })")
+    else
+      final+=("$candidate")
+    fi
+  done
+  retired_packages=(${final[@]+"${final[@]}"})
 }
+retired_kept_for_dependents=()
 compute_retired_packages
 
 # --- user-config classification (read-only; feeds the plan gate) ---------------
@@ -507,6 +533,11 @@ omedora_upgrade_plan_summary() {
   else
     echo "      • no retired packages to remove"
   fi
+  if ((${#retired_kept_for_dependents[@]})); then
+    echo "      • kept although retired — other installed software still requires them"
+    echo "        (dnf would remove the dependents too; remove manually if unwanted):"
+    printf '          %s\n' "${retired_kept_for_dependents[@]}"
+  fi
   echo
   echo -e "\033[1m  Your configs (hash-match engine, backup-then-write):\033[0m"
   echo "      A file matching a KNOWN omedora/omarchy-shipped default is refreshed;"
@@ -709,16 +740,23 @@ install_new_base_packages() {
 }
 
 remove_retired_packages() {
-  ((${#retired_packages[@]})) || { log "No retired packages to remove"; return 0; }
+  # Re-probe installed-ness: the disclosed list was computed BEFORE the package
+  # phase, and the omedora-settings install already swapped hyprland-omedora
+  # out via its Obsoletes — dnf5 fails the whole transaction on a
+  # no-longer-installed spec.
+  local to_remove=() pkg
+  for pkg in ${retired_packages[@]+"${retired_packages[@]}"}; do
+    rpm -q "$pkg" >/dev/null 2>&1 && to_remove+=("$pkg")
+  done
+  ((${#to_remove[@]})) || { log "No retired packages to remove"; return 0; }
 
   log "Removing packages retired from the omedora 4 default install"
   # --noautoremove: never yank shared dependencies out from under other apps.
-  if sudo dnf remove --noautoremove -y "${retired_packages[@]}"; then
+  if sudo dnf remove --noautoremove -y "${to_remove[@]}"; then
     return 0
   fi
   warn "Batch retired-package removal failed; retrying one by one."
-  local pkg
-  for pkg in "${retired_packages[@]}"; do
+  for pkg in "${to_remove[@]}"; do
     rpm -q "$pkg" >/dev/null 2>&1 || continue
     sudo dnf remove --noautoremove -y "$pkg" ||
       warn "Could not remove retired package '$pkg'; leaving it installed."
