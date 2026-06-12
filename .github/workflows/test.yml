@@ -47,6 +47,15 @@ jobs:
       - name: Run etc-overrides audit
         run: bash test/etc-overrides-audit-test.sh
 
+      - name: Run coexistence plan-gate test
+        run: bash test/coexistence-plan-test.sh
+
+      - name: Run coexistence test
+        run: bash test/coexistence-test.sh
+
+      - name: Run finalize-defaults test
+        run: bash test/finalize-defaults-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 
