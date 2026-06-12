@@ -46,7 +46,15 @@ if [[ $(uname -m) != "x86_64" ]]; then
   echo -e "\e[31mOmedora install requires x86_64 (got $(uname -m))\e[0m" >&2
   exit 1
 fi
-if ! command -v sudo >/dev/null 2>&1 || ! sudo -v; then
+# sudo guard, tty-aware: on an interactive terminal `sudo -v` prompts once and
+# caches; without a tty (CI containers) it can't prompt — and Fedora's stock
+# passworded %wheel rule makes `sudo -v` DEMAND a password even when a NOPASSWD
+# rule also matches (verifypw=all), so probe with `sudo -n true` instead.
+sudo_ok() {
+  command -v sudo >/dev/null 2>&1 || return 1
+  if [[ -t 0 ]]; then sudo -v; else sudo -n true; fi
+}
+if ! sudo_ok; then
   echo -e "\e[31mOmedora install requires working sudo for this user\e[0m" >&2
   exit 1
 fi
