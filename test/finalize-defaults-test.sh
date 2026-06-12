@@ -59,8 +59,13 @@ fi
 exit 0
 EOF
 
-# Inert stubs for everything else finalize-user touches.
-for cmd in omarchy-refresh-applications xdg-user-dirs-update mise; do
+# Inert stubs for everything else finalize-user touches. NOTE on
+# omarchy-refresh-applications: finalize-user sources env-bootstrap, which
+# prepends $OMARCHY_PATH/bin to PATH (OMARCHY_PATH=$ROOT here) — so the REAL
+# script can shadow our stub. Stub its leaf command too
+# (update-desktop-database isn't on stock ubuntu CI runners), so it runs
+# inertly against the isolated fixture $HOME either way.
+for cmd in omarchy-refresh-applications xdg-user-dirs-update mise update-desktop-database; do
   printf '#!/bin/bash\nexit 0\n' >"$BIN/$cmd"
 done
 chmod +x "$BIN"/*
