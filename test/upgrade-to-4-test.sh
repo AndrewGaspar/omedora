@@ -35,8 +35,9 @@ SHIM="$SCRATCH/shim"
 mkdir -p "$SHIM"
 MOCK_LOG="$SCRATCH/mock.log"
 RPM_STATE="$SCRATCH/rpm-installed"
+WHATREQ_STATE="$SCRATCH/rpm-whatrequires"
 REPOQUERY_OUT="$SCRATCH/repoquery.out"
-export MOCK_LOG RPM_STATE REPOQUERY_OUT
+export MOCK_LOG RPM_STATE WHATREQ_STATE REPOQUERY_OUT
 
 stub() { printf '#!/bin/bash\n%s\n' "$2" >"$SHIM/$1"; chmod +x "$SHIM/$1"; }
 
@@ -45,7 +46,19 @@ while [[ ${1:-} == -* ]]; do shift; done   # swallow sudo flags (-n/-v probes)
 [[ $# -gt 0 ]] || exit 0
 exec "$@"'
 stub dnf  'printf "dnf %s\n" "$*" >>"$MOCK_LOG"; exit 0'
-stub rpm  'if [[ ${1:-} == -q ]]; then printf "rpm %s\n" "$*" >>"$MOCK_LOG"; grep -qxF "${2:-}" "$RPM_STATE" 2>/dev/null; exit $?; fi; exit 0'
+# rpm stub: `-q <name>` consults $RPM_STATE (installed names, one per line);
+# `-q --whatrequires <name>` consults $WHATREQ_STATE ("<name> <dependent>"
+# pairs) and mimics rpm's "no package requires X" + exit 1 otherwise.
+stub rpm 'printf "rpm %s\n" "$*" >>"$MOCK_LOG"
+case " $* " in
+  *" --whatrequires "*)
+    pkg="${*: -1}"
+    hits=$(awk -v p="$pkg" "\$1 == p { print \$2 }" "$WHATREQ_STATE" 2>/dev/null)
+    if [[ -n $hits ]]; then printf "%s\n" "$hits"; exit 0; fi
+    echo "no package requires $pkg"; exit 1 ;;
+esac
+if [[ ${1:-} == -q ]]; then grep -qxF "${2:-}" "$RPM_STATE" 2>/dev/null; exit $?; fi
+exit 0'
 stub systemctl 'printf "systemctl %s\n" "$*" >>"$MOCK_LOG"
 case " $* " in *" is-active "*iwd*) exit "${IWD_ACTIVE_RC:-3}" ;; esac
 exit 0'
@@ -80,14 +93,21 @@ printf 'ID=arch\n' >"$SCRATCH/os-arch"
 copr3="copr:copr.fedorainfracloud.org:agaspar:omedora-3"
 cat >"$REPOQUERY_OUT" <<EOF
 walker $copr3
+elephant $copr3
 swayosd $copr3
 hyprland $copr3
 hyprutils $copr3
 git updates
 bash anaconda
 EOF
-# rpm -q state: 3.8.2-era Fedora-proper extras that v4 retires + iwd.
-printf 'waybar\nmako\niwd\n' >"$RPM_STATE"
+# rpm -q state (must agree with the repoquery state above): the COPR set +
+# the 3.8.2-era Fedora-proper extras that v4 retires + iwd + polkit-kde,
+# which a coexisting KDE Plasma still requires (cascade guard).
+printf 'walker\nelephant\nswayosd\nhyprland\nhyprutils\nwaybar\nmako\niwd\npolkit-kde\n' >"$RPM_STATE"
+# whatrequires pairs: plasma-workspace (OUTSIDE the retired set) requires
+# polkit-kde; walker (INSIDE the set) requires elephant — intra-set deps must
+# not block removal.
+printf 'polkit-kde plasma-workspace\nelephant walker\n' >"$WHATREQ_STATE"
 
 # --- the fixture v4 payload (the OMEDORA_UPGRADE_PAYLOAD seam) ----------------
 PAYLOAD="$SCRATCH/payload"
@@ -188,11 +208,13 @@ run_upgrade() {
     PATH="$SHIM:/usr/local/bin:/usr/bin:/bin" \
     MOCK_LOG="$MOCK_LOG" \
     RPM_STATE="$RPM_STATE" \
+    WHATREQ_STATE="$WHATREQ_STATE" \
     REPOQUERY_OUT="$REPOQUERY_OUT" \
     IWD_ACTIVE_RC="${IWD_ACTIVE_RC:-3}" \
     OMEDORA_OS_RELEASE="$SCRATCH/os-fedora" \
     OMEDORA_DNF_CMD="$FAKE_DNF_QUERY" \
     OMEDORA_UPGRADE_PAYLOAD="$PAYLOAD" \
+    OMEDORA_UPGRADE_EUID=1000 \
     OMARCHY_PKG_DRY_RUN=1 \
     "$@" bash "$UPGRADE"
 }
@@ -238,6 +260,8 @@ assert_output_contains "plan lists computed retired package swayosd" "$out" "swa
 assert_output_contains "plan lists installed extra waybar" "$out" "waybar"
 assert_output_contains "plan lists iwd (installed, inactive)" "$out" "iwd"
 assert_output_lacks "plan keeps hyprland (still served on omedora-4)" "$out" $'\nhyprland '
+assert_output_contains "plan keeps polkit-kde for its outside dependent" "$out" \
+  "polkit-kde (required by: plasma-workspace)"
 assert_output_contains "plan discloses the checkout retirement backup" "$out" ".pre-omedora-4-"
 assert_output_contains "plan discloses the config engine" "$out" "hash-match"
 assert_output_contains "refusal points at --yes" "$out" "--yes"
@@ -289,6 +313,8 @@ assert_output_contains "retired removal includes swayosd" "$remove_line" "swayos
 assert_output_contains "retired removal includes waybar" "$remove_line" "waybar"
 assert_output_contains "retired removal includes mako" "$remove_line" "mako"
 assert_output_contains "retired removal includes iwd (inactive)" "$remove_line" "iwd"
+assert_output_contains "retired removal includes elephant (intra-set dependent ok)" "$remove_line" "elephant"
+assert_output_lacks "retired removal keeps polkit-kde (outside dependent)" "$remove_line" "polkit-kde"
 assert_output_lacks "retired removal keeps hyprland" "$remove_line" "hyprland"
 assert_output_lacks "retired removal keeps hyprutils" "$remove_line" "hyprutils"
 assert_output_lacks "retired removal never touches git" "$remove_line" " git"
