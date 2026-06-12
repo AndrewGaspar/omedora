@@ -1,0 +1,172 @@
+#!/bin/bash
+
+# omarchy:summary=Scan for installed packages omedora wants to own that come from a foreign repo (e.g. another COPR).
+# omarchy:examples=omedora doctor
+
+# omarchy-doctor (exposed as `omedora doctor`) — coexistence: foreign-repo
+# conflict DETECTION, and (via --fix) guided REPLACEMENT.
+#
+# omedora installs and pins a Hyprland desktop stack (hyprland, hyprlock,
+# hypridle, waybar, walker, elephant, swayosd, xdg-desktop-portal-hyprland, …).
+# On a lived-in Fedora machine the user may already have some of these installed
+# from a *foreign* repo — e.g. solopasha/hyprland or another COPR. If so,
+# omedora installing its pinned waybar/hyprlock/portal stack against a
+# foreign-repo compositor can leave a mismatched, broken session.
+#
+# This tool resolves the set of packages omedora wants to own (from
+# install/omarchy-base.packages via install/packages/fedora.toml), inspects each
+# installed package's source repo, and reports any that come from a repo omedora
+# does NOT control.
+#
+# Modes:
+#   (default)  human-readable warnings to stderr; exit 1 if any conflict.
+#   --list     machine-readable conflicts to stdout, one `name<TAB>repo` per
+#              line; exit 1 if any. Consumed by omedora-replace-foreign and the
+#              install gate.
+#   --fix      delegate to `omedora-replace-foreign` (the replacement engine),
+#              passing through any further flags (e.g. --dry-run, --yes). It
+#              shows the exact dnf transaction and applies it after one yes.
+#
+# Exit status (default/--list):
+#   0  no foreign-repo conflicts found
+#   1  one or more owned packages are installed from a foreign repo
+#
+# Mocking (for tests): set OMEDORA_REPOQUERY_CMD to a command that prints lines
+# of "name evr from_repo" (the same shape as
+#   dnf repoquery --installed --qf '%{name} %{evr} %{from_repo}'
+# ). The default queries the live system via dnf.
+
+set -uo pipefail
+
+# --fix delegates to the replacement engine (single source of the swap/sync UX).
+if [[ ${1:-} == "--fix" ]]; then
+  shift
+  exec omedora-replace-foreign "$@"
+fi
+
+# --list emits machine-readable conflict records instead of human warnings.
+DOCTOR_MODE="warn"
+if [[ ${1:-} == "--list" ]]; then
+  DOCTOR_MODE="list"
+  shift
+fi
+
+# Fedora-only — foreign-repo Hyprland coexistence is a Fedora concept (Arch has
+# no dnf/COPR provenance to inspect). On Arch this is a clean no-op so `omarchy
+# doctor` doesn't error out. The whole body below the guard is Fedora-only.
+if [[ ${OMEDORA_REPOQUERY_CMD:+set} != set ]] &&
+   [[ "$(omarchy-distro 2>/dev/null || echo arch)" != "fedora" ]]; then
+  echo "omarchy-doctor: no checks for this distro." >&2
+  exit 0
+fi
+
+# Friendly *base* repo identifiers (matched against the leading repo token, not
+# loose substrings — a COPR's id literally contains "copr.fedorainfracloud.org",
+# which would false-match a naive "fedora" substring). These are the standard
+# Fedora repos plus RPM Fusion. The omedora repo is handled separately below so
+# both its local-repo name and a future omedora COPR count as friendly.
+FRIENDLY_REPO_PREFIXES=(
+  "fedora"        # fedora, fedora-modular, fedora-cisco-openh264
+  "updates"       # updates, updates-testing, updates-modular
+  "rawhide"
+  "anaconda"      # installed from the Fedora install media
+  "koji"          # Fedora build-system override repo
+  "@system"       # @System pseudo-repo: installed, provenance not tracked
+  "@commandline"  # locally-installed rpm via dnf install ./foo.rpm
+  "rpmfusion-free"
+  "rpmfusion-nonfree"
+)
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+# Resolve the owned Fedora package names.
+owned_pkgs() {
+  python3 "$script_dir/fedora/owned_packages.py"
+}
+
+# Query installed packages' provenance. Mockable via OMEDORA_REPOQUERY_CMD.
+# NOTE: the trailing '\n' is REQUIRED — dnf5's --qf does not append a newline,
+# so without it the whole installed list comes back as one newline-less blob and
+# the `while read` scan loop sees a single unterminated line (read returns
+# non-zero at EOF, so the body never runs) and reports zero conflicts. A real
+# foreign-repo package would then go undetected. (Caught by the live-dnf test;
+# the mocked unit tests supplied their own newlines and masked it.)
+repoquery_installed() {
+  if [[ -n ${OMEDORA_REPOQUERY_CMD:-} ]]; then
+    eval "$OMEDORA_REPOQUERY_CMD"
+  else
+    dnf repoquery --installed --qf '%{name} %{evr} %{from_repo}\n' 2>/dev/null
+  fi
+}
+
+is_friendly_repo() {
+  local repo_lc
+  repo_lc="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+
+  # The omedora repo (local name) and any future omedora COPR are friendly.
+  case "$repo_lc" in
+    omedora | omedora-*) return 0 ;;
+    *omedora*copr* | *copr*omedora*) return 0 ;;  # an omedora COPR id
+  esac
+
+  # Any other COPR is foreign by definition.
+  case "$repo_lc" in
+    copr:* | @copr:* | *copr.fedorainfracloud.org*) return 1 ;;
+  esac
+
+  # Otherwise match against the friendly base-repo prefixes.
+  local pat
+  for pat in "${FRIENDLY_REPO_PREFIXES[@]}"; do
+    if [[ $repo_lc == "$pat" || $repo_lc == "$pat"-* ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Run the scan. Prints warnings to stderr; returns 1 if any conflict found.
+run_scan() {
+  # Build the owned-set lookup.
+  local -A owned=()
+  local p
+  while IFS= read -r p; do
+    [[ -n $p ]] && owned["$p"]=1
+  done < <(owned_pkgs)
+
+  local conflicts=0
+  local name evr repo
+
+  while read -r name evr repo; do
+    [[ -z ${name:-} ]] && continue
+    # Only care about packages omedora intends to own.
+    [[ -n ${owned[$name]:-} ]] || continue
+    if is_friendly_repo "$repo"; then
+      continue
+    fi
+    conflicts=$((conflicts + 1))
+    if [[ $DOCTOR_MODE == "list" ]]; then
+      # Machine-readable: name<TAB>repo (for the replacement engine / gate).
+      printf '%s\t%s\n' "$name" "$repo"
+      continue
+    fi
+    printf '\033[33mWARNING:\033[0m %s %s is installed from %s.\n' \
+      "$name" "$evr" "$repo" >&2
+    printf '  omedora installs and pins its own %s and expects to own the Hyprland desktop stack.\n' "$name" >&2
+    printf '  Installing over a foreign-repo build may leave a mismatched compositor/session.\n' >&2
+    printf '  Fix it with: omedora doctor --fix\n' >&2
+  done < <(repoquery_installed)
+
+  if [[ $conflicts -gt 0 ]]; then
+    [[ $DOCTOR_MODE == "list" ]] && return 1
+    printf '\033[33momedora doctor: %d package(s) come from a foreign repo (see warnings above). Run `omedora doctor --fix` to replace them with omedora'\''s pinned builds.\033[0m\n' \
+      "$conflicts" >&2
+    return 1
+  fi
+
+  # In --list mode stdout is machine-only: stay silent when clean.
+  [[ $DOCTOR_MODE == "list" ]] && return 0
+  echo -e "\033[32momedora doctor: no foreign-repo conflicts found.\033[0m"
+  return 0
+}
+
+run_scan
