@@ -407,7 +407,7 @@ assert_layer omarchy-launcher "summon maps the launcher layer"
 | `700,0,520,44` | center: `omarchy.clock` (`dddd HH:mm`) + weather / system-update / indicators | clock changes every minute; indicators are state-dependent |
 | `1500,0,420,44` | right: tray + bluetooth + network + audio + battery/cpu tail | all state-dependent |
 
-What's left **unmasked and therefore asserted**: the bar's background band across the rest of the top 44 px (proves the bar is drawn — if missing, those rows show wallpaper/black), and the **entire** wallpaper region (rows 44..1079) — proves the shell's background service painted the real theme wallpaper, not a black fill. (The wallpaper requires quickshell to have the QsWindow `updatesEnabled` property — absent from Fedora 44's stalled snapshot, which made the background component fail to load and rows 44+ go black. We vendor quickshell 0.3.0, which has it; see `omedora/packages.md` §11.)
+What's left **unmasked and therefore asserted**: the bar's background band across the rest of the top 44 px (proves the bar is drawn — if missing, those rows show wallpaper/black), and the **entire** wallpaper region (rows 44..1079) — proves the shell's background service painted the real theme wallpaper, not a black fill. (Earlier a black wallpaper here was misattributed to a missing quickshell property; the real cause was a container-only Hyprland config-reload timeout — see the `lspci`-shim note above. The wallpaper renders on both Fedora's 0.2.1 quickshell and the vendored 0.3.0.)
 
 **Regenerating the reference** (only when the UI *legitimately* changes — bar layout/height, default wallpaper/theme). The procedure is documented inline in the `30-visual.sh` header; in short:
 
