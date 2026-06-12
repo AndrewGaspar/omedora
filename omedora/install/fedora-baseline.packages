@@ -1,0 +1,22 @@
+# Fedora-only desktop runtime that Arch pulls in transitively but Fedora's
+# package set doesn't guarantee, and that omedora's own features depend on
+# (ported from 3.8.2's install/packaging/fedora-baseline.sh — see the
+# fedora-desktop-baseline policy). A Fedora Workstation already ships most of
+# these; installing them means omedora works on any Fedora base.
+#
+# xdg-utils            xdg-settings/xdg-mime/xdg-open — the default-browser +
+#                      MIME setup and omarchy-launch-browser need them.
+# xdg-user-dirs        xdg-user-dirs-update — omarchy-finalize-user hard-
+#                      requires it for the Templates/Public/Desktop cleanup.
+# pipewire             the audio server daemon (Fedora minimal ships only
+#                      wireplumber).
+# pipewire-pulseaudio  pactl + the pulse socket the shell's audio talks to.
+# pipewire-alsa        ALSA compat — expected on a desktop.
+# util-linux-script    the `script` PTY logger omarchy-update logs through
+#                      (Fedora 44 split it out of util-linux-core).
+xdg-utils
+xdg-user-dirs
+pipewire
+pipewire-pulseaudio
+pipewire-alsa
+util-linux-script
