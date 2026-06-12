@@ -9,20 +9,21 @@
 #
 # This Dockerfile builds only the BASE (Fedora + systemd + deps + the omedora
 # tree). The install does NOT run here — a Dockerfile RUN has no PID-1 systemd.
-# Instead omedora/test/fedora/build-session.sh boots this image, runs install.sh
-# inside the live logind session, and commits the result. See omedora/testing.md
-# §6 and the migration plan.
+# Instead omedora/test/fedora/build-session.sh boots this image, runs the v4
+# bootstrap (omedora/install-4.sh's steps, via staged-install-4.sh) inside the
+# live logind session, and commits the result. See omedora/testing.md §6.
 #
 # Built and run entirely under podman (--systemd=always); independent of the
-# docker-based L1/L2/L3 images. Build product: omedora-test:fedora44-session-base.
+# docker-based L1/L2/L3 images. Build product: omedora-test:fedora44-session-4-base.
 
 FROM registry.fedoraproject.org/fedora:44
 
 # --- install toolchain + systemd + session prerequisites ---------------------
 #   systemd / systemd-container → PID-1 init + `machinectl shell` login
 #   dbus-broker / polkit        → system bus + privilege prompts the session wants
-#   git gum jq python3 flatpak sudo dnf-plugins-core → what install.sh needs
-#     (mirrors omedora/test/fedora/Dockerfile's set so the install resolves the same way)
+#   git gum jq python3 flatpak sudo dnf-plugins-core → what the v4 bootstrap
+#     needs (gum for the plan gate, python3 for bin/fedora/pkg.py, flatpak for
+#     the Flathub payload, dnf-plugins-core for `dnf copr enable`)
 #   util-linux-script           → some omarchy helpers probe for `script`
 # NOTE: Fedora 44's dnf is dnf5, which caches packages under /var/cache/libdnf5
 # (not the dnf4 /var/cache/dnf). The BuildKit cache mount + keepcache=True only
@@ -109,8 +110,8 @@ RUN install -d -m 0755 /var/lib/systemd/linger && \
     touch /var/lib/systemd/linger/omedora
 
 # --- the omedora tree --------------------------------------------------------
-# install.sh expects the tree at ~/.local/share/omarchy and finds itself via
-# OMARCHY_PATH. Bake it in so the build-via-commit step is reproducible.
+# The v4 bootstrap runs from a checkout (OMEDORA_REPO_ROOT); bake this repo at
+# ~/.local/share/omarchy so the build-via-commit step is reproducible.
 #
 # Create the XDG dirs omedora-owned. NOTE: `install -d -o omedora` only chowns
 # the leaf it's told to create, NOT intermediate parents — so a bare
@@ -121,8 +122,9 @@ RUN install -d -o omedora -g omedora /home/omedora/.local/share && \
     chown omedora:omedora /home/omedora/.local
 COPY --chown=omedora:omedora . /home/omedora/.local/share/omarchy
 
-# install.sh's logger appends to /var/log/omarchy-install.log. Pre-create it
-# owned by omedora so the install writes without sudo.
+# staged-install-4.sh tees its output to /var/log/omarchy-install.log so
+# build-session.sh can copy a clean log out. Pre-create it owned by omedora so
+# the install writes without sudo.
 RUN install -m 0664 -o omedora -g omedora /dev/null /var/log/omarchy-install.log
 
 # Boot systemd. The committed session image inherits this CMD.
