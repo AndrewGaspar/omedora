@@ -59,6 +59,42 @@ EOF
   # value is never validated against hardware once the gate is passed.
   export XDG_SEAT="${XDG_SEAT:-seat0}"
   export XDG_SESSION_ID="${XDG_SESSION_ID:-$(loginctl --no-legend list-sessions 2>/dev/null | awk 'NR==1{print $1}')}"
+
+  omedora_install_fast_lspci_shim
+}
+
+# omedora_install_fast_lspci_shim — work around a CONTAINER-ONLY config artifact.
+#
+# Hyprland's Lua config has a hardware probe (default/hypr/nvidia.lua:
+# `o.shell_succeeds("lspci | grep -qi nvidia")`). Under rootless podman's faked
+# PCI tree, `lspci` is pathologically slow — ~2.5s of syscall time scanning PCI
+# config space (verified) — which blows past Hyprland's config-reload watchdog
+# and leaves a persistent on-screen banner: "Your config has errors:
+# require('default.hypr.apps.system'): [Lua] execution timed out in config
+# reload". (The error is attributed to whichever require was mid-flight when the
+# budget blew; the real culprit is the slow lspci.) On REAL hardware lspci
+# returns in milliseconds and no banner ever appears — so this is purely a
+# container artifact, NOT an omedora config bug, and we must NOT patch the
+# upstream nvidia.lua (rebase surface + byte-identity).
+#
+# Instead drop a fast `lspci` shim on the omedora user's PATH (~/.local/bin,
+# ahead of /usr/bin) that reports "no PCI match" instantly, so the probe (and
+# thus config load) completes well within the watchdog. Verified: reload drops
+# 2.5s -> 0.16s and `hyprctl configerrors` goes empty. This touches only the
+# test user's ~/.local/bin — no /etc, no system policy, no upstream config — and
+# only affects nvidia.lua's no-nvidia fast path (the container has no nvidia GPU
+# anyway, so reporting "none" is also correct).
+omedora_install_fast_lspci_shim() {
+  local shim_dir="$HOME/.local/bin"
+  mkdir -p "$shim_dir"
+  cat >"$shim_dir/lspci" <<'EOF'
+#!/bin/sh
+# L4 test scaffolding: a fast no-op lspci (the container has no real PCI to
+# enumerate and the host lspci is ~2.5s slow here). Reports no devices so
+# nvidia.lua's `lspci | grep -qi nvidia` returns "no nvidia" instantly.
+exit 1
+EOF
+  chmod +x "$shim_dir/lspci"
 }
 
 # omedora_wait_for_shell <timeout-seconds>
