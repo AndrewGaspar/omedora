@@ -2,13 +2,20 @@
 
 # omarchy:summary=Prompt for confirmation before starting an update
 
+# Fedora: point "What's new" at omedora's releases. Arch URL unchanged.
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  whats_new_url="https://github.com/AndrewGaspar/omedora/releases"
+else
+  whats_new_url="https://github.com/omacom/omarchy/releases/latest"
+fi
+
 gum style --border normal --padding "1 2" \
   "$(omarchy-i18n update.ready)" \
   "" \
   "• $(omarchy-i18n update.cannotStop)" \
   "• $(omarchy-i18n update.connectPower)" \
   "" \
-  "$(omarchy-i18n update.whatsNew "https://github.com/omacom/omarchy/releases/latest")"
+  "$(omarchy-i18n update.whatsNew "$whats_new_url")"
 
 echo
 

@@ -2,6 +2,12 @@
 
 # omarchy:summary=Update AUR packages if any are installed
 
+# Fedora dispatch — there is no AUR; foreign-package updates ride the normal
+# dnf transaction. See omedora/architecture.md §3. Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora) exit 0 ;;
+esac
+
 sudo_options=()
 if [[ ${OMARCHY_SUDO_NO_UPDATE:-0} == "1" ]]; then
   sudo_wrapper="$OMARCHY_PATH/default/omarchy/sudo-no-update/sudo"

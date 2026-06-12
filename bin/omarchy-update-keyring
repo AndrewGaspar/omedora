@@ -3,6 +3,13 @@
 # omarchy:summary=Ensure the Omarchy, Arch and (on aarch64) Arch Linux ARM keyring packages are installed and populated
 # omarchy:requires-sudo=true
 
+# Fedora dispatch — no pacman keyring: COPR repo GPG keys are configured by
+# dnf at repo-enable time and verified per transaction. Nothing to refresh.
+# See omedora/architecture.md §3. Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora) exit 0 ;;
+esac
+
 # omarchy-update runs this under set -e as a trusted pre-step, so a failed recv
 # or a broken keyring has to stop this script here, not surface later as
 # signature errors in the middle of the main transaction.
