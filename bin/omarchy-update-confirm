@@ -2,13 +2,20 @@
 
 # omarchy:summary=Prompt for confirmation before starting an update
 
+# Fedora: point "What's new" at omedora's releases. Arch line unchanged.
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  whats_new="What's new: https://github.com/AndrewGaspar/omedora/releases"
+else
+  whats_new="What's new: https://github.com/basecamp/omarchy/releases/latest"
+fi
+
 gum style --border normal --padding "1 2" \
   "Ready to update?" \
   "" \
   "• You cannot stop the update once you start!" \
   "• Make sure you're connected to power or have a full battery" \
   "" \
-  "What's new: https://github.com/basecamp/omarchy/releases/latest"
+  "$whats_new"
 
 echo
 
