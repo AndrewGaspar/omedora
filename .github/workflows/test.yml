@@ -59,6 +59,9 @@ jobs:
       - name: Run update-flow test
         run: bash test/update-flow-test.sh
 
+      - name: Run upgrade-to-4 test
+        run: bash test/upgrade-to-4-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 
