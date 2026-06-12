@@ -252,6 +252,16 @@ else
   journalctl --user --no-pager 2>/dev/null | grep -i quickshell | tail -10 >&2 || true
 fi
 
+# Clear the container-only config-error banner. Hyprland's FIRST config load can
+# time out on the slow-lspci probe (see omedora_install_fast_lspci_shim) and
+# leaves a persistent on-screen error banner that only a SUCCESSFUL reload
+# clears. The fast-lspci shim is now on PATH, so this reload completes well
+# within the watchdog (~0.16s) and dismisses the banner — without it the banner
+# overlaps the bar and skews 30-visual. A no-op on real hardware (no banner).
+if [[ -n "$SIG" ]]; then
+  HYPRLAND_INSTANCE_SIGNATURE="$SIG" hyprctl reload >/dev/null 2>&1 || true
+fi
+
 HYPR_WL=$(hyprctl instances -j 2>/dev/null | python3 -c 'import sys,json;print(json.load(sys.stdin)[0]["wl_socket"])' 2>/dev/null)
 
 cat <<EOF
