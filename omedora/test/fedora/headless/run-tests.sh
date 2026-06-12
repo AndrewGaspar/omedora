@@ -2,13 +2,13 @@
 #
 # L4-headless automated test suite — host orchestrator.
 #
-# Boots ONE self-contained headless Omedora session container (the same path as
-# `run-session.sh --headless`: labwc + nested Hyprland, no host desktop, no
-# socket bind-mount), copies the test library + suite into it, runs each
-# tests/*.sh inside the logind session capturing TAP output + exit code,
-# aggregates into a TAP report, copies artifacts out for any failing test, and
-# exits non-zero iff any test failed. This is the canonical CI gate for L4
-# assertions.
+# Boots ONE self-contained headless Omedora v4 session container (the same path
+# as `run-session.sh --headless`: labwc + nested Hyprland + the Quickshell
+# shell, no host desktop, no socket bind-mount), copies the test library +
+# suite into it, runs each tests/*.sh inside the logind session capturing TAP
+# output + exit code, aggregates into a TAP report, copies artifacts out for
+# any failing test, and exits non-zero iff any test failed. This is the
+# canonical CI gate for L4 assertions.
 #
 # Each run uses a UNIQUE container name (omedora-htest-$$), so two invocations
 # run concurrently without colliding — the headless session brings its own
@@ -62,7 +62,7 @@ done
 # Workstation run gets a "ws-" container prefix so it never collides with a
 # concurrent standard run. Explicit OMEDORA_* env still wins.
 variant=""; ctr_variant=""; $workstation && { variant="-workstation"; ctr_variant="ws-"; }
-SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session${variant}}"
+SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session-4${variant}}"
 CTR="${OMEDORA_HTEST_CTR:-omedora-htest-${ctr_variant}$$}"
 
 log() { printf '\033[1;34m[htest]\033[0m %s\n' "$*"; }
@@ -181,7 +181,7 @@ for t in "${tests[@]}"; do
   out=$(podman exec "$CTR" machinectl shell \
         --setenv=ARTIFACTS="$art_in_ctr" \
         --setenv=TEST_NAME="$name" \
-        --setenv=WALKER_TEST_ITERS="${WALKER_TEST_ITERS:-20}" \
+        --setenv=SHELL_TOGGLE_ITERS="${SHELL_TOGGLE_ITERS:-5}" \
         omedora@.host /bin/bash -c \
           "/bin/bash '$SUITE_IN_CTR/tests/$t'; echo \$? >'$rc_file'" 2>&1)
   rc=$(podman exec "$CTR" cat "$rc_file" 2>/dev/null)
