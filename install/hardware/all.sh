@@ -1,3 +1,11 @@
+# omedora: Fedora runs the portable subset only (all-fedora.sh); the Arch list
+# below is byte-identical to upstream. See omedora/architecture.md
+# §"Omarchy 4 setup-system gating map" for the per-file decisions.
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  source "$OMARCHY_INSTALL/hardware/all-fedora.sh"
+  return 0 2>/dev/null || exit 0
+fi
+
 run_logged "$OMARCHY_INSTALL/hardware/asus-rog.sh"
 run_logged "$OMARCHY_INSTALL/hardware/framework16.sh"
 run_logged "$OMARCHY_INSTALL/hardware/dell-xps-touchpad-haptics.sh"

@@ -1,3 +1,11 @@
+# omedora: Fedora dispatches to the docker-fedora.sh sibling (adds the
+# only-if-absent daemon.json apply); the Arch body below is byte-identical to
+# upstream. See omedora/architecture.md §"Omarchy 4 setup-system gating map".
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  source "${BASH_SOURCE[0]%/*}/docker-fedora.sh"
+  return 0 2>/dev/null || exit 0
+fi
+
 # Record the docker group for provisioning first-boot user creation and factory reset,
 # then grant it directly when the install user already exists (deferred-provisioning
 # installs create the user at first boot instead).
