@@ -5,6 +5,16 @@
 
 set -e
 
+# Fedora: voxtype publishes Arch binaries only (voxtype-bin is skip-mapped, no
+# Fedora build). Don't offer an install that would fail at `voxtype setup`;
+# show a clear notice instead. Arch path below is unchanged.
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]] &&
+  ! command -v voxtype >/dev/null 2>&1; then
+  omarchy-notification-send -u low "Voxtype dictation unavailable" \
+    "Voxtype has no Fedora build yet, so dictation can't be installed on Omedora." -t 8000
+  exit 0
+fi
+
 # Install voxtype and configure it for use.
 
 if gum confirm "Install Voxtype + AI model (~150MB) to enable dictation?"; then
