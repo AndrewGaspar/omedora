@@ -167,6 +167,11 @@ cp "$POLICY" "$FIXTURE/user/default-apps-fedora.sh"
 # the real script no-ops cleanly here (OMARCHY_PATH has no shim source), but
 # it must EXIST to be sourced.
 cp "$ROOT/install/user/powerprofilesctl-shim-fedora.sh" "$FIXTURE/user/powerprofilesctl-shim-fedora.sh"
+# ...and the nvim bootstrap step. We stub it (the real one clones from GitHub +
+# runs Lazy sync, which we don't want in an L1 unit test); the dispatch wiring
+# is what PART 2 proves, and nvim-fedora-test.sh covers the real script.
+printf '# stub: real nvim bootstrap exercised in nvim-fedora-test.sh\n' \
+  >"$FIXTURE/user/nvim-fedora.sh"
 
 run_finalize() {  # $1 distro  $2 browser-get-out  $3 mailto-query-out
   : >"$MOCK_LOG"
