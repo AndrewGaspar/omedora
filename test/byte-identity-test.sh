@@ -77,6 +77,11 @@ ALLOW["bin/omarchy-update-confirm"]='  "What'"'"'s new: https://github.com/basec
 
 ALLOW["bin/omarchy-update-restart"]='  if [[ -f $kernel ]] && pacman -Qo "$kernel" &>/dev/null; then'
 
+# omarchy-debug: the inline expac/pacman package-list moved into the Arch arm of
+# a distro case (verbatim) so Fedora can use rpm/dnf; the heredoc now prints
+# $PKG_LIST.
+ALLOW["bin/omarchy-debug"]='$({ expac -S '"'"'%n %v (%r)'"'"' $(pacman -Qqe) 2>/dev/null; comm -13 <(pacman -Sql | sort) <(pacman -Qqe | sort) | xargs -r expac -Q '"'"'%n %v (AUR)'"'"'; } | sort)'
+
 # The About (fastfetch) OS line is brand-aware on Fedora (shows the Omedora +
 # Fedora versions); the Arch branch reproduces the upstream line verbatim.
 ALLOW["etc/fastfetch/config.jsonc"]='      "text": "version=$(omarchy-version) && echo \"Omarchy $version\""'

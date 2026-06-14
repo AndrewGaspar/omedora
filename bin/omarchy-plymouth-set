@@ -5,6 +5,17 @@
 # omarchy:examples=omarchy plymouth set '#1d2021' '#ebdbb2' ~/.local/state/omarchy/current/theme/plymouth/logo.png
 # omarchy:requires-sudo=true
 
+# Fedora dispatch — Omedora does not own the boot Plymouth theme on Fedora
+# (plymouth is skip-mapped in install/packages/fedora.toml; no omedora theme is
+# installed to /usr/share/plymouth/themes/omarchy, and Fedora uses GDM, not the
+# Omarchy SDDM theme this script also writes). The Arch path below would write
+# into non-existent theme dirs and fall back to `mkinitcpio -P` (Arch
+# initramfs). No-op silently (this is also called during theme switching) and
+# exit 0. Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora) exit 0 ;;
+esac
+
 # Configure the Plymouth boot theme with a custom background color, text color, and logo.
 # Stages the change in a temp dir, then commits the staged files to /usr/share and
 # rebuilds the initramfs. Also syncs the SDDM login screen (the post-logout

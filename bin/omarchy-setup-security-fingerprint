@@ -62,6 +62,55 @@ account    include                     system-local-login
 EOF
 }
 
+# Fedora dispatch — additive; the Arch path below is byte-for-byte identical to
+# upstream. On Fedora there is no libfprint-git AUR conflict dance (fprintd,
+# fprintd-pam, libfprint and usbutils all live in the main repos), and the
+# system PAM stack is regenerated from authselect profiles — hand-editing
+# /etc/pam.d/sudo (setup_pam_config) would be clobbered, so the supported switch
+# is `authselect enable-feature with-fingerprint`, which drops pam_fprintd into
+# the system-auth/password-auth includes sudo and polkit pull in. We reuse the
+# portable helpers above (hardware check, the omarchy-namespaced lock PAM).
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora)
+    echo -e "\e[32mSetting up fingerprint scanner for authentication.\n\e[0m"
+
+    echo "Installing required packages..."
+    omarchy-pkg-add fprintd fprintd-pam libfprint usbutils
+
+    if ! check_fingerprint_hardware; then
+      exit 1
+    fi
+
+    if command -v authselect >/dev/null 2>&1; then
+      echo "Enabling fingerprint authentication via authselect..."
+      sudo authselect enable-feature with-fingerprint
+      sudo authselect apply-changes
+    else
+      echo -e "\e[31mauthselect not found; cannot wire up fingerprint PAM integration.\e[0m"
+      exit 1
+    fi
+
+    echo -e "\e[32m\nLet's setup your right index finger as the first fingerprint.\e[0m"
+    echo -e "Keep moving the finger around on sensor until the process completes.\n"
+
+    if sudo fprintd-enroll "$USER"; then
+      echo -e "\e[32m\nFingerprint enrolled successfully!\e[0m"
+      echo -e "\nNow let's verify that it's working correctly.\n"
+      if fprintd-verify; then
+        setup_lock_fingerprint_pam
+        echo -e "\e[32m\nPerfect! Fingerprint authentication is now configured.\e[0m"
+        echo "You can use your fingerprint for sudo, polkit, and lock screen (Super + Ctrl + L)."
+      else
+        echo -e "\e[31m\nVerification failed. You may want to try enrolling again.\e[0m"
+      fi
+    else
+      echo -e "\e[31m\nEnrollment failed. Please try again.\e[0m"
+      exit 1
+    fi
+    exit 0
+    ;;
+esac
+
 
 echo -e "\e[32mSetting up fingerprint scanner for authentication.\n\e[0m"
 

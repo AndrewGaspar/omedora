@@ -3,5 +3,16 @@
 # omarchy:summary=Restore the default Omarchy Plymouth boot theme and SDDM login screen
 # omarchy:requires-sudo=true
 
+# Fedora dispatch — Omedora does not own the boot Plymouth theme on Fedora (see
+# omarchy-refresh-plymouth). No theme to restore, and the `mkinitcpio -P`
+# fallback is Arch-only. No-op with a note and exit 0. Arch path below is
+# unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora)
+    echo "Omedora keeps Fedora's stock boot splash; there's no Omarchy Plymouth theme to reset."
+    exit 0
+    ;;
+esac
+
 omarchy-refresh-plymouth
 omarchy-refresh-sddm
