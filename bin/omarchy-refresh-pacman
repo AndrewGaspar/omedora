@@ -3,6 +3,16 @@
 # omarchy:summary=Overwrite the package configuration for /etc/pacman with the Omarchy default of using its dedicated mirrors and repositories, then update all packages.
 # omarchy:requires-sudo=true
 
+# Fedora dispatch — there is no pacman and no per-channel mirror/repo concept on
+# Omedora; packages come from a single COPR. No-op with a clear note and exit 0
+# so the Channel menu items don't hard-error. Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora)
+    echo "Channel switching isn't available on Omedora — packages come from the omedora COPR."
+    exit 0
+    ;;
+esac
+
 sudo cp -f /etc/pacman.conf /etc/pacman.conf.bak
 sudo cp -f /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.bak
 
