@@ -77,6 +77,10 @@ ALLOW["bin/omarchy-update-confirm"]='  "What'"'"'s new: https://github.com/basec
 
 ALLOW["bin/omarchy-update-restart"]='  if [[ -f $kernel ]] && pacman -Qo "$kernel" &>/dev/null; then'
 
+# The About (fastfetch) OS line is brand-aware on Fedora (shows the Omedora +
+# Fedora versions); the Arch branch reproduces the upstream line verbatim.
+ALLOW["etc/fastfetch/config.jsonc"]='      "text": "version=$(omarchy-version) && echo \"Omarchy $version\""'
+
 
 # --- the audit ---------------------------------------------------------------
 # Modified upstream files = files that differ from the pin AND exist on the pin

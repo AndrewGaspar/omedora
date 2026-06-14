@@ -71,7 +71,7 @@
       "type": "command",
       "key": "\ue900 OS",
       "keyColor": "blue",
-      "text": "version=$(omarchy-version) && echo \"Omarchy $version\""
+      "text": "if [[ \"$(omarchy-distro 2>/dev/null)\" == fedora ]]; then echo \"$(omarchy-version) on $(. /etc/os-release; echo \"$NAME $VERSION_ID\")\"; else version=$(omarchy-version) && echo \"Omarchy $version\"; fi"
     },
     {
       "type": "command",
