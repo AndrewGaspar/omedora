@@ -138,6 +138,61 @@ verify_progress() {
   done
 }
 
+# Fedora dispatch — additive; the Arch path below is byte-for-byte identical to
+# upstream. On Fedora there is no libfprint-git conflict dance (fprintd,
+# fprintd-pam, libfprint and usbutils all live in the main repos), and the
+# system PAM stack is regenerated from authselect profiles — hand-editing
+# /etc/pam.d/sudo (setup_pam_config) would be clobbered, so the supported switch
+# is `authselect enable-feature with-fingerprint`, which drops pam_fprintd into
+# the system-auth/password-auth includes sudo and polkit pull in. Like the Arch
+# path, PAM changes only once a print is enrolled and verified; the lock screen
+# then comes from omarchy-apply-lock (bin/fedora/setup-lock on Fedora). The
+# reader detection and progress filters above are shared.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora)
+    echo -e "\e[32mSetting up fingerprint scanner for authentication.\n\e[0m"
+
+    if ! omarchy-hw-fingerprint; then
+      echo -e "\e[31mNo fingerprint sensor detected.\e[0m"
+      exit 1
+    fi
+
+    if omarchy-cmd-missing authselect; then
+      echo -e "\e[31mauthselect not found; cannot wire up fingerprint PAM integration.\e[0m"
+      exit 1
+    fi
+
+    echo "Installing required packages..."
+    omarchy-pkg-add fprintd fprintd-pam libfprint usbutils
+
+    echo -e "\e[32m\nLet's set up your right index finger as the first fingerprint.\e[0m"
+    echo -e "Touch or swipe the sensor, and keep going until it says Enrolled.\nA step can take a few tries.\n"
+    again="Touch or swipe it again."
+
+    sudo fprintd-enroll "$USER" | enroll_progress "$again"
+    if (( PIPESTATUS[0] != 0 )); then
+      echo -e "\e[31m\nEnrollment failed. Please try again.\e[0m"
+      exit 1
+    fi
+    echo -e "\e[32m\nFingerprint enrolled successfully!\e[0m"
+
+    echo -e "\nNow let's verify that it's working correctly. Touch or swipe the sensor.\n"
+    fprintd-verify | verify_progress "$again"
+    if (( PIPESTATUS[0] != 0 )); then
+      echo -e "\e[31m\nVerification failed. You may want to try enrolling again.\e[0m"
+      exit 1
+    fi
+
+    echo "Enabling fingerprint authentication via authselect..."
+    sudo authselect enable-feature with-fingerprint
+    sudo authselect apply-changes
+    "$OMARCHY_PATH/bin/omarchy-apply-lock"
+    echo -e "\e[32m\nPerfect! Fingerprint authentication is now configured.\e[0m"
+    echo "You can use your fingerprint for sudo, polkit, and lock screen (Super + Ctrl + L)."
+    exit 0
+    ;;
+esac
+
 echo -e "\e[32mSetting up fingerprint scanner for authentication.\n\e[0m"
 
 # Bail before installing anything if there's no reader to talk to.
