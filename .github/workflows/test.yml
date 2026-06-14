@@ -80,6 +80,9 @@ jobs:
       - name: Run archism-gating test
         run: bash test/archism-gating-test.sh
 
+      - name: Run voxtype-install test
+        run: bash test/voxtype-install-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 
