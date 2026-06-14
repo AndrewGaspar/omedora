@@ -391,7 +391,7 @@ reason = "Not in Fedora main or RPM Fusion (verified against both, 2026-06-11); 
 
 [voxtype-bin]
 source = "skip"
-reason = "Voxtype publishes Arch binaries only. It is on-demand (omarchy-voxtype-install), not in the base set; the install command degrades gracefully. Revisit (omedora RPM or upstream Fedora build) if demand surfaces."
+reason = "Skip-mapped because voxtype-bin (the Arch package) never reaches pkg.py on Fedora: omarchy-voxtype-install's Fedora arm installs voxtype's OFFICIAL upstream Fedora RPM on demand instead, via bin/fedora/voxtype-install-pkg (pinned version + sha256). It is on-demand (not in the base set). wtype resolves natively. Bump = edit the two constants in bin/fedora/voxtype-install-pkg."
 
 [yaru-icon-theme]
 source = "dnf"
