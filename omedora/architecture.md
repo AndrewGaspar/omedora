@@ -571,6 +571,7 @@ Per-file status as of the current tip of `dev`. The roadmap in `testing.md` §10
 | `omedora/test/fedora/smoke.sh` | New | ✅ shipped | L3 audit-only smoke (scheduled / label-gated) |
 | `omedora/test/fedora/run-integration.sh`, `run-smoke.sh` | New | ✅ shipped | Host-side runners for L2 / L3 |
 | `bin/fedora/pkg.py` | New | ✅ shipped | Python implementation of pkg-add/missing/present/drop/aur-add on Fedora; map resolution + dnf/rpm/flatpak/source dispatch |
+| `bin/fedora/voxtype-install-pkg` | New | ✅ shipped | Fedora arm of `omarchy-voxtype-install`: downloads voxtype's official upstream Fedora RPM (pinned version + sha256, abort on mismatch), `dnf install`s it, adds `wtype` + best-effort `vulkan-loader`. Bump = two inline constants. Test seams: `$OMEDORA_DNF_CMD`, `$OMEDORA_VOXTYPE_RPM_URL`, `$OMEDORA_VOXTYPE_DOWNLOAD_CMD` |
 | `bin/omarchy-dev-validate-fedora-packages` | New | ✅ shipped | Package-map validator; mirrors `bin/omarchy-dev-bin-metadata` shape |
 | `install/packages/fedora.toml` | New | ✅ shipped | Package map (44 entries; bulks out per testing.md step 10) |
 | `install/packages/installers/` | New | ✅ shipped | Source-installer tier **retired** — only `README.md` (a pointer to `omedora/packaging/copr/`) remains. New non-Fedora packages are RPMs (see [Packaging tier](#packaging-tier-rpmcopr)) |
@@ -682,7 +683,7 @@ dev/test seam that keeps running from the checkout).
 
 | File | Decision | Why |
 | --- | --- | --- |
-| `bin/omarchy-first-run` | Fedora condition around the Voxtype hook | voxtype-bin is skip-mapped (no Fedora build); the hook is only installed when `voxtype` is available. Arch branch byte-identical |
+| `bin/omarchy-first-run` | Unchanged (byte-identical to upstream) | Previously gated the Voxtype install hook off on Fedora (no Fedora build). voxtype now installs on demand from its official upstream Fedora RPM (see `bin/fedora/voxtype-install-pkg`), so the hook is offered on Fedora like Arch — the gate was dropped and the file restored to upstream-identical |
 | `install/user/first-run/enable-user-units.sh` | Unchanged | The shipped user units come from the omedora-settings RPM; `systemctl --user` failures are tolerated by `run_first_run_step` (first-run retries next login) |
 | `install/user/first-run/gnome-theme.sh` | Arch-only gate | Same decision as 3.8.2: the theme system (`omarchy-theme-set-gnome`) owns GNOME appearance on Fedora; fixed dark hardcodes would clobber a coexisting GNOME setup |
 | `install/user/first-run/gtk-primary-paste.sh` | Unchanged | A behavioral (not appearance) setting upstream relies on; runs on both |
