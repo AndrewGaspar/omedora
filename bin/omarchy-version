@@ -17,6 +17,25 @@ if [[ $omarchy_path != "/usr/share/omarchy" ]]; then
   exit 0
 fi
 
+# Fedora: the omedora/omedora-settings RPMs replace the Arch `omarchy` package.
+# Report the Omedora SemVer (omedora/version, also what omarchy-update-available
+# compares) with the Omarchy base it rebases on; the Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora)
+    omedora_version=$(cat "$omarchy_path/omedora/version" 2>/dev/null || true)
+    base_version=$(cat "$omarchy_path/version" 2>/dev/null || true)
+    # Fall back to the RPM's version if the shipped file is somehow absent.
+    [[ -n $omedora_version ]] || omedora_version=$(rpm -q --qf '%{VERSION}' omedora 2>/dev/null || true)
+    [[ -n $omedora_version ]] || exit 1
+    if [[ -n $base_version ]]; then
+      echo "Omedora $omedora_version (Omarchy $base_version)"
+    else
+      echo "Omedora $omedora_version"
+    fi
+    exit 0
+    ;;
+esac
+
 # The edge channel installs omarchy-dev instead of omarchy, so check both.
 for package in omarchy-dev omarchy; do
   version=$(pacman -Q "$package" 2>/dev/null | awk '{ print $2 }')
