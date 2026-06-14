@@ -77,6 +77,9 @@ jobs:
       - name: Run byte-identity audit (upstream files are additive-only)
         run: bash test/byte-identity-test.sh
 
+      - name: Run archism-gating test
+        run: bash test/archism-gating-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 
