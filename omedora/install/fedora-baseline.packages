@@ -14,9 +14,23 @@
 # pipewire-alsa        ALSA compat — expected on a desktop.
 # util-linux-script    the `script` PTY logger omarchy-update logs through
 #                      (Fedora 44 split it out of util-linux-core).
+# perl-JSON-PP         JSON::PP — omarchy-menu-select builds its menu payload
+# perl-Encode          with `perl -MEncode -MJSON::PP`. Both are core-bundled
+#                      with Arch's perl but split into separate, uninstalled
+#                      packages on Fedora, so the perl `use` aborted
+#                      ("BEGIN failed") and EVERY omarchy-menu-select picker
+#                      (keybindings cheatsheet, and the other pick-one menus)
+#                      came up empty.
+# libxkbcommon-utils   provides `xkbcli`, which omarchy-menu-keybindings uses
+#                      to resolve keycodes->symbols (otherwise keys show as
+#                      code:N). On Arch it ships with libxkbcommon; Fedora
+#                      splits it into this subpackage and doesn't pull it in.
 xdg-utils
 xdg-user-dirs
 pipewire
 pipewire-pulseaudio
 pipewire-alsa
 util-linux-script
+perl-JSON-PP
+perl-Encode
+libxkbcommon-utils
