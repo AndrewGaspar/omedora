@@ -1,0 +1,85 @@
+#!/bin/bash
+#
+# Fedora-only voxtype package install, the omedora-owned sibling exec'd by
+# bin/omarchy-voxtype-install's Fedora arm (zero upstream rebase surface; bump
+# is a two-constant edit — mirrors bin/fedora/pkg-install + the inline-pin idiom
+# in install/user/nvim-fedora.sh).
+#
+# Upstream (peteonrails/voxtype) publishes Arch binaries only via its PKGBUILD,
+# but it ALSO ships an official Fedora RPM as a GitHub release asset that bundles
+# every binary variant (avx2/avx512/vulkan/onnx-cuda/migraphx) under
+# /usr/lib/voxtype/ with a /usr/bin/voxtype wrapper. `voxtype setup gpu --enable`
+# (run later by omarchy-voxtype-install) just re-points that wrapper. So instead
+# of re-deriving the multi-hundred-MB bundle as our own COPR package, we install
+# the upstream RPM on demand, pinned by version + sha256.
+#
+# Supply-chain gate: the release's SHA256SUMS.txt covers the raw per-variant
+# binaries but NOT the .rpm, so we pin the .rpm's sha256 ourselves (computed once
+# at vendor-time) and ABORT on any mismatch — consistent with every other omedora
+# vendored source. (Upstream also GPG-signs voxtype-<VER>-1.x86_64.rpm.asc /
+# SHA256SUMS.txt.asc as optional hardening; sha256 is the required gate.)
+#
+# Bump procedure: download the new voxtype-<VER>-1.x86_64.rpm, `sha256sum` it,
+# and update the two constants below. Nothing else changes.
+
+set -euo pipefail
+
+# --- pinned upstream RPM -----------------------------------------------------
+# v0.7.5 is the latest true stable (do NOT pin v1.0.0-rc* release candidates).
+VOXTYPE_VERSION="0.7.5"
+# sha256 of voxtype-0.7.5-1.x86_64.rpm (computed locally at vendor-time; the
+# release's SHA256SUMS.txt does NOT cover the .rpm, so this is our own pin).
+VOXTYPE_RPM_SHA256="50dd10fe8dcdd0f0d7a2796ca8d628e21810c81e2ae1c365075643e552e79c61"
+
+RPM_NAME="voxtype-${VOXTYPE_VERSION}-1.x86_64.rpm"
+# Test seam: $OMEDORA_VOXTYPE_RPM_URL lets the L1 test point the download at a
+# local fixture rpm (file:// or a path the fake downloader understands) so it's
+# hermetic/offline.
+RPM_URL="${OMEDORA_VOXTYPE_RPM_URL:-https://github.com/peteonrails/voxtype/releases/download/v${VOXTYPE_VERSION}/${RPM_NAME}}"
+
+# Test seam: $OMEDORA_DNF_CMD defaults to the real dnf (consistent with the rest
+# of the Fedora bin/ siblings).
+DNF_CMD="${OMEDORA_DNF_CMD:-dnf}"
+
+# wtype is the wlroots typing backend Hyprland uses; native in Fedora repos.
+omarchy-pkg-add wtype
+
+workdir="$(mktemp -d)"
+trap 'rm -rf "${workdir:-}"' EXIT
+rpm_path="$workdir/$RPM_NAME"
+
+echo "Downloading voxtype ${VOXTYPE_VERSION} RPM..."
+# Test seam: $OMEDORA_VOXTYPE_DOWNLOAD_CMD lets the test inject a fake downloader
+# (called as: <cmd> <url> <dest>). Default: curl (follow redirects), wget fallback.
+if [[ -n "${OMEDORA_VOXTYPE_DOWNLOAD_CMD:-}" ]]; then
+  "$OMEDORA_VOXTYPE_DOWNLOAD_CMD" "$RPM_URL" "$rpm_path"
+elif command -v curl >/dev/null 2>&1; then
+  curl -fsSL -o "$rpm_path" "$RPM_URL"
+elif command -v wget >/dev/null 2>&1; then
+  wget -qO "$rpm_path" "$RPM_URL"
+else
+  echo "Error: neither curl nor wget is available to download voxtype." >&2
+  exit 1
+fi
+
+# --- supply-chain gate: verify sha256, ABORT loudly on mismatch --------------
+actual_sha="$(sha256sum "$rpm_path" | awk '{print $1}')"
+if [[ "$actual_sha" != "$VOXTYPE_RPM_SHA256" ]]; then
+  echo "Error: voxtype RPM sha256 mismatch — refusing to install." >&2
+  echo "  expected: $VOXTYPE_RPM_SHA256" >&2
+  echo "  actual:   $actual_sha" >&2
+  echo "  url:      $RPM_URL" >&2
+  exit 1
+fi
+echo "voxtype RPM sha256 verified ($VOXTYPE_RPM_SHA256)."
+
+# Install the verified local RPM. Idempotent-ish: a re-run reinstalls the same
+# pinned rpm.
+sudo "$DNF_CMD" install -y "$rpm_path"
+
+# Best-effort: the Vulkan variant needs an ICD loader the upstream RPM doesn't
+# pull. Only add it when a GPU/ICD is actually present, so the later
+# `voxtype setup gpu --enable` has the loader. Never fatal.
+if omarchy-hw-vulkan; then
+  omarchy-pkg-add vulkan-loader || true
+fi
