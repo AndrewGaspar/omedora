@@ -34,6 +34,21 @@ else
   DMESG_OUTPUT="$(sudo dmesg)"
 fi
 
+# Installed-packages listing. On Arch this is the upstream expac/pacman pipeline
+# (unchanged below). On Fedora pacman/expac are absent and would emit blank or
+# garbled output, so use the rpm/dnf equivalent. Additive: the Arch arm
+# reproduces the upstream command verbatim.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora)
+    PKG_LIST="$(rpm -q omedora omedora-settings 2>/dev/null
+                { dnf -q repoquery --userinstalled --qf '%{name} %{version}-%{release}' 2>/dev/null \
+                  || rpm -qa --qf '%{name} %{version}-%{release}\n'; } | sort)"
+    ;;
+  *)
+    PKG_LIST="$({ expac -S '%n %v (%r)' $(pacman -Qqe) 2>/dev/null; comm -13 <(pacman -Sql | sort) <(pacman -Qqe | sort) | xargs -r expac -Q '%n %v (AUR)'; } | sort)"
+    ;;
+esac
+
 cat > "$LOG_FILE" <<EOF
 Date: $(date)
 Hostname: $(hostname)
@@ -57,7 +72,7 @@ $(journalctl -b -p 4..1)
 =========================================
 INSTALLED PACKAGES
 =========================================
-$({ expac -S '%n %v (%r)' $(pacman -Qqe) 2>/dev/null; comm -13 <(pacman -Sql | sort) <(pacman -Qqe | sort) | xargs -r expac -Q '%n %v (AUR)'; } | sort)
+$PKG_LIST
 EOF
 
 if [[ $PRINT_ONLY = "true" ]]; then
