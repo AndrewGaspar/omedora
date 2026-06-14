@@ -68,14 +68,8 @@ run_first_run_step() {
   fi
 }
 
-# omedora: voxtype has no Fedora build (voxtype-bin is skip-mapped), so on
-# Fedora only offer the install hook when voxtype is actually available.
-# The Arch branch is byte-identical to upstream.
-if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" != "fedora" ]] ||
-  command -v voxtype >/dev/null 2>&1; then
-  run_first_run_step "install Voxtype post-update hook" \
-    omarchy-hook-install post-update "$OMARCHY_PATH/install/user/first-run/install-voxtype.hook"
-fi
+run_first_run_step "install Voxtype post-update hook" \
+  omarchy-hook-install post-update "$OMARCHY_PATH/install/user/first-run/install-voxtype.hook"
 run_first_run_step "install fingerprint setup post-update hook" \
   omarchy-hook-install post-update "$OMARCHY_PATH/install/user/first-run/setup-fingerprint.hook"
 run_first_run_step "install agent setup post-update hook" \
