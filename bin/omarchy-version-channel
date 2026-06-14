@@ -2,6 +2,17 @@
 
 # omarchy:summary=Print the active Omarchy mirror and package channel
 
+# Fedora has no Omarchy pacman mirror/channel concept — packages come from the
+# single omedora COPR. Report that as the channel (avoids the pacman.conf grep
+# errors + the bogus "unknown"). Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora)
+    copr=$(omedora-copr 2>/dev/null || true)
+    echo "${copr:-omedora COPR}"
+    exit 0
+    ;;
+esac
+
 if grep -q "https://stable-mirror.omarchy.org/" /etc/pacman.d/mirrorlist; then
   mirror="stable"
 elif grep -q "https://rc-mirror.omarchy.org/" /etc/pacman.d/mirrorlist; then
