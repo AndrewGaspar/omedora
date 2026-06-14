@@ -129,7 +129,12 @@ rm -rf %{buildroot}%{_datadir}/omarchy/default/libalpm \
        %{buildroot}%{_datadir}/omarchy/default/plymouth
 
 # Branding sources (omarchy-branding-* reset from $OMARCHY_PATH/{icon,logo}.txt).
-install -pm644 logo.txt logo.svg icon.txt icon.png %{buildroot}%{_datadir}/omarchy/
+# logo.txt is the wide WORDMARK shown by omarchy-show-logo, the screensaver, and
+# `omarchy branding screensaver reset` — a user-facing surface omedora rebrands
+# (see omedora/branding.md). Ship Omedora's wordmark for it; logo.svg/icon.* stay
+# upstream (no omedora variants; the About icon stays Omarchy, matching 3.8.2).
+install -pm644 logo.svg icon.txt icon.png %{buildroot}%{_datadir}/omarchy/
+install -pm644 omedora/branding/logo.txt %{buildroot}%{_datadir}/omarchy/logo.txt
 
 # etc-overrides/: REFERENCE COPIES ONLY on Fedora. Upstream Arch copies these
 # over package-owned /etc files from post_install (cp -f); on Fedora those
@@ -154,10 +159,12 @@ install -Dpm644 etc/plymouth/plymouthd.conf \
 # ---------------------------------------------------------------------------
 install -d %{buildroot}/etc/skel/.config
 cp -a config/. %{buildroot}/etc/skel/.config/
-# Branding seeds (about <- icon.txt, screensaver <- logo.txt; matches what
-# omarchy-branding-{about,screensaver} reset to).
+# Branding seeds (about <- icon.txt [upstream], screensaver <- the Omedora
+# wordmark; matches what omarchy-branding-{about,screensaver} reset to now that
+# /usr/share/omarchy/logo.txt is Omedora's). This is the v4 home of the 3.8.2
+# install/config/branding.sh screensaver rebrand.
 install -Dpm644 icon.txt %{buildroot}/etc/skel/.config/omarchy/branding/about.txt
-install -Dpm644 logo.txt %{buildroot}/etc/skel/.config/omarchy/branding/screensaver.txt
+install -Dpm644 omedora/branding/logo.txt %{buildroot}/etc/skel/.config/omarchy/branding/screensaver.txt
 # Web-app/utility launchers.
 install -d %{buildroot}/etc/skel/.local/share/applications
 cp -a applications/*.desktop %{buildroot}/etc/skel/.local/share/applications/
