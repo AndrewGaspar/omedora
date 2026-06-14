@@ -4,6 +4,78 @@
 
 set -e
 
+# Fedora dispatch — additive; the Arch path below is byte-for-byte identical to
+# upstream. The Arch path installs ~40 AUR/repo packages that don't exist on
+# Fedora (every name would dnf "no match" and hard-fail). On Fedora, RPM Fusion
+# (enabled by the omedora repos step) ships `retroarch` + a subset of
+# `libretro-*` cores; cores live in /usr/lib64/libretro (not /usr/lib), and
+# overlays/shaders/cursors aren't packaged (RetroArch's online updater fetches
+# them on demand), so we omit those config paths. Self-contained arm: installs
+# Fedora packages, writes the same retroarch.cfg keys with Fedora paths, sets up
+# ~/Games, and exits before the Arch body.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora)
+    echo "Installing RetroArch..."
+    # retroarch ships the info DB + autoconfig; retroarch-assets the menu
+    # assets; retroarch-database the rdb/cht/cursors; retroarch-filters the
+    # CPU video filters. The libretro-* set is every core RPM Fusion packages
+    # for Fedora 44 (the rest are fetched via RetroArch's Online Updater).
+    omarchy-pkg-add \
+      retroarch retroarch-assets retroarch-database retroarch-filters \
+      libretro-beetle-ngp libretro-beetle-pce-fast libretro-beetle-vb \
+      libretro-beetle-wswan libretro-bsnes-mercury libretro-desmume2015 \
+      libretro-gambatte libretro-gw libretro-handy libretro-mgba \
+      libretro-nestopia libretro-pcsx-rearmed libretro-prosystem \
+      libretro-stella2014
+
+    # Set up ~/Games for BIOS files and ROMs
+    mkdir -p "$HOME/Games/bios" "$HOME/Games/roms"
+
+    CFG="$HOME/.config/retroarch/retroarch.cfg"
+    mkdir -p "$(dirname "$CFG")"
+    touch "$CFG"
+
+    set_cfg() {
+      local key=$1 value=$2
+      if grep -q "^$key = " "$CFG"; then
+        sed -i "s|^$key = .*|$key = \"$value\"|" "$CFG"
+      else
+        echo "$key = \"$value\"" >>"$CFG"
+      fi
+    }
+
+    set_cfg rgui_browser_directory "$HOME/Games/roms"
+    set_cfg system_directory "$HOME/Games/bios"
+
+    # Fedora/RPM Fusion paths: cores in /usr/lib64/libretro; info, database and
+    # autoconfig under /usr/share/libretro (shipped by retroarch + assets/db).
+    set_cfg libretro_directory "/usr/lib64/libretro"
+    set_cfg libretro_info_path "/usr/share/libretro/info"
+    set_cfg joypad_autoconfig_dir "/usr/share/libretro/autoconfig"
+    set_cfg content_database_path "/usr/share/libretro/database/rdb"
+    set_cfg cheat_database_path "/usr/share/libretro/database/cht"
+    set_cfg cursor_directory "/usr/share/libretro/database/cursors"
+
+    # Vulkan unlocks hardware renderers where the core supports it.
+    set_cfg video_driver "vulkan"
+    # XMB is the classic PS3-style menu (vs. ozone/rgui/glui)
+    set_cfg menu_driver "xmb"
+
+    # Hide Images and Video tabs in the main menu sidebar
+    set_cfg content_show_images "false"
+    set_cfg content_show_video "false"
+
+    echo ""
+    echo "Put your roms and bios files in ~/Games. Then start RetroArch from the app launcher (Super + Space)."
+    echo "Overlays and shaders aren't packaged on Fedora — fetch them via RetroArch's Online Updater (Main Menu > Online Updater)."
+
+    if command -v nautilus >/dev/null 2>&1; then
+      setsid nautilus "$HOME/Games" >/dev/null 2>&1 &
+    fi
+    exit 0
+    ;;
+esac
+
 echo "Installing RetroArch..."
 omarchy-pkg-add \
   retroarch \
