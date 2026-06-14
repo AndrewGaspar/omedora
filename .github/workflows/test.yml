@@ -53,6 +53,9 @@ jobs:
       - name: Run etc-overrides audit
         run: bash test/etc-overrides-audit-test.sh
 
+      - name: Run branding-screensaver audit
+        run: bash test/branding-screensaver-test.sh
+
       - name: Run coexistence plan-gate test
         run: bash test/coexistence-plan-test.sh
 
