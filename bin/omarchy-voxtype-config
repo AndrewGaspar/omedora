@@ -4,5 +4,15 @@
 
 set -e
 
+# Fedora: voxtype publishes Arch binaries only (voxtype-bin is skip-mapped, no
+# Fedora build), so the dictation bar icon can't configure/install it. Degrade
+# to a clear notice instead of erroring on a missing `voxtype`. Arch unchanged.
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]] &&
+  ! command -v voxtype >/dev/null 2>&1; then
+  omarchy-notification-send -u low "Voxtype dictation unavailable" \
+    "Voxtype has no Fedora build yet, so dictation isn't available on Omedora." -t 8000
+  exit 0
+fi
+
 omarchy-launch-floating-terminal-with-presentation "voxtype configure"
 omarchy-restart-shell
