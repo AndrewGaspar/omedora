@@ -125,6 +125,12 @@ if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora
   # tuned-ppd has the PowerProfiles D-Bus API but not the powerprofilesctl CLI
   # omarchy shells out to; install omedora's shim into ~/.local/bin only-if-absent.
   source "$OMARCHY_INSTALL/user/powerprofilesctl-shim-fedora.sh"
+  # omarchy-nvim is skip-mapped on Fedora (its COPR build can't bake the plugin
+  # cache offline), so /etc/skel never seeds ~/.config/nvim. Bootstrap the same
+  # commit-pinned LazyVim+omarchy config here and Lazy-sync it. Idempotent
+  # (skips when ~/.config/nvim/lazyvim.json exists); never destroys an existing
+  # config. See install/user/nvim-fedora.sh.
+  source "$OMARCHY_INSTALL/user/nvim-fedora.sh"
 else
   env -u BROWSER xdg-settings set default-web-browser chromium.desktop
   xdg-mime default HEY.desktop x-scheme-handler/mailto

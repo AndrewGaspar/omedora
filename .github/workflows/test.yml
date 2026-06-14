@@ -68,6 +68,9 @@ jobs:
       - name: Run powerprofilesctl shim test
         run: bash test/powerprofilesctl-shim-test.sh
 
+      - name: Run nvim-fedora bootstrap test
+        run: bash test/nvim-fedora-test.sh
+
       - name: Run upgrade-to-4 test
         run: bash test/upgrade-to-4-test.sh
 
