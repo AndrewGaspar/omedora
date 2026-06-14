@@ -2,4 +2,21 @@
 
 # omarchy:summary=Print when system packages were last upgraded
 
+# Fedora has no /var/log/pacman.log; derive the last upgrade time from dnf
+# history instead (without it, the upstream `grep` fails and `date -d ""`
+# silently prints "now"). Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora)
+    # Newest "Upgrade"/"I,U" transaction end time from dnf history.
+    last=$(dnf history list 2>/dev/null \
+      | awk -F'|' 'NR>2 && $3 ~ /[UI]/ { gsub(/^ +| +$/,"",$4); print $4; exit }')
+    if [[ -n $last ]]; then
+      date -d "$last" "+%A, %B %d %Y at %H:%M" 2>/dev/null || echo "$last"
+    else
+      echo "unknown"
+    fi
+    exit 0
+    ;;
+esac
+
 date -d "$(grep upgraded /var/log/pacman.log | tail -1 | sed -E 's/\[([^]]+)\].*/\1/')" "+%A, %B %d %Y at %H:%M"
