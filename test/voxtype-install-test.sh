@@ -13,6 +13,9 @@
 #            runs `omarchy-pkg-add wtype voxtype-bin` VERBATIM on Arch.
 #   PART 3 — omarchy-voxtype-remove runs `dnf remove ... voxtype` on Fedora and
 #            `omarchy-pkg-drop voxtype-bin` on Arch (Arch path unchanged).
+#   PART 4 — omarchy-voxtype-config (the bar mic click): on Fedora, OFFERS THE
+#            INSTALL (launches omarchy-voxtype-install) when voxtype is absent,
+#            and runs `voxtype configure` once it's installed.
 #
 # Everything external is stubbed on PATH + via the $OMEDORA_* seams; no network,
 # no real dnf, no real download.
@@ -211,5 +214,40 @@ grep -q "^omarchy-pkg-drop voxtype-bin$" "$MOCK_LOG" \
 grep -q "dnf remove" "$MOCK_LOG" \
   && fail "Arch remove never calls dnf" \
   || pass "Arch remove never calls dnf"
+
+# ===========================================================================
+echo "# --- PART 4: omarchy-voxtype-config mic-click dispatch ---"
+# ===========================================================================
+# The bar mic (shell/plugins/bar/indicators/Dictation.qml) runs
+# omarchy-voxtype-config on click. On Fedora, when voxtype isn't installed yet,
+# that must OFFER THE INSTALL (launch omarchy-voxtype-install in a floating
+# terminal) rather than the old dead-end "no Fedora build yet" notice; once
+# voxtype is installed it runs `voxtype configure` (the upstream Arch path).
+stub omarchy-launch-floating-terminal-with-presentation 'printf "launch %s\n" "$*" >>"$MOCK_LOG"'
+stub omarchy-restart-shell ':'
+
+# --- (a) Fedora + voxtype MISSING -> offers the install ----------------------
+rm -f "$SHIM/voxtype"   # voxtype absent from PATH
+: >"$MOCK_LOG"
+( export OMARCHY_DISTRO=fedora
+  bash "$ROOT/bin/omarchy-voxtype-config" ) >/dev/null 2>&1 || true
+grep -q "^launch omarchy-voxtype-install$" "$MOCK_LOG" \
+  && pass "Fedora mic-click offers the install when voxtype is missing" \
+  || { cat "$MOCK_LOG" >&2; fail "Fedora mic-click offers the install when voxtype is missing"; }
+grep -q "voxtype configure" "$MOCK_LOG" \
+  && fail "Fedora mic-click does NOT run 'voxtype configure' when voxtype missing" \
+  || pass "Fedora mic-click does NOT run 'voxtype configure' when voxtype missing"
+
+# --- (b) Fedora + voxtype PRESENT -> runs voxtype configure ------------------
+stub voxtype 'exit 0'   # voxtype now on PATH
+: >"$MOCK_LOG"
+( export OMARCHY_DISTRO=fedora
+  bash "$ROOT/bin/omarchy-voxtype-config" ) >/dev/null 2>&1 || true
+grep -q "^launch voxtype configure$" "$MOCK_LOG" \
+  && pass "Fedora mic-click runs 'voxtype configure' once voxtype is installed" \
+  || { cat "$MOCK_LOG" >&2; fail "Fedora mic-click runs 'voxtype configure' once installed"; }
+grep -q "omarchy-voxtype-install" "$MOCK_LOG" \
+  && fail "Fedora mic-click does NOT re-offer install when voxtype present" \
+  || pass "Fedora mic-click does NOT re-offer install when voxtype present"
 
 echo "# all voxtype-install tests passed"
