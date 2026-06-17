@@ -21,8 +21,8 @@
 %global lua_version 5.5.0
 
 Name:           hyprland
-Version:        0.55.2
-Release:        2%{?dist}
+Version:        0.55.4
+Release:        1%{?dist}
 Summary:        Dynamic tiling Wayland compositor that doesn't sacrifice on its looks
 
 # hyprland: BSD-3-Clause
@@ -260,6 +260,14 @@ install -Dpm644 %{SOURCE1} -t %{buildroot}%{macrosdir}
 %{macrosdir}/macros.hyprland
 
 %changelog
+* Tue Jun 16 2026 omedora <noreply@omedora> - 0.55.4-1
+- Bump to upstream 0.55.4 (Hyprland 0.55.4 wave, with glaze 7.8.2 + aquamarine
+  0.12.1). 0.55.4's CMakeLists dependency floors (aquamarine>=0.9.3,
+  hyprlang>=0.6.7, hyprcursor>=0.1.7, hyprutils>=0.13.1, hyprgraphics>=0.5.1,
+  hyprwayland-scanner>=0.3.10, hyprland-protocols>=0.6.4) are all already
+  satisfied by the pinned stack, so only glaze/aquamarine/hyprland move. Lua
+  pin stays 5.5.0 (0.55.4 still requires lua>=5.5,<5.6).
+
 * Tue Jun 03 2026 omedora <noreply@omedora> - 0.55.2-2
 - Split the wayland-session entries out of the compositor binaries. Hyprland is
   still built once, but: hyprland-no-session (new base) owns all binaries +
