@@ -67,12 +67,13 @@ declare -A ALLOW
 ALLOW["bin/omarchy-finalize-user"]='xdg-settings set default-web-browser chromium.desktop
 xdg-mime default HEY.desktop x-scheme-handler/mailto'
 
-# voxtype install/remove: the upstream unconditional package line moved into the
-# Arch arm of a distro case (verbatim) so Fedora installs/removes the official
-# upstream RPM (Name: voxtype) instead of the Arch voxtype-bin package.
+# voxtype install: the upstream unconditional package line moved into the Arch
+# arm of a distro case (verbatim) so Fedora dispatches to the omedora flavor
+# installer (base voxtype RPM + auto-detected GPU add-on) instead of the Arch
+# voxtype-bin package. The REMOVE script is byte-identical to upstream again
+# (`omarchy-pkg-drop voxtype-bin` -> dnf remove voxtype, which cascades to the
+# installed -cuda/-migraphx subpackages), so it has NO allowlist entry.
 ALLOW["bin/omarchy-voxtype-install"]='  omarchy-pkg-add wtype voxtype-bin'
-
-ALLOW["bin/omarchy-voxtype-remove"]='  omarchy-pkg-drop voxtype-bin'
 
 ALLOW["bin/omarchy-update"]='if [[ -z ${OMARCHY_UPDATE_LOGGED:-} ]]; then
 trap '"'"'echo ""; echo -e "\033[0;31mSomething went wrong during the update!\n\nPlease review the output above carefully, correct the error, and retry the update.\n\nIf you need assistance, get help from the community at https://omarchy.org/discord\033[0m"'"'"' ERR'

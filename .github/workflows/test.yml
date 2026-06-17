@@ -86,6 +86,9 @@ jobs:
       - name: Run voxtype-install test
         run: bash test/voxtype-install-test.sh
 
+      - name: Run voxtype-spec static guard
+        run: bash test/voxtype-spec-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 
