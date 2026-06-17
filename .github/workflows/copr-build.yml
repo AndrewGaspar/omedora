@@ -33,7 +33,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2   # need the push's parent to diff changed specs
+          fetch-depth: 0   # full history: a shallow clone can't reach the
+                           # push's parent on a multi-commit push (git diff
+                           # $before..HEAD then fails with exit 128)
 
       - name: Gate on the COPR token secret
         id: gate
