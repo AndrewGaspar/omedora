@@ -102,6 +102,11 @@ ALLOW["bin/omarchy-launch-webapp"]='# omarchy:args=<url>
 exec setsid uwsm-app -- $(sed -n '"'"'s/^Exec=\([^ ]*\).*/\1/p'"'"' {~/.local,~/.nix-profile,/usr}/share/applications/$browser 2>/dev/null | head -1) --app="$1" "${@:2}"'
 
 
+
+# The Menu > Update entry is rebranded Omarchy -> Omedora (user-facing
+# label). learn.omarchy keeps "Omarchy" (it is the actual Omarchy manual).
+# Unwind if the pin ever ships an Omedora-branded menu.
+ALLOW["default/omarchy/omarchy-menu.jsonc"]='  "update.omarchy": {"icon":"","label":"Omarchy","keywords":"system","action":"omarchy-launch-floating-terminal-with-presentation omarchy-update"},'
 # --- the audit ---------------------------------------------------------------
 # Modified upstream files = files that differ from the pin AND exist on the pin
 # (so omedora-ADDED files like bin/omedora-* are out of scope — they have no
