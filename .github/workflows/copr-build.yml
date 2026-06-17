@@ -111,6 +111,50 @@ jobs:
           echo "list=$list" >> "$GITHUB_OUTPUT"
           echo "Packages to build: ${list:-<none>}"
 
+      - name: Register changed packages (idempotent upsert)
+        # A NEW spec has no COPR package yet, so `build-package --name X` fails
+        # with "No package with name X in copr" (#123). Register every changed
+        # package first — add-package-scm creates it, edit-package-scm updates an
+        # existing one; trying add then falling back to edit is idempotent, so
+        # this is a no-op for already-registered packages and a create for new
+        # ones. Mirrors copr-submit.sh's register_one, but keyed off the changed
+        # package list directly (not build-repo.sh's SPECS array) so a brand-new
+        # spec not yet wired into SPECS still registers.
+        if: steps.gate.outputs.skip == 'false' && steps.pkgs.outputs.list != ''
+        run: |
+          set -euo pipefail
+          project="$(OMARCHY_PATH="$PWD" bin/omedora-copr)"
+          echo "COPR project: $project"
+          clone_url="https://github.com/${{ github.repository }}.git"
+          branch="${{ github.sha }}"
+          subdir="omedora/packaging/copr"
+          for p in ${{ steps.pkgs.outputs.list }}; do
+            spec="$subdir/$p.spec"
+            if [[ ! -f "$spec" ]]; then
+              echo "==> $p: no $spec in tree, skipping registration"
+              continue
+            fi
+            args=(
+              --name "$p"
+              --clone-url "$clone_url"
+              --commit "$branch"
+              --subdir "$subdir"
+              --spec "$p.spec"
+              --type git
+              --method make_srpm
+              --timeout 18000
+              --webhook-rebuild off
+            )
+            if copr-cli add-package-scm "$project" "${args[@]}" >/dev/null 2>&1; then
+              echo "==> $p: registered (new package)"
+            elif copr-cli edit-package-scm "$project" "${args[@]}" >/dev/null 2>&1; then
+              echo "==> $p: already registered (updated SCM config)"
+            else
+              echo "==> $p: FAILED to register" >&2
+              exit 1
+            fi
+          done
+
       - name: Submit COPR builds (no-wait)
         if: steps.gate.outputs.skip == 'false' && steps.pkgs.outputs.list != ''
         run: |
