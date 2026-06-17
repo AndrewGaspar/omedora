@@ -7,7 +7,7 @@
 # changelog, soname via glob.
 
 Name:           aquamarine
-Version:        0.12.0
+Version:        0.12.1
 Release:        1%{?dist}
 Summary:        A very light linux rendering backend library
 
@@ -65,6 +65,10 @@ Development files for %{name}.
 %{_libdir}/pkgconfig/%{name}.pc
 
 %changelog
+* Tue Jun 16 2026 omedora <noreply@omedora> - 0.12.1-1
+- Bump to upstream 0.12.1 (Hyprland 0.55.4 wave). SOVERSION unchanged
+  (libaquamarine.so.11), so the soname glob and Hyprland link are unaffected.
+
 * Sat May 30 2026 omedora <noreply@omedora> - 0.12.0-1
 - Initial omedora build of aquamarine 0.12.0 (adapted from solopasha/hyprlandRPM).
 - Exports libaquamarine.so.11, matching Hyprland 0.55.2.
