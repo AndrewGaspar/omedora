@@ -40,6 +40,12 @@ SPECS=(
   # task #59 back-fill (all build-tested):
   lazygit.spec lazydocker.spec mise.spec starship.spec usage.spec
   satty.spec hyprland-preview-share-picker.spec
+  # voxtype: subpackaged binary-repackage of upstream's official Fedora RPM —
+  # one spec -> base voxtype (CPU+Vulkan+ONNX-CPU) plus opt-in voxtype-cuda /
+  # voxtype-migraphx GPU add-ons. On-demand (not in any base package set); the
+  # Fedora installer auto-detects the GPU and adds the matching flavor. No
+  # intra-stack BuildRequires (Source0 is the prebuilt upstream RPM).
+  voxtype.spec
   # omarchy-nvim.spec is intentionally NOT built: its %build bakes the plugin
   # cache via a headless `:Lazy! sync` that fetches ~50 plugins from GitHub,
   # which fails in COPR's offline mock build. Nothing Requires it, so instead

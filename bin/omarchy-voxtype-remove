@@ -15,13 +15,7 @@ if omarchy-cmd-present voxtype; then
   systemctl --user daemon-reload
 
   # Remove packages and configs
-  # Fedora installs the upstream RPM (Name: voxtype) via
-  # bin/fedora/voxtype-install-pkg, not the Arch voxtype-bin package; remove the
-  # right one per distro. The Arch arm reproduces the upstream line verbatim.
-  case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
-    fedora) sudo "${OMEDORA_DNF_CMD:-dnf}" remove -y voxtype ;;
-    *) omarchy-pkg-drop voxtype-bin ;;
-  esac
+  omarchy-pkg-drop voxtype-bin
   rm -rf ~/.config/voxtype
   rm -rf ~/.local/share/voxtype
   hyprctl reload >/dev/null
