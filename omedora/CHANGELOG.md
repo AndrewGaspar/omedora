@@ -1,3 +1,24 @@
+## v0.1.4 — 2026-06-16 (Omarchy 3.8.2)
+
+- ci(copr): register changed packages before building (#123)
+- Make webapps profile-aware for Chromium browsers
+- Add Wezterm auto-theming support
+- ci(copr): fetch full history so multi-commit pushes diff cleanly
+- chore(copr): bump Hyprland wave — glaze 7.8.2, aquamarine 0.12.1, hyprland 0.55.4
+- chore(copr): bump satty 0.20.1 -> 0.21.1
+- chore(copr): bump mise 2026.6.11, usage 3.5.0, uwsm 0.26.5
+- feat(upgrade): ship omedora-upgrade-to-4 on the stable line
+- docs(testing): correct the L4-in-CI feasibility claim — hosted runners can't
+- fix(test): isolate XDG_DATA_DIRS in mimetypes-browser-test
+- test(ci): wire fcitx seed-skip + XCompose backup tests into the L1 job
+- feat(fedora): disclose default-app & preference changes in the plan gate
+- fix(fedora): set HEY as mailto handler only when none is set
+- fix(fedora): back up ~/.XCompose before overwriting it
+- fix(fedora): skip seeding fcitx IME env vars when fcitx isn't installed
+- refactor(fedora): drop redundant GNOME dark-mode hardcode on Fedora
+- test(fedora): cover default-browser respect/force in mimetypes.sh
+- fix(fedora): don't clobber the user's default web browser
+
 ## v0.1.3 — 2026-06-05 (Omarchy 3.8.2)
 
 - fix(bootstrap): default boot-omedora.sh ref to 3.8.2-omedora, not dev
