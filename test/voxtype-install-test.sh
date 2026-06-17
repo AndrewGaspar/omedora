@@ -45,10 +45,10 @@ stub() { printf '#!/bin/bash\n%s\n' "$2" >"$SHIM/$1"; chmod +x "$SHIM/$1"; }
 # Record every traced action to $MOCK_LOG so assertions can grep it.
 stub omarchy-pkg-add     'printf "omarchy-pkg-add %s\n" "$*" >>"$MOCK_LOG"'
 stub omarchy-pkg-drop    'printf "omarchy-pkg-drop %s\n" "$*" >>"$MOCK_LOG"'
-# GPU probes — overridden per-case below. Default: no GPU.
-stub omarchy-hw-nvidia   'exit 1'
-stub omarchy-hw-vulkan   'exit 1'
-stub lspci               'exit 0'   # prints nothing -> no AMD match by default
+# GPU detection is driven entirely by lspci — the installer inlines both
+# `lspci | grep -qi nvidia` and the AMD probe (it does NOT exec the upstream
+# omarchy-hw-nvidia helper, which ships non-executable). Default: no GPU.
+stub lspci               'exit 0'   # prints nothing -> no GPU match by default
 
 export PATH="$SHIM:$ROOT/bin:$PATH"
 
@@ -64,7 +64,6 @@ lspci_prints() { stub lspci 'cat <<'"'"'EOF'"'"'
 EOF'; }
 
 # --- (a) NVIDIA present -> base + voxtype-cuda (NOT migraphx) -----------------
-stub omarchy-hw-nvidia 'exit 0'
 lspci_prints '01:00.0 VGA compatible controller: NVIDIA Corporation GA104 [GeForce RTX 3070]'
 : >"$MOCK_LOG"
 ( export OMARCHY_DISTRO=fedora; bash "$PKG" ) >/dev/null 2>&1
@@ -79,7 +78,6 @@ grep -q "voxtype-migraphx" "$MOCK_LOG" \
   || pass "NVIDIA: does NOT add voxtype-migraphx"
 
 # --- (b) AMD present (no NVIDIA) -> base + voxtype-migraphx -------------------
-stub omarchy-hw-nvidia 'exit 1'
 lspci_prints '0a:00.0 VGA compatible controller: Advanced Micro Devices, Inc. [AMD/ATI] Navi 31 [Radeon RX 7900 XTX]'
 : >"$MOCK_LOG"
 ( export OMARCHY_DISTRO=fedora; bash "$PKG" ) >/dev/null 2>&1
@@ -94,7 +92,6 @@ grep -q "voxtype-cuda" "$MOCK_LOG" \
   || pass "AMD: does NOT add voxtype-cuda"
 
 # --- (c) Intel/none -> base only, no GPU add-on ------------------------------
-stub omarchy-hw-nvidia 'exit 1'
 lspci_prints '00:02.0 VGA compatible controller: Intel Corporation Raptor Lake-S UHD Graphics'
 : >"$MOCK_LOG"
 ( export OMARCHY_DISTRO=fedora; bash "$PKG" ) >/dev/null 2>&1
@@ -106,7 +103,6 @@ grep -qE "voxtype-(cuda|migraphx)" "$MOCK_LOG" \
   || pass "Intel/none: adds NO GPU flavor (base only)"
 
 # --- (d) the AMD probe doesn't false-match generic non-GPU lspci lines -------
-stub omarchy-hw-nvidia 'exit 1'
 lspci_prints '00:1f.3 Audio device: Intel Corporation Alder Lake PCH-P High Definition Audio'
 : >"$MOCK_LOG"
 ( export OMARCHY_DISTRO=fedora; bash "$PKG" ) >/dev/null 2>&1
@@ -114,8 +110,20 @@ grep -q "voxtype-migraphx" "$MOCK_LOG" \
   && { cat "$MOCK_LOG" >&2; fail "non-GPU lspci line does NOT trigger migraphx"; } \
   || pass "non-GPU lspci line does NOT trigger migraphx"
 
+# --- (e) hybrid NVIDIA+AMD laptop -> NVIDIA wins (cuda, not migraphx) ---------
+# Guards probe precedence: the installer checks NVIDIA first, so a machine with
+# BOTH discrete GPUs gets the higher-performance CUDA backend, not migraphx.
+lspci_prints $'c1:00.0 VGA compatible controller: NVIDIA Corporation GB206M [GeForce RTX 5070]\nc2:00.0 Display controller: Advanced Micro Devices, Inc. [AMD/ATI] Strix [Radeon 890M]'
+: >"$MOCK_LOG"
+( export OMARCHY_DISTRO=fedora; bash "$PKG" ) >/dev/null 2>&1
+grep -q "^omarchy-pkg-add voxtype-cuda$" "$MOCK_LOG" \
+  && pass "hybrid NVIDIA+AMD: NVIDIA wins (adds voxtype-cuda)" \
+  || { cat "$MOCK_LOG" >&2; fail "hybrid NVIDIA+AMD: NVIDIA wins (adds voxtype-cuda)"; }
+grep -q "voxtype-migraphx" "$MOCK_LOG" \
+  && { cat "$MOCK_LOG" >&2; fail "hybrid: does NOT also add voxtype-migraphx"; } \
+  || pass "hybrid: does NOT also add voxtype-migraphx"
+
 # restore defaults
-stub omarchy-hw-nvidia 'exit 1'
 stub lspci 'exit 0'
 
 # ===========================================================================
