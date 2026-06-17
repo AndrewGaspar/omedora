@@ -91,6 +91,16 @@ ALLOW["bin/omarchy-debug"]='$({ expac -S '"'"'%n %v (%r)'"'"' $(pacman -Qqe) 2>/
 # Fedora versions); the Arch branch reproduces the upstream line verbatim.
 ALLOW["etc/fastfetch/config.jsonc"]='      "text": "version=$(omarchy-version) && echo \"Omarchy $version\""'
 
+# Carried from upstream omarchy commit e8939ed9 ("Make webapps profile-aware for
+# Chromium browsers"), cherry-picked AHEAD of the current pin. That commit
+# reworks omarchy-launch-webapp: it adds profile-aware Exec resolution and in
+# doing so drops the old single-arg `# omarchy:args=<url>` metadata line and the
+# old single-line `exec setsid uwsm-app -- ...` launcher. These are upstream
+# deletions, not omedora ones. Unwind this entry when the pin rotates past
+# e8939ed9 (the deletions become part of the pin baseline and stop showing here).
+ALLOW["bin/omarchy-launch-webapp"]='# omarchy:args=<url>
+exec setsid uwsm-app -- $(sed -n '"'"'s/^Exec=\([^ ]*\).*/\1/p'"'"' {~/.local,~/.nix-profile,/usr}/share/applications/$browser 2>/dev/null | head -1) --app="$1" "${@:2}"'
+
 
 # --- the audit ---------------------------------------------------------------
 # Modified upstream files = files that differ from the pin AND exist on the pin
