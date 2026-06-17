@@ -2,23 +2,30 @@
 #
 # L1 unit test for on-demand voxtype install on Fedora.
 #
-# Covers bin/fedora/voxtype-install-pkg (the omedora-owned sibling) and the
-# Fedora/Arch dispatch in bin/omarchy-voxtype-install + bin/omarchy-voxtype-remove.
+# voxtype is hosted in the omedora COPR as a subpackaged binary-repackage: a slim
+# base 'voxtype' RPM (CPU + Vulkan + ONNX-CPU) plus opt-in voxtype-cuda (NVIDIA)
+# and voxtype-migraphx (AMD) GPU add-ons. The Fedora installer
+# (bin/fedora/voxtype-install-pkg) installs the base, then AUTO-DETECTS the GPU and
+# adds the matching flavor. This covers that sibling + the Fedora/Arch dispatch in
+# bin/omarchy-voxtype-install and bin/omarchy-voxtype-remove.
 #
-#   PART 1 — voxtype-install-pkg downloads the PINNED url/version, verifies the
-#            rpm sha256 and ABORTS on mismatch (no dnf install), and on a
-#            matching sha runs `dnf install` of the local rpm + `omarchy-pkg-add
-#            wtype`; vulkan-loader is added ONLY when omarchy-hw-vulkan succeeds.
-#   PART 2 — omarchy-voxtype-install dispatches to the sibling on Fedora and
-#            runs `omarchy-pkg-add wtype voxtype-bin` VERBATIM on Arch.
-#   PART 3 — omarchy-voxtype-remove runs `dnf remove ... voxtype` on Fedora and
-#            `omarchy-pkg-drop voxtype-bin` on Arch (Arch path unchanged).
+#   PART 1 — voxtype-install-pkg: always adds `wtype voxtype-bin` (base, mapped to
+#            voxtype) via omarchy-pkg-add, then ADDS voxtype-cuda on NVIDIA,
+#            voxtype-migraphx on AMD, and NOTHING extra on Intel/none. Selection is
+#            mutually exclusive (NVIDIA wins). Honors OMARCHY_PKG_DRY_RUN (no-op
+#            here since omarchy-pkg-add is stubbed, but the script never shells out
+#            to dnf directly).
+#   PART 2 — omarchy-voxtype-install dispatches to the sibling on Fedora and runs
+#            `omarchy-pkg-add wtype voxtype-bin` VERBATIM on Arch.
+#   PART 3 — omarchy-voxtype-remove runs `omarchy-pkg-drop voxtype-bin` on BOTH
+#            distros (the script is byte-identical to upstream; on Fedora pkg.py
+#            maps that to `dnf remove voxtype`, which cascades to the subpackages).
 #   PART 4 — omarchy-voxtype-config (the bar mic click): on Fedora, OFFERS THE
-#            INSTALL (launches omarchy-voxtype-install) when voxtype is absent,
-#            and runs `voxtype configure` once it's installed.
+#            INSTALL (launches omarchy-voxtype-install) when voxtype is absent, and
+#            runs `voxtype configure` once it's installed.
 #
-# Everything external is stubbed on PATH + via the $OMEDORA_* seams; no network,
-# no real dnf, no real download.
+# Everything external is stubbed on PATH; no network, no real dnf, no real
+# package manager.
 
 set -euo pipefail
 
@@ -35,145 +42,108 @@ export MOCK_LOG
 
 stub() { printf '#!/bin/bash\n%s\n' "$2" >"$SHIM/$1"; chmod +x "$SHIM/$1"; }
 
-# Real tools the script genuinely uses (mktemp, sha256sum, awk, command, rm)
-# come from the host PATH, appended after the shim dir.
-stub sudo                'printf "sudo %s\n" "$*" >>"$MOCK_LOG"; "$@"'
-stub dnf                 'printf "dnf %s\n" "$*" >>"$MOCK_LOG"'
+# Record every traced action to $MOCK_LOG so assertions can grep it.
 stub omarchy-pkg-add     'printf "omarchy-pkg-add %s\n" "$*" >>"$MOCK_LOG"'
 stub omarchy-pkg-drop    'printf "omarchy-pkg-drop %s\n" "$*" >>"$MOCK_LOG"'
-stub omarchy-hw-vulkan   'exit 0'   # default: GPU present (overridden per-case)
+# GPU probes — overridden per-case below. Default: no GPU.
+stub omarchy-hw-nvidia   'exit 1'
+stub omarchy-hw-vulkan   'exit 1'
+stub lspci               'exit 0'   # prints nothing -> no AMD match by default
 
 export PATH="$SHIM:$ROOT/bin:$PATH"
 
 PKG="$ROOT/bin/fedora/voxtype-install-pkg"
 
-# The pin lives in the script — read it so the test tracks bumps automatically.
-PINNED_VER=$(sed -n 's/^VOXTYPE_VERSION="\(.*\)"/\1/p' "$PKG")
-PINNED_SHA=$(sed -n 's/^VOXTYPE_RPM_SHA256="\(.*\)"/\1/p' "$PKG")
-[[ -n $PINNED_VER ]] || fail "could not read VOXTYPE_VERSION from the sibling"
-[[ -n $PINNED_SHA ]] || fail "could not read VOXTYPE_RPM_SHA256 from the sibling"
-
-# A fake downloader: records the url it was asked to fetch, then copies a fixture
-# file into the destination. Which fixture depends on $FIXTURE_SRC (set per-case).
-make_downloader() {
-  local src="$1" out="$SCRATCH/fake-download"
-  cat >"$out" <<EOF
-#!/bin/bash
-printf 'download %s\n' "\$1" >>"$MOCK_LOG"
-cp "$src" "\$2"
-EOF
-  chmod +x "$out"
-  printf '%s' "$out"
-}
-
 # ===========================================================================
-echo "# --- PART 1: voxtype-install-pkg supply-chain gate + install ---"
+echo "# --- PART 1: voxtype-install-pkg flavor auto-detect ---"
 # ===========================================================================
 
-# The pin IS the supply-chain gate, so the script has no sha-override seam by
-# design. To exercise the MATCH path offline we generate a fixture and run a copy
-# of the script whose pinned sha is swapped to that fixture's real sha (see (b)).
+# Helper: stub lspci to print a given line (so the AMD grep can match it).
+lspci_prints() { stub lspci 'cat <<'"'"'EOF'"'"'
+'"$1"'
+EOF'; }
 
-# --- (a) sha MISMATCH -> abort, no dnf install -------------------------------
-BAD_FIX="$SCRATCH/bad.rpm"
-printf 'this is not the pinned rpm' >"$BAD_FIX"
+# --- (a) NVIDIA present -> base + voxtype-cuda (NOT migraphx) -----------------
+stub omarchy-hw-nvidia 'exit 0'
+lspci_prints '01:00.0 VGA compatible controller: NVIDIA Corporation GA104 [GeForce RTX 3070]'
 : >"$MOCK_LOG"
-rc=0
-( export OMARCHY_DISTRO=fedora \
-         OMEDORA_DNF_CMD=dnf \
-         OMEDORA_VOXTYPE_RPM_URL="https://example.invalid/$(basename "$BAD_FIX")" \
-         OMEDORA_VOXTYPE_DOWNLOAD_CMD="$(make_downloader "$BAD_FIX")"
-  bash "$PKG" ) >/dev/null 2>&1 || rc=$?
-[[ $rc -ne 0 ]] \
-  && pass "sha256 mismatch aborts with non-zero exit" \
-  || fail "sha256 mismatch aborts with non-zero exit"
-grep -q "^dnf install" "$MOCK_LOG" \
-  && fail "no dnf install runs on sha mismatch" \
-  || pass "no dnf install runs on sha mismatch"
+( export OMARCHY_DISTRO=fedora; bash "$PKG" ) >/dev/null 2>&1
+grep -q "^omarchy-pkg-add wtype voxtype-bin$" "$MOCK_LOG" \
+  && pass "NVIDIA: installs the base (wtype voxtype-bin)" \
+  || { cat "$MOCK_LOG" >&2; fail "NVIDIA: installs the base (wtype voxtype-bin)"; }
+grep -q "^omarchy-pkg-add voxtype-cuda$" "$MOCK_LOG" \
+  && pass "NVIDIA: adds voxtype-cuda" \
+  || { cat "$MOCK_LOG" >&2; fail "NVIDIA: adds voxtype-cuda"; }
+grep -q "voxtype-migraphx" "$MOCK_LOG" \
+  && fail "NVIDIA: does NOT add voxtype-migraphx" \
+  || pass "NVIDIA: does NOT add voxtype-migraphx"
 
-# --- (b) sha MATCH -> dnf install + wtype + (gpu) vulkan-loader --------------
-# Build a fixture and a script-copy whose pin equals the fixture's real sha, so
-# the MATCH path runs fully offline. The download-url assertion still targets the
-# REAL pinned version (we don't override the url here, so the default pinned URL
-# is what the downloader records).
-GOOD_FIX="$SCRATCH/good.rpm"
-printf 'pretend-voxtype-rpm-payload' >"$GOOD_FIX"
-GOOD_SHA=$(sha256sum "$GOOD_FIX" | awk '{print $1}')
-PKG_MATCH="$SCRATCH/voxtype-install-pkg.match"
-sed "s/^VOXTYPE_RPM_SHA256=.*/VOXTYPE_RPM_SHA256=\"$GOOD_SHA\"/" "$PKG" >"$PKG_MATCH"
-chmod +x "$PKG_MATCH"
-
+# --- (b) AMD present (no NVIDIA) -> base + voxtype-migraphx -------------------
+stub omarchy-hw-nvidia 'exit 1'
+lspci_prints '0a:00.0 VGA compatible controller: Advanced Micro Devices, Inc. [AMD/ATI] Navi 31 [Radeon RX 7900 XTX]'
 : >"$MOCK_LOG"
-( export OMARCHY_DISTRO=fedora \
-         OMEDORA_DNF_CMD=dnf \
-         OMEDORA_VOXTYPE_DOWNLOAD_CMD="$(make_downloader "$GOOD_FIX")"
-  bash "$PKG_MATCH" ) >/dev/null 2>&1
+( export OMARCHY_DISTRO=fedora; bash "$PKG" ) >/dev/null 2>&1
+grep -q "^omarchy-pkg-add wtype voxtype-bin$" "$MOCK_LOG" \
+  && pass "AMD: installs the base (wtype voxtype-bin)" \
+  || { cat "$MOCK_LOG" >&2; fail "AMD: installs the base (wtype voxtype-bin)"; }
+grep -q "^omarchy-pkg-add voxtype-migraphx$" "$MOCK_LOG" \
+  && pass "AMD: adds voxtype-migraphx" \
+  || { cat "$MOCK_LOG" >&2; fail "AMD: adds voxtype-migraphx"; }
+grep -q "voxtype-cuda" "$MOCK_LOG" \
+  && fail "AMD: does NOT add voxtype-cuda" \
+  || pass "AMD: does NOT add voxtype-cuda"
 
-# Downloaded the PINNED url/version (default url, not overridden above).
-grep -q "^download https://github.com/peteonrails/voxtype/releases/download/v${PINNED_VER}/voxtype-${PINNED_VER}-1.x86_64.rpm$" "$MOCK_LOG" \
-  && pass "downloads the pinned voxtype $PINNED_VER release url" \
-  || { cat "$MOCK_LOG" >&2; fail "downloads the pinned voxtype $PINNED_VER release url"; }
-grep -q "^omarchy-pkg-add wtype$" "$MOCK_LOG" \
-  && pass "installs wtype via omarchy-pkg-add" \
-  || { cat "$MOCK_LOG" >&2; fail "installs wtype via omarchy-pkg-add"; }
-grep -qE "^dnf install -y .*voxtype-${PINNED_VER}-1.x86_64.rpm$" "$MOCK_LOG" \
-  && pass "dnf install -y of the local pinned rpm" \
-  || { cat "$MOCK_LOG" >&2; fail "dnf install -y of the local pinned rpm"; }
-grep -q "^omarchy-pkg-add vulkan-loader$" "$MOCK_LOG" \
-  && pass "adds vulkan-loader when omarchy-hw-vulkan succeeds" \
-  || { cat "$MOCK_LOG" >&2; fail "adds vulkan-loader when omarchy-hw-vulkan succeeds"; }
-
-# --- (c) no GPU -> vulkan-loader NOT added -----------------------------------
-stub omarchy-hw-vulkan 'exit 1'
+# --- (c) Intel/none -> base only, no GPU add-on ------------------------------
+stub omarchy-hw-nvidia 'exit 1'
+lspci_prints '00:02.0 VGA compatible controller: Intel Corporation Raptor Lake-S UHD Graphics'
 : >"$MOCK_LOG"
-( export OMARCHY_DISTRO=fedora \
-         OMEDORA_DNF_CMD=dnf \
-         OMEDORA_VOXTYPE_DOWNLOAD_CMD="$(make_downloader "$GOOD_FIX")"
-  bash "$PKG_MATCH" ) >/dev/null 2>&1
-grep -q "vulkan-loader" "$MOCK_LOG" \
-  && fail "vulkan-loader NOT added when omarchy-hw-vulkan fails" \
-  || pass "vulkan-loader NOT added when omarchy-hw-vulkan fails"
-grep -qE "^dnf install -y .*\.rpm$" "$MOCK_LOG" \
-  && pass "still installs the rpm without a GPU" \
-  || fail "still installs the rpm without a GPU"
-stub omarchy-hw-vulkan 'exit 0'  # restore default
+( export OMARCHY_DISTRO=fedora; bash "$PKG" ) >/dev/null 2>&1
+grep -q "^omarchy-pkg-add wtype voxtype-bin$" "$MOCK_LOG" \
+  && pass "Intel/none: installs the base (wtype voxtype-bin)" \
+  || { cat "$MOCK_LOG" >&2; fail "Intel/none: installs the base (wtype voxtype-bin)"; }
+grep -qE "voxtype-(cuda|migraphx)" "$MOCK_LOG" \
+  && { cat "$MOCK_LOG" >&2; fail "Intel/none: adds NO GPU flavor"; } \
+  || pass "Intel/none: adds NO GPU flavor (base only)"
+
+# --- (d) the AMD probe doesn't false-match generic non-GPU lspci lines -------
+stub omarchy-hw-nvidia 'exit 1'
+lspci_prints '00:1f.3 Audio device: Intel Corporation Alder Lake PCH-P High Definition Audio'
+: >"$MOCK_LOG"
+( export OMARCHY_DISTRO=fedora; bash "$PKG" ) >/dev/null 2>&1
+grep -q "voxtype-migraphx" "$MOCK_LOG" \
+  && { cat "$MOCK_LOG" >&2; fail "non-GPU lspci line does NOT trigger migraphx"; } \
+  || pass "non-GPU lspci line does NOT trigger migraphx"
+
+# restore defaults
+stub omarchy-hw-nvidia 'exit 1'
+stub lspci 'exit 0'
 
 # ===========================================================================
 echo "# --- PART 2: omarchy-voxtype-install dispatch ---"
 # ===========================================================================
 # Stub the shared setup tools so the script runs past the dispatch hermetically.
-stub gum                     'exit 0'   # confirm yes
-stub voxtype                 'printf "voxtype %s\n" "$*" >>"$MOCK_LOG"; exit 0'
-stub omarchy-hyprland-toggle 'printf "toggle %s\n" "$*" >>"$MOCK_LOG"'
-stub omarchy-restart-shell   ':'
+stub gum                       'exit 0'   # confirm yes
+stub voxtype                   'printf "voxtype %s\n" "$*" >>"$MOCK_LOG"; exit 0'
+stub omarchy-hyprland-toggle   'printf "toggle %s\n" "$*" >>"$MOCK_LOG"'
+stub omarchy-restart-shell     ':'
 stub omarchy-notification-send ':'
-# The Fedora arm execs "$(dirname)/fedora/voxtype-install-pkg" (relative), whose
-# FIRST action is `omarchy-pkg-add wtype` — emitted before the sha gate. We feed
-# the seams so the sibling reaches that point hermetically; the real pinned sha
-# won't match the tiny fixture, so the sibling aborts AFTER the traced
-# pkg-add+download, which is exactly the dispatch evidence we assert on (we don't
-# need the full install to complete here — PART 1 already proved the match path).
+
 FAKE_OMARCHY="$SCRATCH/omarchy"
 mkdir -p "$FAKE_OMARCHY/default/voxtype"
 printf 'cfg\n' >"$FAKE_OMARCHY/default/voxtype/config.toml"
 
+# --- Fedora: dispatches to the sibling (omarchy-pkg-add wtype voxtype-bin) ----
 : >"$MOCK_LOG"
-( export OMARCHY_DISTRO=fedora OMARCHY_PATH="$FAKE_OMARCHY" HOME="$SCRATCH/home-fed" \
-         OMEDORA_DNF_CMD=dnf \
-         OMEDORA_VOXTYPE_DOWNLOAD_CMD="$(make_downloader "$GOOD_FIX")"
+( export OMARCHY_DISTRO=fedora OMARCHY_PATH="$FAKE_OMARCHY" HOME="$SCRATCH/home-fed"
   mkdir -p "$HOME"
   bash "$ROOT/bin/omarchy-voxtype-install" ) >/dev/null 2>&1 || true
-# The Fedora arm runs the sibling, whose first traced action is omarchy-pkg-add wtype
-# (NOT the Arch "omarchy-pkg-add wtype voxtype-bin" line).
-grep -q "^omarchy-pkg-add wtype$" "$MOCK_LOG" \
-  && pass "Fedora install dispatches to the sibling (omarchy-pkg-add wtype)" \
-  || { cat "$MOCK_LOG" >&2; fail "Fedora install dispatches to the sibling (omarchy-pkg-add wtype)"; }
-grep -q "^download https://github.com/peteonrails/voxtype/releases/download/v${PINNED_VER}/" "$MOCK_LOG" \
-  && pass "Fedora install reaches the sibling's pinned download" \
-  || { cat "$MOCK_LOG" >&2; fail "Fedora install reaches the sibling's pinned download"; }
 grep -q "^omarchy-pkg-add wtype voxtype-bin$" "$MOCK_LOG" \
-  && fail "Fedora install does NOT run the Arch voxtype-bin line" \
-  || pass "Fedora install does NOT run the Arch voxtype-bin line"
+  && pass "Fedora install dispatches to the sibling (adds wtype voxtype-bin base)" \
+  || { cat "$MOCK_LOG" >&2; fail "Fedora install dispatches to the sibling (adds wtype voxtype-bin base)"; }
+# With all GPU probes off (defaults), Fedora install adds no GPU flavor.
+grep -qE "voxtype-(cuda|migraphx)" "$MOCK_LOG" \
+  && { cat "$MOCK_LOG" >&2; fail "Fedora install with no GPU adds no flavor"; } \
+  || pass "Fedora install with no GPU adds no flavor"
 
 # --- Arch path: verbatim omarchy-pkg-add wtype voxtype-bin -------------------
 : >"$MOCK_LOG"
@@ -183,46 +153,35 @@ grep -q "^omarchy-pkg-add wtype voxtype-bin$" "$MOCK_LOG" \
 grep -q "^omarchy-pkg-add wtype voxtype-bin$" "$MOCK_LOG" \
   && pass "Arch install runs omarchy-pkg-add wtype voxtype-bin verbatim" \
   || { cat "$MOCK_LOG" >&2; fail "Arch install runs omarchy-pkg-add wtype voxtype-bin verbatim"; }
-grep -q "^download " "$MOCK_LOG" \
-  && fail "Arch install never downloads the rpm" \
-  || pass "Arch install never downloads the rpm"
+grep -qE "voxtype-(cuda|migraphx)" "$MOCK_LOG" \
+  && fail "Arch install never touches the omedora GPU flavors" \
+  || pass "Arch install never touches the omedora GPU flavors"
 
 # ===========================================================================
-echo "# --- PART 3: omarchy-voxtype-remove dispatch ---"
+echo "# --- PART 3: omarchy-voxtype-remove dispatch (byte-identical) ---"
 # ===========================================================================
 stub voxtype 'exit 0'  # omarchy-cmd-present voxtype -> true
 stub systemctl ':'
 
-: >"$MOCK_LOG"
-( export OMARCHY_DISTRO=fedora HOME="$SCRATCH/home-rm-fed" OMEDORA_DNF_CMD=dnf
-  mkdir -p "$HOME"
-  bash "$ROOT/bin/omarchy-voxtype-remove" ) >/dev/null 2>&1 || true
-grep -q "^dnf remove -y voxtype$" "$MOCK_LOG" \
-  && pass "Fedora remove runs dnf remove -y voxtype" \
-  || { cat "$MOCK_LOG" >&2; fail "Fedora remove runs dnf remove -y voxtype"; }
-grep -q "omarchy-pkg-drop" "$MOCK_LOG" \
-  && fail "Fedora remove does NOT call omarchy-pkg-drop" \
-  || pass "Fedora remove does NOT call omarchy-pkg-drop"
-
-: >"$MOCK_LOG"
-( export OMARCHY_DISTRO=arch HOME="$SCRATCH/home-rm-arch"
-  mkdir -p "$HOME"
-  bash "$ROOT/bin/omarchy-voxtype-remove" ) >/dev/null 2>&1 || true
-grep -q "^omarchy-pkg-drop voxtype-bin$" "$MOCK_LOG" \
-  && pass "Arch remove runs omarchy-pkg-drop voxtype-bin" \
-  || { cat "$MOCK_LOG" >&2; fail "Arch remove runs omarchy-pkg-drop voxtype-bin"; }
-grep -q "dnf remove" "$MOCK_LOG" \
-  && fail "Arch remove never calls dnf" \
-  || pass "Arch remove never calls dnf"
+# Both distros run `omarchy-pkg-drop voxtype-bin` — the script is byte-identical
+# to upstream. On Fedora pkg.py maps voxtype-bin -> `dnf remove voxtype`, which
+# cascades to the installed -cuda/-migraphx subpackages.
+for distro in fedora arch; do
+  : >"$MOCK_LOG"
+  ( export OMARCHY_DISTRO=$distro HOME="$SCRATCH/home-rm-$distro"
+    mkdir -p "$HOME"
+    bash "$ROOT/bin/omarchy-voxtype-remove" ) >/dev/null 2>&1 || true
+  grep -q "^omarchy-pkg-drop voxtype-bin$" "$MOCK_LOG" \
+    && pass "$distro remove runs omarchy-pkg-drop voxtype-bin" \
+    || { cat "$MOCK_LOG" >&2; fail "$distro remove runs omarchy-pkg-drop voxtype-bin"; }
+  grep -qE "^dnf |^sudo dnf " "$MOCK_LOG" \
+    && fail "$distro remove never shells out to dnf directly" \
+    || pass "$distro remove never shells out to dnf directly"
+done
 
 # ===========================================================================
 echo "# --- PART 4: omarchy-voxtype-config mic-click dispatch ---"
 # ===========================================================================
-# The bar mic (shell/plugins/bar/indicators/Dictation.qml) runs
-# omarchy-voxtype-config on click. On Fedora, when voxtype isn't installed yet,
-# that must OFFER THE INSTALL (launch omarchy-voxtype-install in a floating
-# terminal) rather than the old dead-end "no Fedora build yet" notice; once
-# voxtype is installed it runs `voxtype configure` (the upstream Arch path).
 stub omarchy-launch-floating-terminal-with-presentation 'printf "launch %s\n" "$*" >>"$MOCK_LOG"'
 stub omarchy-restart-shell ':'
 
