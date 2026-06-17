@@ -26,7 +26,7 @@
 # scalable icon + license).
 
 Name:           satty
-Version:        0.20.1
+Version:        0.21.1
 Release:        1%{?dist}
 Summary:        A screenshot annotation tool inspired by Swappy and Flameshot
 
@@ -126,6 +126,14 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/satty.desktop
 %{_datadir}/icons/hicolor/scalable/apps/satty.svg
 
 %changelog
+* Tue Jun 16 2026 omedora <noreply@omedora> - 0.21.1-1
+- Bump to upstream 0.21.1. No spec change beyond Version/pin: 0.21.0 moved
+  build.rs completion generation to OUT_DIR (a `ci-release` cargo feature
+  restores the old top-level completions/ dir for upstream's `make install`),
+  but this spec runs its own %%install (binary + .desktop + svg only) and never
+  packaged shell completions, so the change is a no-op here. Vendor tarball is
+  regenerated from the in-tarball Cargo.lock by build-local.sh.
+
 * Sat May 30 2026 omedora <noreply@omedora> - 0.20.1-1
 - Initial from-source (cargo) build of Satty (Rust/GTK4, relm4; no meson).
 - Hermetic vendored/offline build (cargo-vendor tarball generated at SRPM-gen
