@@ -4,7 +4,7 @@
 # it was implicitly provided by that COPR, so vendoring the Hyprland stack
 # (task #66) means owning uwsm too. All BuildRequires are in Fedora main.
 Name:           uwsm
-Version:        0.26.4
+Version:        0.26.5
 Release:        1%{?dist}
 Summary:        Universal Wayland Session Manager
 
@@ -104,6 +104,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/*.desktop
 %{_userunitdir}/wayland-*.target
 
 %changelog
+* Tue Jun 16 2026 Andrew Gaspar <andrew.gaspar@outlook.com> - 0.26.5-1
+- Bump to upstream 0.26.5 (tag tarball).
+
 * Thu Jun 04 2026 Andrew Gaspar <andrew.gaspar@outlook.com> - 0.26.4-1
 - Bump to upstream 0.26.4 (from 0.23.3).
 - Drop the omedora uwsm-app flock patch: upstream's "fix: add mutex to
