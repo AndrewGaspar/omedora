@@ -12,12 +12,27 @@
 # anything else = error). The aur file is always empty on Fedora — kept so the
 # widget's file set is identical. Override the dnf invocation with
 # OMEDORA_DNF_CMD for tests.
+#
+# SCOPING (#108): the indicator must mean "an omedora/omarchy update is
+# available", matching upstream omarchy's semantics — NOT "any pending dnf
+# update on the system" (kernel, glibc, …). So the check is restricted to the
+# omedora COPR repo via `dnf check-upgrade --repo <id>`. The repo id is the
+# single source of truth from `omedora-copr --repo-id` (e.g.
+# copr:copr.fedorainfracloud.org:agaspar:omedora-4). Override with
+# OMEDORA_COPR_REPO_ID for tests; if the id can't be resolved we fall back to an
+# unscoped check so a misconfigured box still surfaces *some* signal.
 
 set -euo pipefail
 
 CHECK_TIMEOUT="${OMARCHY_UPDATE_CHECK_TIMEOUT:-60}"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/updates"
 DNF="${OMEDORA_DNF_CMD:-dnf}"
+
+# Restrict the upgrade check to the omedora COPR repo so the bar's update light
+# fires only for omedora/omarchy/COPR packages (#108).
+REPO_ID="${OMEDORA_COPR_REPO_ID:-$(omedora-copr --repo-id 2>/dev/null || true)}"
+repo_args=()
+[[ -n $REPO_ID ]] && repo_args=(--repo "$REPO_ID")
 
 mkdir -p "$STATE_DIR"
 
@@ -33,7 +48,7 @@ status=0
 # --refresh so a stale metadata cache can't hide (or invent) updates; the
 # output is "name arch version repo" lines plus headers we strip to package
 # lines only. dnf5's check-upgrade prints nothing when current.
-timeout "$CHECK_TIMEOUT" $DNF -q check-upgrade --refresh \
+timeout "$CHECK_TIMEOUT" $DNF -q check-upgrade --refresh "${repo_args[@]}" \
   >"$tmp_dir/raw" 2>"$tmp_dir/err" || status=$?
 
 case "$status" in

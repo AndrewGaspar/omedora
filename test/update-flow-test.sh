@@ -94,19 +94,29 @@ echo "# --- PART 2: bin/fedora/update-available state contract ---"
 # ===========================================================================
 export XDG_STATE_HOME="$SCRATCH/state"
 
-# A dnf whose check-upgrade reports two updates (dnf exit 100).
+# A dnf whose check-upgrade reports two updates (dnf exit 100). It also records
+# its own argv so we can assert the check is SCOPED to the omedora COPR repo
+# (#108) — the indicator must mean "an omedora update is available", not "any
+# pending dnf update".
+DNF_ARGS_LOG="$SCRATCH/dnf-args.log"
 FAKE_DNF="$SCRATCH/fake-dnf-updates"
-cat >"$FAKE_DNF" <<'EOF'
+cat >"$FAKE_DNF" <<EOF
 #!/bin/bash
+printf '%s\n' "\$*" >"$DNF_ARGS_LOG"
 printf 'omedora.noarch 0.2.0~alpha.1 copr:...:omedora-4\nfoo.x86_64 1.2-3.fc44 updates\n'
 exit 100
 EOF
 chmod +x "$FAKE_DNF"
 
-out=$(OMARCHY_DISTRO=fedora OMEDORA_DNF_CMD="$FAKE_DNF" bash "$ROOT/bin/omarchy-update-available") \
+SCOPED_REPO_ID="copr:copr.fedorainfracloud.org:agaspar:omedora-4"
+out=$(OMARCHY_DISTRO=fedora OMEDORA_DNF_CMD="$FAKE_DNF" \
+      OMEDORA_COPR_REPO_ID="$SCOPED_REPO_ID" \
+      bash "$ROOT/bin/omarchy-update-available") \
   && rc=0 || rc=$?
 assert_equals "updates available -> exit 0" "0" "$rc"
 assert_output_contains "stdout lists the updates" "$out" "omedora.noarch"
+assert_output_contains "check-upgrade is scoped to the omedora COPR repo (#108)" \
+  "$(cat "$DNF_ARGS_LOG")" "--repo $SCOPED_REPO_ID"
 assert_file_exists "packages state file written" "$XDG_STATE_HOME/omarchy/updates/packages"
 assert_file_exists "available state file written" "$XDG_STATE_HOME/omarchy/updates/available"
 assert_file_exists "checked-at state file written" "$XDG_STATE_HOME/omarchy/updates/checked-at"
