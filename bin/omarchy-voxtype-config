@@ -4,8 +4,9 @@
 
 set -e
 
-# Fedora: voxtype installs on demand from upstream's official Fedora RPM (see
-# bin/fedora/voxtype-install-pkg). When it isn't installed yet, clicking the bar
+# Fedora: voxtype installs on demand from the omedora COPR — the slim base RPM
+# plus an auto-detected GPU flavor (see bin/fedora/voxtype-install-pkg). When it
+# isn't installed yet, clicking the bar
 # mic offers to install it — in a floating terminal, the same flow the first-run
 # post-update hook and the Install > AI > Dictation menu use — instead of
 # erroring on a missing `voxtype configure`. Once installed, the Arch path below

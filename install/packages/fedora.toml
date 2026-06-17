@@ -390,8 +390,19 @@ app_id = "com.moonlight_stream.Moonlight"
 reason = "Not in Fedora main or RPM Fusion (verified against both, 2026-06-11); Flathub is the maintained distribution channel."
 
 [voxtype-bin]
-source = "skip"
-reason = "Skip-mapped because voxtype-bin (the Arch package) never reaches pkg.py on Fedora: omarchy-voxtype-install's Fedora arm installs voxtype's OFFICIAL upstream Fedora RPM on demand instead, via bin/fedora/voxtype-install-pkg (pinned version + sha256). It is on-demand (not in the base set). wtype resolves natively. Bump = edit the two constants in bin/fedora/voxtype-install-pkg."
+source = "dnf"
+names = ["voxtype"]
+reason = "voxtype-bin (the Arch package) maps to the base 'voxtype' RPM we host in the omedora COPR (omedora/packaging/copr/voxtype.spec) — a subpackaged binary-repackage of upstream's official Fedora RPM: base = CPU(avx2/avx512) + Vulkan + ONNX-CPU (~42 MB). On-demand only (not in any base package set); installed by omarchy-pkg-add via bin/fedora/voxtype-install-pkg, which then auto-detects the GPU and adds voxtype-cuda (NVIDIA) or voxtype-migraphx (AMD). dnf-updatable. wtype resolves natively. Bump = Version: + .sources sha in the spec."
+
+[voxtype-cuda]
+source = "dnf"
+names = ["voxtype-cuda"]
+reason = "Opt-in NVIDIA CUDA ONNX-GPU backend (cuda-12 + cuda-13 provider trees, ~233 MB) for voxtype; subpackage of omedora/packaging/copr/voxtype.spec, served from the omedora repo. Added by bin/fedora/voxtype-install-pkg only when omarchy-hw-nvidia detects an NVIDIA GPU. Requires the base voxtype RPM (cascades on remove)."
+
+[voxtype-migraphx]
+source = "dnf"
+names = ["voxtype-migraphx"]
+reason = "Opt-in AMD ROCm/MIGraphX ONNX-GPU backend (~13 MB) for voxtype; subpackage of omedora/packaging/copr/voxtype.spec, served from the omedora repo. Added by bin/fedora/voxtype-install-pkg only when an AMD/ATI/Radeon GPU is detected via lspci. Requires the base voxtype RPM (cascades on remove)."
 
 [yaru-icon-theme]
 source = "dnf"
