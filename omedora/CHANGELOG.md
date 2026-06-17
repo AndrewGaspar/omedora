@@ -1,3 +1,7 @@
+## v0.1.5 — 2026-06-16 (Omarchy 3.8.2)
+
+- fix(branding): label the Menu > Update entry Omedora, not Omarchy
+
 ## v0.1.4 — 2026-06-16 (Omarchy 3.8.2)
 
 - ci(copr): register changed packages before building (#123)
