@@ -14,8 +14,8 @@
 # This installs the slim base for everyone, then ADDS the matching GPU add-on
 # only when the host has a discrete GPU we have a backend for. RPM/dnf can't
 # probe for a GPU, so the selection is driven here in userspace:
-#   - NVIDIA  -> voxtype-cuda      (omarchy-hw-nvidia: lspci | grep -qi nvidia)
-#   - AMD/ATI -> voxtype-migraphx  (inline lspci probe, mirroring omarchy-hw-nvidia)
+#   - NVIDIA  -> voxtype-cuda      (inline lspci probe)
+#   - AMD/ATI -> voxtype-migraphx  (inline lspci probe)
 #   - else    -> base only (Intel / none / Vulkan-only get the slim install)
 #
 # Everything goes through omarchy-pkg-add, which maps the names via
@@ -32,14 +32,18 @@ set -euo pipefail
 # voxtype base RPM (voxtype-bin -> voxtype via the package map).
 omarchy-pkg-add wtype voxtype-bin
 
-# GPU add-on auto-detect. omarchy-hw-nvidia is an exit-code probe
-# (lspci | grep -qi nvidia); mirror it inline for AMD. Intel/none -> base only.
+# GPU add-on auto-detect via inline lspci probes. We do NOT exec the upstream
+# omarchy-hw-nvidia helper: upstream ships it non-executable (mode 0644, unlike
+# omarchy-hw-vulkan at 0755), so exec'ing it fails with "Permission denied" and
+# silently falls through. Inlining the same `lspci | grep -qi nvidia` check keeps
+# it robust and symmetric with the AMD probe. NVIDIA is preferred on hybrid
+# (NVIDIA+AMD) laptops — CUDA is the higher-performance ONNX-GPU backend.
 #
 # The AMD pattern matches a VGA/3D/Display controller line whose vendor is AMD —
 # the "Advanced Micro Devices" vendor string, the "[AMD/ATI]" subsystem tag, or a
 # "Radeon" model. We deliberately do NOT match a bare "ATI": case-insensitively it
 # false-matches the "ATI" inside "Corpor*ATI*on" on Intel/NVIDIA lines.
-if omarchy-hw-nvidia; then
+if lspci | grep -qi nvidia; then
   echo "NVIDIA GPU detected — adding the CUDA ONNX-GPU backend (voxtype-cuda)."
   omarchy-pkg-add voxtype-cuda
 elif lspci | grep -qiE '(VGA|3D|Display).*(Advanced Micro Devices|\[AMD/ATI\]|\bRadeon\b)'; then
