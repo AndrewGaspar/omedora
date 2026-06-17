@@ -1,3 +1,7 @@
+## v0.1.6 — 2026-06-16 (Omarchy 3.8.2)
+
+- fix(branding): rebrand the waybar menu + update tooltips to Omedora
+
 ## v0.1.5 — 2026-06-16 (Omarchy 3.8.2)
 
 - fix(branding): label the Menu > Update entry Omedora, not Omarchy
