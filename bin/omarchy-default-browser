@@ -47,9 +47,14 @@ if omarchy-cmd-missing "$command"; then
   fi
 fi
 
+prev="$(omarchy-cmd-default-browser)"
+
 # xdg-settings checks what it set by reading the handler back, which the
 # desktop-specific list would answer with omarchy-browser.desktop, so it must
 # only see mimeapps.list, where the browser itself is kept.
 env -u BROWSER XDG_CURRENT_DESKTOP= xdg-settings set default-web-browser "$desktop_id" || exit 1
+
+# A different browser may have different profiles, so drop remembered webapp selections.
+[[ $prev != "$desktop_id" ]] && omarchy-webapp-profile-store clear-all
 
 omarchy-notification-send -g $glyph "$(omarchy-i18n default.browserSet "$name")"
