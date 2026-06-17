@@ -16,7 +16,7 @@
 # that bump and made hyprland FetchContent-clone glaze at build time — fatal in
 # the offline build root).
 Name:           glaze
-Version:        7.7.1
+Version:        7.8.2
 Release:        1%{?dist}
 Summary:        Extremely fast, in memory, JSON and interface library
 
@@ -58,6 +58,9 @@ Development files for %{name}.
 %{_includedir}/%{name}/
 
 %changelog
+* Tue Jun 16 2026 omedora <noreply@omedora> - 7.8.2-1
+- Bump to upstream 7.8.2 (still in the [7,8) range Hyprland 0.55.x requires).
+
 * Sat May 30 2026 omedora <noreply@omedora> - 7.7.1-1
 - Initial omedora build of glaze 7.7.1 (adapted from solopasha/hyprlandRPM).
 - BuildRequire-only header lib for Hyprland; not in Fedora/RPM Fusion.
