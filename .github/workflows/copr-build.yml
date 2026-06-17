@@ -80,11 +80,48 @@ jobs:
 
       - name: Submit COPR builds (no-wait)
         if: steps.gate.outputs.skip == 'false' && steps.pkgs.outputs.list != ''
+        env:
+          # Keep these in lockstep with omedora/packaging/copr/copr-submit.sh.
+          BRANCH: 3.8.2-omedora
+          CLONE_URL: https://github.com/AndrewGaspar/omedora.git
+          SUBDIR: omedora/packaging/copr
         run: |
           set -euo pipefail
           project="$(OMARCHY_PATH="$PWD" bin/omedora-copr)"
           echo "COPR project: $project"
+
+          # A brand-new spec has no registered package on COPR yet, so a bare
+          # `build-package --name X` fails with "No package with name X in copr".
+          # Registration (add-package-scm) is a separate, idempotent step. We
+          # therefore upsert each changed package's SCM definition BEFORE building
+          # it: try add-package-scm (creates; errors if it already exists), fall
+          # back to edit-package-scm (edits; errors if it doesn't). This mirrors
+          # copr-submit.sh's register_one() and is safe to repeat on every push.
+          register_one() {
+            local name="$1"
+            local args=(
+              --name "$name"
+              --clone-url "$CLONE_URL"
+              --commit "$BRANCH"
+              --subdir "$SUBDIR"
+              --spec "$name.spec"
+              --type git
+              --method make_srpm
+              --timeout 18000
+              --webhook-rebuild off
+            )
+            if copr-cli add-package-scm "$project" "${args[@]}" >/dev/null 2>&1; then
+              echo "  registered (new):     $name"
+            elif copr-cli edit-package-scm "$project" "${args[@]}" >/dev/null 2>&1; then
+              echo "  registered (updated): $name"
+            else
+              echo "  FAILED to register: $name" >&2
+              return 1
+            fi
+          }
+
           for p in ${{ steps.pkgs.outputs.list }}; do
-            echo "==> building $p"
+            echo "==> $p"
+            register_one "$p"
             copr-cli build-package "$project" --name "$p" --nowait
           done
