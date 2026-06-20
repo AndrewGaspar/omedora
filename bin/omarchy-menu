@@ -496,7 +496,15 @@ show_setup_system_menu() {
 }
 
 show_install_menu() {
-  case $(menu "Install" "󰣇  Package\n󰣇  AUR\n  Web App\n  TUI\n  Service\n  Style\n󰵮  Development\n  Editor\n  Terminal\n  Browser\n󱚤  AI\n  Gaming\n󰍲  Windows") in
+  # The AUR doesn't exist on Fedora — hide that entry there (the Package
+  # entry dispatches to a dnf-backed picker instead). On Arch the menu is
+  # unchanged.
+  local aur_item="󰣇  AUR\n"
+  if [[ $(omarchy-distro 2>/dev/null || echo arch) == fedora ]]; then
+    aur_item=""
+  fi
+
+  case $(menu "Install" "󰣇  Package\n${aur_item}  Web App\n  TUI\n  Service\n  Style\n󰵮  Development\n  Editor\n  Terminal\n  Browser\n󱚤  AI\n  Gaming\n󰍲  Windows") in
   *Package*) terminal omarchy-pkg-install ;;
   *AUR*) terminal omarchy-pkg-aur-install ;;
   *Web*) present_terminal omarchy-webapp-install ;;
