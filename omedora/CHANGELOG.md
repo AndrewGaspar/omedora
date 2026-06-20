@@ -1,3 +1,9 @@
+## v0.1.7 — 2026-06-20 (Omarchy 3.8.2)
+
+- test(install): cover the Fedora Package picker + AUR no-op
+- feat(install): hide the AUR install path on Fedora
+- feat(install): port the Install → Package picker to dnf on Fedora
+
 ## v0.1.6 — 2026-06-16 (Omarchy 3.8.2)
 
 - fix(branding): rebrand the waybar menu + update tooltips to Omedora
