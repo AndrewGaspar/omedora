@@ -41,6 +41,9 @@ jobs:
       - name: Run pkg map test
         run: bash test/pkg-map-test.sh
 
+      - name: Run pkg install picker test
+        run: bash test/pkg-install-picker-test.sh
+
       - name: Run coexistence seeding test
         run: bash test/coexistence-test.sh
 
