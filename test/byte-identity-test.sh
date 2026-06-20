@@ -103,10 +103,17 @@ exec setsid uwsm-app -- $(sed -n '"'"'s/^Exec=\([^ ]*\).*/\1/p'"'"' {~/.local,~/
 
 
 
-# The Menu > Update entry is rebranded Omarchy -> Omedora (user-facing
-# label). learn.omarchy keeps "Omarchy" (it is the actual Omarchy manual).
-# Unwind if the pin ever ships an Omedora-branded menu.
-ALLOW["default/omarchy/omarchy-menu.jsonc"]='  "update.omarchy": {"icon":"","label":"Omarchy","keywords":"system","action":"omarchy-launch-floating-terminal-with-presentation omarchy-update"},'
+# Two relocations in the menu data, combined under one key (a bash assoc array
+# overwrites on a second assignment to the same key, so both deleted lines
+# must share one value, newline-separated):
+#  1. The Menu > Install > AUR entry gains a `when` distro gate so it hides on
+#     Fedora (the AUR doesn't exist there). Editing the line deletes the
+#     ungated upstream original. Unwind if the entry is dropped/repurposed.
+#  2. The Menu > Update entry is rebranded Omarchy -> Omedora (user-facing
+#     label). learn.omarchy keeps "Omarchy" (it is the actual Omarchy manual).
+#     Unwind if the pin ever ships an Omedora-branded menu.
+ALLOW["default/omarchy/omarchy-menu.jsonc"]='  "install.aur": {"icon":"󰣇","label":"AUR","keywords":"package","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install"},
+  "update.omarchy": {"icon":"","iconFont":"omarchy","label":"Omarchy","keywords":"system","action":"omarchy-launch-floating-terminal-with-presentation omarchy-update"},'
 # --- the audit ---------------------------------------------------------------
 # Modified upstream files = files that differ from the pin AND exist on the pin
 # (so omedora-ADDED files like bin/omedora-* are out of scope — they have no
