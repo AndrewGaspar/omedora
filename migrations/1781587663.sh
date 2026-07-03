@@ -1,3 +1,9 @@
+# Fedora: the clipboard provider is installed from /usr/share/omarchy-nvim, which
+# doesn't exist on Omedora (nvim is bootstrapped by install/user/nvim-fedora.sh,
+# not RPM-packaged). Skip on Omedora — remote-nvim-clipboard is a deferred Fedora
+# nvim enhancement owned by nvim-fedora.sh.
+[[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]] && exit 0
+
 echo "Enable secure remote Neovim clipboard support"
 
 nvim_config_dir="$HOME/.config/nvim"
