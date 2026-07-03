@@ -89,8 +89,10 @@ jobs:
             list="${{ github.event.inputs.packages }}"
           else
             before="${{ github.event.before }}"
-            # New branch / unknown parent → compare against HEAD~1.
-            if [[ -z "$before" || "$before" == "0000000000000000000000000000000000000000" ]]; then
+            # New branch / unknown parent, OR a force-push that orphaned `before`
+            # (the old tip is no longer reachable after a rebase) → HEAD~1.
+            if [[ -z "$before" || "$before" == "0000000000000000000000000000000000000000" ]] \
+               || ! git cat-file -e "$before^{commit}" 2>/dev/null; then
               before="HEAD~1"
             fi
             list="$(git diff --name-only "$before" "${{ github.sha }}" -- 'omedora/packaging/copr/*.spec' \
