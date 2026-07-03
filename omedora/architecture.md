@@ -1,7 +1,8 @@
 # Omedora architecture
 
-> **Omarchy 4 port status (2026-06-11).** This branch (`omarchy-4-omedora`) sits on the
-> upstream `omarchy-4` pin tag `omedora-base-20260611-omarchy4-17f024d4`. Omarchy 4 is a
+> **Omarchy 4 port status (2026-07-03).** This branch (`omarchy-4-omedora`) sits on the
+> upstream `omarchy-4` pin tag `omedora-base-20260703-omarchy4-1e996609` (upstream renamed
+> the active v4 branch `omarchy-4` → `quattro`; the pin now tracks `omarchy/quattro`). Omarchy 4 is a
 > re-architecture into a package-backed distro (no `install.sh`/`boot.sh`; `omarchy` +
 > `omarchy-settings` packages; Quickshell `shell/` replaces waybar/mako/walker/elephant/
 > swayosd; updates via package manager + split `migrations/{system,user}/`). Much of this
