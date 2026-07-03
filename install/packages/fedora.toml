@@ -140,6 +140,15 @@ reason = "Not in Fedora main or RPM Fusion; atim/lazydocker COPR not on the allo
 source = "dnf"
 names = ["satty"]
 reason = "Wayland screenshot annotation (Rust/GTK4). Not in Fedora repos/RPM Fusion, and — despite being a GUI — NOT on Flathub (verified against Flathub appstream+search). Built from source by omedora/packaging/copr/satty.spec."
+[tensaku]
+source = "skip"
+reason = "The quattro line's replacement for satty as the screenshot/clipboard annotation editor (dev.tensaku.Tensaku; Arch package). Not packaged for Fedora. omedora keeps satty (satty.spec) and ships a tensaku-edit -> satty shim (omedora/bin/tensaku-edit, installed by install/user/tensaku-edit-shim-fedora.sh) so omarchy-capture-screenshot/-clipboard-open work unchanged. TODO: port tensaku to the COPR to adopt it natively."
+[omacut]
+source = "skip"
+reason = "New omarchy-family app added to omarchy-base.packages in quattro. Not packaged for Fedora and not wired into any core flow (only an icon-name example in Launcher.qml). Skip until ported to the COPR."
+[omawrite]
+source = "skip"
+reason = "New omarchy-family writing app added to omarchy-base.packages in quattro (bound to SUPER+SHIFT+W). Not packaged for Fedora; the keybind simply no-ops when absent. Skip until ported to the COPR."
 [hyprland-preview-share-picker]
 source = "dnf"
 names = ["hyprland-preview-share-picker"]

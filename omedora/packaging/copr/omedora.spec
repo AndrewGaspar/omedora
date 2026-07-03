@@ -132,6 +132,9 @@ install -Dpm644 omedora/version %{buildroot}%{_datadir}/omarchy/omedora/version
 # omarchy-* commands. powerprofilesctl-shim: copied to ~/.local/bin by
 # install/user/powerprofilesctl-shim-fedora.sh (tuned-ppd has no CLI).
 install -Dpm755 omedora/bin/powerprofilesctl-shim %{buildroot}%{_datadir}/omarchy/omedora/bin/powerprofilesctl-shim
+# tensaku-edit: copied to ~/.local/bin by install/user/tensaku-edit-shim-fedora.sh
+# (quattro swapped satty -> the Arch-only tensaku; this shim wraps satty).
+install -Dpm755 omedora/bin/tensaku-edit %{buildroot}%{_datadir}/omarchy/omedora/bin/tensaku-edit
 
 # /etc/skel: pre-applied user-migration markers (per the map's `version` row).
 # A NEW user starts at the shipped migration level — omarchy-migrate-user
@@ -186,6 +189,7 @@ fi
 %{_datadir}/omarchy/omedora/version
 %dir %{_datadir}/omarchy/omedora/bin
 %{_datadir}/omarchy/omedora/bin/powerprofilesctl-shim
+%{_datadir}/omarchy/omedora/bin/tensaku-edit
 # Pre-applied user-migration markers for new users.
 /etc/skel/.local/
 
