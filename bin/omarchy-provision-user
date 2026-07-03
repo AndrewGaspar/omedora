@@ -117,6 +117,10 @@ if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora
   # tuned-ppd has the PowerProfiles D-Bus API but not the powerprofilesctl CLI
   # omarchy shells out to; install omedora's shim into ~/.local/bin only-if-absent.
   source "$OMARCHY_INSTALL/user/powerprofilesctl-shim-fedora.sh"
+  # quattro switched Omarchy's screenshot/clipboard editor to tensaku-edit (the
+  # Arch-only tensaku package); omedora keeps satty and installs a tensaku-edit
+  # -> satty shim into ~/.local/bin so the capture scripts stay byte-identical.
+  source "$OMARCHY_INSTALL/user/tensaku-edit-shim-fedora.sh"
   # omarchy-nvim is skip-mapped on Fedora (its COPR build can't bake the plugin
   # cache offline), so /etc/skel never seeds ~/.config/nvim. Bootstrap the same
   # commit-pinned LazyVim+omarchy config here and Lazy-sync it. Idempotent
