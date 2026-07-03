@@ -71,6 +71,9 @@ jobs:
       - name: Run powerprofilesctl shim test
         run: bash test/powerprofilesctl-shim-test.sh
 
+      - name: Run tensaku-edit shim test
+        run: bash test/tensaku-edit-shim-test.sh
+
       - name: Run nvim-fedora bootstrap test
         run: bash test/nvim-fedora-test.sh
 
