@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+# omedora Fedora shim for Omarchy's screenshot / clipboard annotation editor.
+#
+# The quattro line switched Omarchy's editor from satty to `tensaku-edit` (the
+# Arch-only `tensaku` package). tensaku isn't packaged for Fedora; omedora keeps
+# satty (COPR-hosted, omedora/packaging/copr/satty.spec), so provide tensaku-edit
+# as a thin satty wrapper. These are the exact flags Omarchy itself used for
+# satty at the pre-quattro pin, so omarchy-capture-screenshot,
+# omarchy-clipboard-open and config/imv/config stay byte-identical to upstream.
+#
+# Invoked as: tensaku-edit <image-path>. Installed into ~/.local/bin by
+# install/user/tensaku-edit-shim-fedora.sh (which skips shadowing a genuine
+# tensaku-edit if one is ever installed).
+
+exec satty --filename "$1" \
+  --output-filename "$1" \
+  --actions-on-enter save-to-clipboard \
+  --save-after-copy \
+  --copy-command 'wl-copy --type image/png'
