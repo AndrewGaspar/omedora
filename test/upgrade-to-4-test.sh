@@ -439,8 +439,14 @@ echo "# --- spec-set cross-check: v4_kept_packages can't silently desync ---"
 spec_names=$(sed -n '/^SPECS=(/,/^)/p' "$ROOT/omedora/packaging/copr/build-repo.sh" \
   | sed 's/#.*//' | grep -oE '[a-zA-Z0-9._-]+\.spec' | sed 's/\.spec$//' | sort -u)
 kept_block=$(sed -n '/^v4_kept_packages=(/,/^)/p' "$ROOT/bin/omedora-upgrade-to-4")
+# On-demand specs the COPR serves but the upgrade must NOT force-install: they
+# are installed only when the user opts in (e.g. clicking Install Dictation), so
+# they are intentionally absent from v4_kept_packages. voxtype (+ its -cuda/
+# -migraphx GPU subpackages, same spec) is the dictation engine — on-demand.
+on_demand_specs=" voxtype "
 missing=""
 for s in $spec_names; do
+  [[ $on_demand_specs == *" $s "* ]] && continue
   # terminaltexteffects builds python3-terminaltexteffects; match either name.
   grep -qw "$s\|python3-$s" <<<"$kept_block" || missing="$missing $s"
 done
