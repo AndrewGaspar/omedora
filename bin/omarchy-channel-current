@@ -4,6 +4,15 @@
 
 set -euo pipefail
 
+# Fedora: Omedora has no stable/rc/dev/edge package channels — everything ships
+# from the single omedora COPR, which is the stable release channel. Report
+# "stable" (so the menu's channel ✓ is coherent) instead of shelling out to
+# pacman, which isn't present. Channel switching itself is a no-op here
+# (omarchy-channel-set is Fedora-gated). Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora) echo stable; exit 0 ;;
+esac
+
 # Dev is a linked source checkout: OMARCHY_PATH points somewhere other than
 # the package-backed install at /usr/share/omarchy. This takes precedence over
 # the package channels, since the checkout overrides whatever is installed.
