@@ -178,7 +178,7 @@ v4_kept_packages=(
   omedora omedora-settings
   quickshell
   omedora-nerd-fonts python3-terminaltexteffects
-  lazygit lazydocker mise starship usage satty tensaku
+  lazygit lazydocker mise starship usage satty tensaku omacut omawrite
   hyprland-preview-share-picker
   glaze glaze-devel
   hyprland-protocols hyprland-protocols-devel

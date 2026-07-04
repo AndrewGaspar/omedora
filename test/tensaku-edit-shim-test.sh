@@ -86,8 +86,8 @@ done
 
 # tensaku is now packaged natively (dnf from the COPR), providing the real
 # /usr/bin/tensaku-edit that self-deactivates the satty shim above. omacut (a
-# video-trim tool) and omawrite (a writing app) are out of scope for the
-# screenshot flow and stay skip-mapped.
+# video-trim tool) and omawrite (a writing app) are also packaged natively now
+# (omacut.spec / omawrite.spec) but are out of scope for the screenshot flow.
 awk '/^\[tensaku\]/{f=1;next} /^\[/{f=0} f' "$ROOT/install/packages/fedora.toml" \
   | grep -qE '^source = "dnf"' \
   && pass "fedora.toml maps [tensaku] to source=dnf (native COPR package)" \
