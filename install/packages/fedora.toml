@@ -157,6 +157,12 @@ source = "dnf"
 names = ["hyprland-preview-share-picker"]
 reason = "Rust (edition 2024) GTK4 xdph share picker. Not in Fedora main/RPM Fusion or the allowlisted lionheartp/Hyprland COPR. Built from source by omedora/packaging/copr/hyprland-preview-share-picker.spec (hyprland-protocols submodule fetched at a pinned commit). Runtime dep xdg-desktop-portal-hyprland comes from lionheartp/Hyprland."
 
+[ghostty]
+source = "copr"
+copr = "scottames/ghostty"
+names = ["ghostty"]
+reason = "Zig GPU terminal, offered via Menu > Install > Terminal > Ghostty (on-demand; NOT a base package — foot is the base terminal). Not in Fedora main/RPM Fusion. An in-house vendored build is impractical right now: ghostty pins zig 0.15.x while Fedora 44 ships zig 0.16, so we'd have to also vendor a pinned zig plus ghostty's ~25 source archives and re-pin every release. scottames/ghostty is the ghostty-docs-endorsed, actively-maintained canonical Fedora COPR — a deliberate allowlist exception (packages.md §3). The COPR is enabled lazily by pkg.py only when the user actually installs ghostty from the menu (never at base install), so no third-party repo is added to a machine unless the user opts in. TODO: revisit vendoring once ghostty builds against Fedora's zig (or omedora ships a pinned zig)."
+
 [ttf-ia-writer]
 source = "skip"
 reason = "TODO: source installer (proprietary iA Writer font; vendored from upstream). Not in Fedora main repos."
