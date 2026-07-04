@@ -40,6 +40,11 @@ SPECS=(
   # task #59 back-fill (all build-tested):
   lazygit.spec lazydocker.spec mise.spec starship.spec usage.spec
   satty.spec hyprland-preview-share-picker.spec
+  # tensaku: the quattro line's screenshot/clipboard annotation editor (a Satty
+  # fork; dev.tensaku.Tensaku). From-source cargo build, vendored like satty.
+  # Ships /usr/bin/tensaku + the tensaku-edit wrapper omarchy's capture scripts
+  # invoke, so omedora adopts it natively (retiring the satty->tensaku-edit shim).
+  tensaku.spec
   # voxtype: subpackaged binary-repackage of upstream's official Fedora RPM —
   # one spec -> base voxtype (CPU+Vulkan+ONNX-CPU) plus opt-in voxtype-cuda /
   # voxtype-migraphx GPU add-ons. On-demand (not in any base package set); the
