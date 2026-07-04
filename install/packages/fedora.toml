@@ -145,11 +145,13 @@ source = "dnf"
 names = ["tensaku"]
 reason = "The quattro line's screenshot/clipboard annotation editor (dev.tensaku.Tensaku; a Satty fork, Rust/GTK4). Not in Fedora repos/RPM Fusion; built from source by omedora/packaging/copr/tensaku.spec (hermetic vendored cargo build, like satty). Ships /usr/bin/tensaku plus the /usr/bin/tensaku-edit wrapper omarchy-capture-screenshot/-clipboard-open/imv invoke, so omedora adopts it natively. omedora still keeps satty (independent tool) and the tensaku-edit -> satty shim (install/user/tensaku-edit-shim-fedora.sh), which self-deactivates once this package provides the real /usr/bin/tensaku-edit."
 [omacut]
-source = "skip"
-reason = "New omarchy-family app added to omarchy-base.packages in quattro. Not packaged for Fedora and not wired into any core flow (only an icon-name example in Launcher.qml). Skip until ported to the COPR."
+source = "dnf"
+names = ["omacut"]
+reason = "Dead-simple video length trimmer (Qt6/QML + ffmpeg; github.com/omacom-io/omacut, MIT), a quattro-line omarchy-family app. Not in Fedora repos/RPM Fusion; built from source by omedora/packaging/copr/omacut.spec (plain qmake6 build, no vendoring). Ships /usr/bin/omacut; requires ffmpeg/ffprobe (by path, so ffmpeg-free satisfies it) + xdg-desktop-portal for its file picker."
 [omawrite]
-source = "skip"
-reason = "New omarchy-family writing app added to omarchy-base.packages in quattro (bound to SUPER+SHIFT+W). Not packaged for Fedora; the keybind simply no-ops when absent. Skip until ported to the COPR."
+source = "dnf"
+names = ["omawrite"]
+reason = "Dead-simple Markdown writing app bound to SUPER+SHIFT+W (Qt6/QML; github.com/omacom-io/omawrite, MIT), a quattro-line omarchy-family app. Not in Fedora repos/RPM Fusion; built from source by omedora/packaging/copr/omawrite.spec (plain qmake6 build, no vendoring). Ships /usr/bin/omawrite. Upstream's Arch package pulls the proprietary ttf-ia-writer font, which omedora skip-maps ([ttf-ia-writer]); this RPM deliberately does NOT require it (Qt substitutes a fallback monospace by family name), so the app installs and runs without it — wiring the font is a separate deferred item."
 [hyprland-preview-share-picker]
 source = "dnf"
 names = ["hyprland-preview-share-picker"]
