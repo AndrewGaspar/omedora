@@ -141,8 +141,9 @@ source = "dnf"
 names = ["satty"]
 reason = "Wayland screenshot annotation (Rust/GTK4). Not in Fedora repos/RPM Fusion, and — despite being a GUI — NOT on Flathub (verified against Flathub appstream+search). Built from source by omedora/packaging/copr/satty.spec."
 [tensaku]
-source = "skip"
-reason = "The quattro line's replacement for satty as the screenshot/clipboard annotation editor (dev.tensaku.Tensaku; Arch package). Not packaged for Fedora. omedora keeps satty (satty.spec) and ships a tensaku-edit -> satty shim (omedora/bin/tensaku-edit, installed by install/user/tensaku-edit-shim-fedora.sh) so omarchy-capture-screenshot/-clipboard-open work unchanged. TODO: port tensaku to the COPR to adopt it natively."
+source = "dnf"
+names = ["tensaku"]
+reason = "The quattro line's screenshot/clipboard annotation editor (dev.tensaku.Tensaku; a Satty fork, Rust/GTK4). Not in Fedora repos/RPM Fusion; built from source by omedora/packaging/copr/tensaku.spec (hermetic vendored cargo build, like satty). Ships /usr/bin/tensaku plus the /usr/bin/tensaku-edit wrapper omarchy-capture-screenshot/-clipboard-open/imv invoke, so omedora adopts it natively. omedora still keeps satty (independent tool) and the tensaku-edit -> satty shim (install/user/tensaku-edit-shim-fedora.sh), which self-deactivates once this package provides the real /usr/bin/tensaku-edit."
 [omacut]
 source = "skip"
 reason = "New omarchy-family app added to omarchy-base.packages in quattro. Not packaged for Fedora and not wired into any core flow (only an icon-name example in Launcher.qml). Skip until ported to the COPR."
