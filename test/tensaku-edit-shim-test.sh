@@ -4,11 +4,13 @@
 # satty shim.
 #
 # The quattro line swapped Omarchy's screenshot/clipboard annotation editor from
-# satty to `tensaku-edit` (the Arch-only `tensaku` package). tensaku isn't
-# packaged for Fedora, so omedora keeps satty and installs a tensaku-edit ->
-# satty wrapper into ~/.local/bin — but ONLY when no genuine tensaku-edit is
-# present. This test drives that logic with a stubbed filesystem, mirroring
-# powerprofilesctl-shim-test.sh.
+# satty to `tensaku-edit` (the `tensaku` package). omedora now packages tensaku
+# natively (omedora/packaging/copr/tensaku.spec, tensaku-spec-test.sh), which
+# provides the real /usr/bin/tensaku-edit — but it ALSO keeps satty and this
+# tensaku-edit -> satty wrapper as a self-deactivating FALLBACK: the wrapper
+# installs into ~/.local/bin ONLY when no genuine tensaku-edit is present, so a
+# native tensaku auto-wins. This test drives that logic with a stubbed
+# filesystem, mirroring powerprofilesctl-shim-test.sh.
 
 set -euo pipefail
 
@@ -75,11 +77,20 @@ grep -q 'omedora/bin/tensaku-edit' "$ROOT/omedora/packaging/copr/omedora.spec" \
   && pass "omedora.spec ships the tensaku-edit shim under the payload" \
   || fail "omedora.spec ships the tensaku-edit shim under the payload"
 
-# --- the new quattro base apps are mapped (skip) so install can't wedge ------
+# --- the new quattro base apps are all mapped so install can't wedge ---------
 for p in tensaku omacut omawrite; do
   grep -q "^\[$p\]" "$ROOT/install/packages/fedora.toml" \
     && pass "fedora.toml maps [$p] (quattro base package)" \
     || fail "fedora.toml maps [$p] (quattro base package)"
 done
+
+# tensaku is now packaged natively (dnf from the COPR), providing the real
+# /usr/bin/tensaku-edit that self-deactivates the satty shim above. omacut (a
+# video-trim tool) and omawrite (a writing app) are out of scope for the
+# screenshot flow and stay skip-mapped.
+awk '/^\[tensaku\]/{f=1;next} /^\[/{f=0} f' "$ROOT/install/packages/fedora.toml" \
+  | grep -qE '^source = "dnf"' \
+  && pass "fedora.toml maps [tensaku] to source=dnf (native COPR package)" \
+  || fail "fedora.toml maps [tensaku] to source=dnf (native COPR package)"
 
 echo "# all tensaku-edit-shim tests passed"
