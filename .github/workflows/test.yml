@@ -98,6 +98,12 @@ jobs:
       - name: Run tensaku-spec static guard
         run: bash test/tensaku-spec-test.sh
 
+      - name: Run omacut-spec static guard
+        run: bash test/omacut-spec-test.sh
+
+      - name: Run omawrite-spec static guard
+        run: bash test/omawrite-spec-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 
