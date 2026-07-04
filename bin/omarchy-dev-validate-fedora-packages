@@ -52,7 +52,6 @@ emit_json    = os.environ.get("EMIT_JSON", "false") == "true"
 # omedora/packages.md §6. Adding a new COPR requires a separate PR that
 # updates this list AND the doc.
 COPR_ALLOWLIST = {
-    "lionheartp/Hyprland",
     # ghostty (Zig terminal) is in no Fedora/RPM Fusion repo, and an in-house
     # vendored build is blocked by ghostty's zig 0.15.x pin vs Fedora 44's zig
     # 0.16. scottames/ghostty is the ghostty-docs-endorsed canonical Fedora COPR
