@@ -48,7 +48,7 @@ names = ["dnf-pkg-fedora"]
 
 [copr-pkg]
 source = "copr"
-copr = "lionheartp/Hyprland"
+copr = "scottames/ghostty"
 names = ["copr-pkg"]
 
 [flathub-pkg]
