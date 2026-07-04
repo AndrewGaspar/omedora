@@ -45,6 +45,13 @@ SPECS=(
   # Ships /usr/bin/tensaku + the tensaku-edit wrapper omarchy's capture scripts
   # invoke, so omedora adopts it natively (retiring the satty->tensaku-edit shim).
   tensaku.spec
+  # omacut / omawrite: the other two quattro-line omarchy-family apps added to
+  # omarchy-base.packages. Both are plain Qt6/qmake6 C++ builds (no vendoring —
+  # deps come from BuildRequires), mirroring upstream's ./bin/build. omacut is a
+  # video-trim tool (ships /usr/bin/omacut, needs ffmpeg at runtime); omawrite is
+  # a Markdown writing app bound to SUPER+SHIFT+W (ships /usr/bin/omawrite). No
+  # intra-stack BuildRequires, so order is flexible.
+  omacut.spec omawrite.spec
   # voxtype: subpackaged binary-repackage of upstream's official Fedora RPM —
   # one spec -> base voxtype (CPU+Vulkan+ONNX-CPU) plus opt-in voxtype-cuda /
   # voxtype-migraphx GPU add-ons. On-demand (not in any base package set); the
