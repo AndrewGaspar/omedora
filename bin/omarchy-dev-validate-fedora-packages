@@ -53,6 +53,13 @@ emit_json    = os.environ.get("EMIT_JSON", "false") == "true"
 # updates this list AND the doc.
 COPR_ALLOWLIST = {
     "lionheartp/Hyprland",
+    # ghostty (Zig terminal) is in no Fedora/RPM Fusion repo, and an in-house
+    # vendored build is blocked by ghostty's zig 0.15.x pin vs Fedora 44's zig
+    # 0.16. scottames/ghostty is the ghostty-docs-endorsed canonical Fedora COPR
+    # — a deliberate allowlist exception. Only enabled on-demand when a user
+    # runs Install > Terminal > Ghostty (ghostty is not a base package, and
+    # pkg.py enables a copr source lazily at add-time). See packages.md §3.
+    "scottames/ghostty",
 }
 
 VALID_SOURCES = {"dnf", "copr", "flathub", "source", "skip"}
