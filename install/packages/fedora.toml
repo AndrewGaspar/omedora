@@ -276,8 +276,9 @@ names = ["uwsm"]
 reason = "Universal Wayland Session Manager — omedora's session launches through `uwsm start`. Not in Fedora main/RPM Fusion; it was implicitly provided by the dropped lionheartp/Hyprland COPR. Vendored as omedora/packaging/copr/uwsm.spec (0.23.3, noarch, adapted from solopasha/hyprlandRPM); served from the omedora repo. Without an entry it falls through to plain dnf and aborts the base install (No match for argument: uwsm)."
 
 [gpu-screen-recorder]
-source = "skip"
-reason = "GPU screen recorder (NVENC/VAAPI); was implicitly provided by the dropped lionheartp/Hyprland COPR, not Fedora main or RPM Fusion. Not session-critical, and building it needs RPM Fusion ffmpeg BuildRequires the build container doesn't enable. Skipped for now; TODO: vendor it (needs RPM Fusion build deps) or document a manual install for screen recording."
+source = "dnf"
+names = ["gpu-screen-recorder"]
+reason = "GPU-accelerated screen recorder (NVENC/VAAPI/Vulkan) that omarchy's screenrecord flow (bin/omarchy-capture-screenrecording) and the Quickshell bar indicator are hardcoded to (`gpu-screen-recorder` binary / `pgrep -f '^gpu-screen-recorder'`); skip-mapping it made recording a silent no-op. Was implicitly provided by the dropped lionheartp/Hyprland COPR, not Fedora main or RPM Fusion. Built FROM SOURCE (Meson) as omedora/packaging/copr/gpu-screen-recorder.spec (5.14.1, GPL-3.0-only, git.dec05eba.com) and served from the omedora repo. Builds against Fedora main's ffmpeg-free-devel (VAAPI/NVENC/Vulkan encode, not libx264) — NO RPM Fusion needed at build or runtime; all deps resolve from Fedora main. Ships /usr/bin/gpu-screen-recorder + the gsr-kms-server KMS helper (granted CAP_SYS_ADMIN via %post setcap)."
 
 # --- quickshell (vendored omedora RPM, served from the omedora repo) ----------
 
