@@ -95,6 +95,9 @@ jobs:
       - name: Run voxtype-spec static guard
         run: bash test/voxtype-spec-test.sh
 
+      - name: Run tensaku-spec static guard
+        run: bash test/tensaku-spec-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 
