@@ -155,7 +155,7 @@ reason = "Dead-simple Markdown writing app bound to SUPER+SHIFT+W (Qt6/QML; gith
 [hyprland-preview-share-picker]
 source = "dnf"
 names = ["hyprland-preview-share-picker"]
-reason = "Rust (edition 2024) GTK4 xdph share picker. Not in Fedora main/RPM Fusion or the allowlisted lionheartp/Hyprland COPR. Built from source by omedora/packaging/copr/hyprland-preview-share-picker.spec (hyprland-protocols submodule fetched at a pinned commit). Runtime dep xdg-desktop-portal-hyprland comes from lionheartp/Hyprland."
+reason = "Rust (edition 2024) GTK4 xdph share picker. Not in Fedora main/RPM Fusion. Built from source by omedora/packaging/copr/hyprland-preview-share-picker.spec (hyprland-protocols submodule fetched at a pinned commit). Runtime dep xdg-desktop-portal-hyprland is vendored in the omedora COPR (xdg-desktop-portal-hyprland.spec)."
 
 [ghostty]
 source = "copr"
