@@ -52,6 +52,13 @@ SPECS=(
   # a Markdown writing app bound to SUPER+SHIFT+W (ships /usr/bin/omawrite). No
   # intra-stack BuildRequires, so order is flexible.
   omacut.spec omawrite.spec
+  # gpu-screen-recorder: the GPU-accelerated screen recorder omarchy's screenrecord
+  # flow + Quickshell bar indicator are hardcoded to. From-source Meson C/C++ build
+  # (git.dec05eba.com, GPL-3.0-only); builds against Fedora main's ffmpeg-free-devel
+  # (VAAPI/NVENC/Vulkan encode, not libx264) so NO RPM Fusion is needed. Ships
+  # /usr/bin/gpu-screen-recorder + the gsr-kms-server KMS helper (CAP_SYS_ADMIN via
+  # %post setcap). No intra-stack BuildRequires, so order is flexible.
+  gpu-screen-recorder.spec
   # voxtype: subpackaged binary-repackage of upstream's official Fedora RPM —
   # one spec -> base voxtype (CPU+Vulkan+ONNX-CPU) plus opt-in voxtype-cuda /
   # voxtype-migraphx GPU add-ons. On-demand (not in any base package set); the
