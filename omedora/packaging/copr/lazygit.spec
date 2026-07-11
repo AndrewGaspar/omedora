@@ -7,7 +7,8 @@
 #
 # Why not Fedora main / RPM Fusion / a COPR: lazygit is in neither Fedora main
 # nor RPM Fusion (confirmed against fedora:44). The well-known atim/lazygit COPR
-# is NOT on omedora's COPR allowlist (only lionheartp/Hyprland is), so we build
+# is NOT on omedora's COPR allowlist (which is empty — omedora-3 has no
+# third-party COPRs), so we build
 # it ourselves. A from-source Go build is the more idiomatic Fedora form we'd
 # refine to for a public COPR; binary-repackage is the fastest correct thing.
 

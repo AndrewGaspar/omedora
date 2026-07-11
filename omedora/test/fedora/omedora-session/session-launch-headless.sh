@@ -220,7 +220,7 @@ log "Hyprland IPC up (instance $SIG)"
 
 # --- 3. ensure a usable monitor --------------------------------------------
 # The nested aquamarine output doesn't always promote to a Hyprland monitor on
-# its own under this lionheartp v0.55.2 build, so create an explicit headless
+# its own under this vendored Hyprland v0.55.2 build, so create an explicit headless
 # output. (`hyprctl keyword` is rejected by the Lua parser; `output create`
 # works.)
 sleep 1

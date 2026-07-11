@@ -33,8 +33,8 @@ fi
 # the TUIs, uwsm — are served from omedora's COPR. Enable it so the
 # `source = "dnf"` entries in install/packages/fedora.toml resolve from it. The
 # project name is resolved by `omedora-copr` (single source of truth,
-# version-scoped per Omarchy base — see bin/omedora-copr). The old third-party
-# lionheartp/Hyprland COPR was retired in task #66; this is omedora's own repo.
+# version-scoped per Omarchy base — see bin/omedora-copr). omedora-3 has no
+# third-party COPR dependencies (task #66); this is omedora's own repo.
 #
 # The L4 test harness instead injects a LOCAL repo at
 # /etc/yum.repos.d/omedora-local.repo (build-session.sh) for fast, hermetic,

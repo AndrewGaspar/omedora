@@ -6,7 +6,7 @@
 # -git spec). Adapted from solopasha/hyprlandRPM (its non-git release path).
 # omedora conventions: pinned Version, explicit Release + changelog.
 #
-# Replaces the dropped third-party lionheartp/Hyprland COPR. BuildRequires the
+# Built from omedora's own COPR — no third-party COPRs. BuildRequires the
 # whole vendored hypr* stack (glaze-static, hyprwayland-scanner, +the libs),
 # all resolved from the omedora local repo at build time.
 #
@@ -278,5 +278,5 @@ install -Dpm644 %{SOURCE1} -t %{buildroot}%{macrosdir}
 
 * Sat May 30 2026 omedora <noreply@omedora> - 0.55.2-1
 - Initial omedora build of Hyprland 0.55.2 from the release source tarball.
-- Adapted from solopasha/hyprlandRPM; replaces the dropped lionheartp/Hyprland COPR.
+- Adapted from solopasha/hyprlandRPM; built from omedora's own COPR.
 - Subprojects (udis86, hyprland-protocols) bundled in the release tarball.

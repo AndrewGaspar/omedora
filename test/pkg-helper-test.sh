@@ -22,17 +22,13 @@ mkdir -p "$INSTALLERS_DIR"
 echo '#!/bin/bash' >"$INSTALLERS_DIR/install-walker.sh"
 chmod +x "$INSTALLERS_DIR/install-walker.sh"
 
-# Fixture map exercising each tier
+# Fixture map exercising each resolvable tier (no copr tier: omedora-3's COPR
+# allowlist is empty, so there is no valid copr source to enable/install)
 FIXTURE_MAP="$TMPDIR/fedora.toml"
 cat >"$FIXTURE_MAP" <<'EOF'
 [ttf-jetbrains-mono-nerd]
 source = "dnf"
 names = ["jetbrains-mono-fonts-all"]
-
-[hyprland]
-source = "copr"
-copr = "lionheartp/Hyprland"
-names = ["hyprland"]
 
 [obsidian]
 source = "flathub"
@@ -86,23 +82,6 @@ if log_contains "sudo dnf install -y --setopt=install_weak_deps=False jetbrains-
 else
   cat "$MOCK_LOG" >&2
   fail "pkg-add → expected translated install call"
-fi
-
-# --- omarchy-pkg-add: COPR enable + install ---
-
-reset_log
-"$ROOT/bin/omarchy-pkg-add" hyprland >/dev/null 2>&1 || true
-if log_contains "sudo dnf copr enable -y lionheartp/Hyprland"; then
-  pass "pkg-add hyprland enables lionheartp/Hyprland COPR"
-else
-  cat "$MOCK_LOG" >&2
-  fail "pkg-add hyprland → expected COPR enable call"
-fi
-if log_contains "sudo dnf install -y --setopt=install_weak_deps=False hyprland"; then
-  pass "pkg-add hyprland → install after COPR enable"
-else
-  cat "$MOCK_LOG" >&2
-  fail "pkg-add hyprland → expected dnf install after COPR enable"
 fi
 
 # --- omarchy-pkg-add: flathub install ---

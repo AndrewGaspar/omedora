@@ -49,11 +49,11 @@ inst_dir     = os.environ["INSTALLERS_DIR"]
 emit_json    = os.environ.get("EMIT_JSON", "false") == "true"
 
 # Allowed COPR identifiers — must match the documented allowlist in
-# omedora/packages.md §6. Adding a new COPR requires a separate PR that
-# updates this list AND the doc.
-COPR_ALLOWLIST = {
-    "lionheartp/Hyprland",
-}
+# omedora/packages.md §6. omedora-3 has ZERO third-party COPR dependencies
+# (the entire hyprwm stack is vendored as omedora's own RPMs), so this is
+# intentionally empty. Adding a new COPR requires a separate PR that updates
+# this set AND the doc.
+COPR_ALLOWLIST: set[str] = set()
 
 VALID_SOURCES = {"dnf", "copr", "flathub", "source", "skip"}
 

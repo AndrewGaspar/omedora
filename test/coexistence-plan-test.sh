@@ -173,7 +173,7 @@ assert_equals "C: non-interactive did NOT prompt (no gum)" \
 # Can't ask whether to replace, and installing over it is a guaranteed conflict,
 # so the gate must abort with guidance rather than proceed into failure.
 gate_home C2
-export OMEDORA_REPOQUERY_CMD="printf '%s\n' 'hyprland 0.55.1 copr:copr.fedorainfracloud.org:lionheartp:Hyprland'"
+export OMEDORA_REPOQUERY_CMD="printf '%s\n' 'hyprland 0.55.1 copr:copr.fedorainfracloud.org:solopasha:hyprland'"
 run_gate
 assert_equals "C2: non-interactive + foreign Hyprland aborts (exit 1)" "$PLAN_RC" "1"
 assert_output_contains "C2: abort explains the file conflict + the fix" \

@@ -20,7 +20,7 @@ When omedora installs a package on Fedora, it picks an install source in this or
 | --- | --- | --- | --- |
 | 1 | **Fedora main repos / RPM Fusion** (`dnf install <name>`) | `dnf` | Default. If the package name is unchanged from Arch, no map entry needed. If the name differs, the map provides the Fedora name. RPM Fusion (enabled in preflight) is the same `dnf` codepath — for multimedia codecs and the handful of nonfree libs. |
 | 2 | **The omedora repo** (`dnf install <name>` from RPMs we build) | `dnf` | Packages that aren't anywhere in Fedora's ecosystem but that we build ourselves as RPMs under [`omedora/packaging/copr/`](#4-the-rpmcopr-tier-omedorapackagingcopr). Same `source = "dnf"` install path — the RPMs are served from a repo dnf already trusts (a local repo today, a published COPR later). The `names` point at the RPM's package name(s). |
-| 3 | **Vetted third-party COPR** (`dnf copr enable <copr>` then `dnf install <name>`) | `copr` | Third-party COPRs we don't maintain. Allowed COPRs are an explicit allowlist (see [§7](#7-review-checklist)). Currently empty — the only past entry, `lionheartp/Hyprland`, was retired in task #66 (the hyprwm stack is now vendored under tier 2). New COPRs require review. |
+| 3 | **Vetted third-party COPR** (`dnf copr enable <copr>` then `dnf install <name>`) | `copr` | Third-party COPRs we don't maintain. Allowed COPRs are an explicit allowlist (see [§7](#7-review-checklist)). Currently empty — omedora-3 has no third-party COPR dependencies (the hyprwm stack is vendored under tier 2 as of task #66). New COPRs require review. |
 | 4 | **Flathub** (`flatpak install -y flathub <app_id>`) | `flathub` | For proprietary or otherwise unpackaged GUI apps. Flathub remote is enabled in preflight. |
 | 5 | **Skip** (`source = "skip"`, logged) | `skip` | Not installed on Fedora at all — hardware/Arch-specific packages, bootloader components, or things still awaiting a packaging decision. Always carries a `reason`. |
 
@@ -99,9 +99,9 @@ names = ["swayosd"]
 reason = "Not in Fedora repos and ships no prebuilt binaries, so omedora/packaging/copr/swayosd.spec builds it from source (meson+cargo). Served from the omedora repo."
 
 # --- Hyprland stack (vendored omedora RPMs, served from the omedora repo) --
-# Formerly pulled from the third-party lionheartp/Hyprland COPR; that COPR was
-# retired in task #66 when the whole hyprwm stack was vendored under
-# omedora/packaging/copr/ and routed through source = "dnf" (the omedora repo).
+# The whole hyprwm stack is vendored under omedora/packaging/copr/ (task #66)
+# and routed through source = "dnf" (the omedora repo) — built from omedora's
+# own COPR, with no third-party COPR dependencies.
 
 [hyprland]
 source = "dnf"
@@ -271,7 +271,7 @@ When upstream Omarchy adds a new package to `omarchy-base.packages` or to a feat
 
 1. **Search Fedora main repos first.** `dnf search <name>`. If found under a slightly different name, add a `source = "dnf"` entry with the `names` translation.
 2. **If not in main, check RPM Fusion.** `dnf --enablerepo=rpmfusion-free,rpmfusion-nonfree search <name>`. Still uses `source = "dnf"` since RPM Fusion is enabled in preflight.
-3. **If not in RPM Fusion, check the allowed third-party COPRs.** The allowlist is currently empty (`lionheartp/Hyprland` was retired in task #66). If a future package is on an allowlisted COPR, add `source = "copr"` with the COPR identifier.
+3. **If not in RPM Fusion, check the allowed third-party COPRs.** The allowlist is currently empty — omedora-3 has no third-party COPR dependencies. If a future package is added to the allowlist, use `source = "copr"` with the COPR identifier.
 4. **If not in a vetted COPR, check Flathub.** Browse https://flathub.org/. If a maintained Flatpak exists, add `source = "flathub"` with the app ID.
 5. **If none of the above, package it as an omedora RPM.** Write a spec under `omedora/packaging/copr/` (see [§4](#4-the-rpmcopr-tier-omedorapackagingcopr) and the workflow below) and route the entry to `source = "dnf"`. This replaces the old source-installer tier. If you can't get to a spec immediately, park the entry as `source = "skip"` with a TODO `reason` so `install.sh` still completes — but the spec is the destination.
 6. **If the package is fundamentally not appropriate on Fedora** (a kernel module, a bootloader component, an Arch-specific repo manager), use `source = "skip"` with a clear `reason`.
@@ -312,7 +312,7 @@ Before merging a new map entry — agents and humans both run through this:
 | --- | --- | --- |
 | _(none)_ | — | No third-party COPRs are currently in use. |
 
-**Retired:** `lionheartp/Hyprland` (Hyprland + hypridle/hyprlock/hyprpaper/hyprpicker/hyprsunset/xdg-desktop-portal-hyprland). Retired in task #66: the entire hyprwm stack is now vendored as omedora RPMs under [`omedora/packaging/copr/`](#4-the-rpmcopr-tier-omedorapackagingcopr) (specs adapted from the maintained `solopasha/hyprlandRPM` spec set) and resolved via `source = "dnf"` from the omedora repo. `hyprpaper` was dropped entirely (omedora uses swaybg).
+**No third-party COPRs.** The hyprwm stack (Hyprland + hypridle/hyprlock/hyprpicker/hyprsunset/xdg-desktop-portal-hyprland) was formerly sourced from a third-party COPR; as of task #66 it is vendored entirely as omedora RPMs under [`omedora/packaging/copr/`](#4-the-rpmcopr-tier-omedorapackagingcopr) (specs adapted from the maintained `solopasha/hyprlandRPM` spec set) and resolved via `source = "dnf"` from the omedora repo. `hyprpaper` was dropped entirely (omedora uses swaybg).
 
 This allowlist is for **third-party** COPRs only. The omedora repo (our own RPMs in [`omedora/packaging/copr/`](#4-the-rpmcopr-tier-omedorapackagingcopr), eventually a published omedora COPR) is not a third-party trust decision — those specs are reviewed as ordinary source in this repo — so it doesn't appear here.
 

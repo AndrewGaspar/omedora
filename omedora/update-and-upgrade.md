@@ -130,7 +130,7 @@ In practice, source installers are infrequent (Walker and a small handful at mos
 When a user runs `dnf system-upgrade` to go from Fedora 44 to Fedora 45, three things can break omedora:
 
 1. **Third-party `.repo` files get disabled.** Fedora's `dnf system-upgrade` plugin auto-disables RPM Fusion and any COPRs to prevent cross-version dependency conflicts during the upgrade. They need re-enabling on the new release.
-2. **COPRs may lack a build for the new Fedora version.** If `lionheartp/Hyprland` doesn't have an F45 build yet on the morning the user upgrades, `dnf` will refuse to install/update Hyprland from that source. omedora needs to handle this gracefully.
+2. **COPRs may lack a build for the new Fedora version.** If omedora's own COPR doesn't have an F45 build of the Hyprland stack yet on the morning the user upgrades, `dnf` will refuse to install/update Hyprland from that source. omedora needs to handle this gracefully.
 3. **Packages may have moved into or out of main repos.** Hyprland might be in F45 main repos when it wasn't in F44; conversely a package we relied on may have been removed. The package map should reflect the new reality.
 
 ### `install/packages/fedora-upgrade.sh`

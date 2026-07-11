@@ -2,8 +2,8 @@
 #
 # BuildRequire-only dependency of Hyprland (hyprland BR glaze-static). Not in
 # Fedora 44 / RPM Fusion, so omedora vendors it. Adapted from solopasha's
-# Fedora spec set (github.com/solopasha/hyprlandRPM) — the maintained spec set
-# the dropped lionheartp/Hyprland COPR forked. Converted to omedora conventions:
+# Fedora spec set (github.com/solopasha/hyprlandRPM) — the maintained spec set —
+# and built from omedora's own COPR. Converted to omedora conventions:
 # pinned Version (no rpmautospec auto-release/auto-changelog), explicit
 # Release + changelog.
 #

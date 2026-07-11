@@ -41,15 +41,13 @@ assert_output_contains "real fedora.toml validates clean" "$real_output" "packag
 
 # --- Valid fixtures: one of each tier --------------------------------------
 
+# Note: there is intentionally no valid source="copr" tier here — omedora-3's
+# COPR allowlist is empty (the hyprwm stack is vendored as omedora's own RPMs),
+# so every copr source is rejected. That rejection is covered below.
 valid=$(write_map valid '
 [dnf-pkg]
 source = "dnf"
 names = ["dnf-pkg-fedora"]
-
-[copr-pkg]
-source = "copr"
-copr = "lionheartp/Hyprland"
-names = ["copr-pkg"]
 
 [flathub-pkg]
 source = "flathub"
@@ -64,7 +62,7 @@ source = "skip"
 reason = "not applicable on fedora"
 ')
 
-assert_exit_code "valid map of all 5 tiers exits 0" 0 \
+assert_exit_code "valid map of all valid tiers exits 0" 0 \
   env OMARCHY_FEDORA_MAP="$valid" OMARCHY_FEDORA_INSTALLERS="$INSTALLERS_DIR" "$VALIDATOR"
 
 # --- Missing source key fails ----------------------------------------------
@@ -100,7 +98,7 @@ source = "dnf"
 output=$(run_validator "$dnf_no_names" || true)
 assert_output_contains "source=dnf requires names" "$output" "requires non-empty 'names' array"
 
-# --- source=copr with un-allowlisted COPR fails ----------------------------
+# --- source=copr fails: the allowlist is empty, so ANY copr is rejected ------
 
 bad_copr=$(write_map bad-copr '
 [bad]
@@ -111,6 +109,19 @@ names = ["bad"]
 
 output=$(run_validator "$bad_copr" || true)
 assert_output_contains "un-allowlisted COPR fails" "$output" "not in the allowlist"
+
+# Even a well-formed owner/repo COPR is rejected while the allowlist is empty.
+empty_allowlist_copr=$(write_map empty-allowlist-copr '
+[bad]
+source = "copr"
+copr = "some/repo"
+names = ["bad"]
+')
+
+assert_exit_code "copr source rejected against empty allowlist" 1 \
+  env OMARCHY_FEDORA_MAP="$empty_allowlist_copr" OMARCHY_FEDORA_INSTALLERS="$INSTALLERS_DIR" "$VALIDATOR"
+output=$(run_validator "$empty_allowlist_copr" || true)
+assert_output_contains "empty allowlist rejects any COPR" "$output" "not in the allowlist"
 
 # --- source=copr without copr field fails ----------------------------------
 
@@ -212,7 +223,7 @@ echo "$json_output" | python3 -c '
 import json, sys
 data = json.load(sys.stdin)
 assert data["ok"] is True, f"ok should be true, got {data}"
-assert data["package_count"] == 5, f"package_count should be 5, got {data}"
+assert data["package_count"] == 4, f"package_count should be 4, got {data}"
 assert data["errors"] == [], f"errors should be empty, got {data}"
 '
 pass "--json output is structured and reports ok=true for valid map"

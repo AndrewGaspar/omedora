@@ -125,7 +125,7 @@ A new install script in the preflight stage, sourced only when `omarchy-distro` 
 1. **RPM Fusion free + nonfree** — for multimedia codecs and the handful of nonfree libs (e.g., `libva-nvidia-driver`) we may need.
 2. **Flathub remote** — `flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo`. Idempotent.
 
-No third-party COPR is enabled here. The Hyprland stack used to come from the `lionheartp/Hyprland` COPR, but task #66 vendored the entire hyprwm stack as omedora RPMs (`omedora/packaging/copr/`) served from the omedora repo; the COPR block was removed from this script.
+No third-party COPR is enabled here. omedora-3 has no third-party COPR dependencies: task #66 vendored the entire hyprwm stack as omedora RPMs (`omedora/packaging/copr/`) served from the omedora repo, built from omedora's own COPR.
 
 Conservative by design. New COPRs require explicit review (see [`packages.md`](packages.md) review checklist). Random PPA-style additions are out.
 
@@ -432,7 +432,7 @@ Packages with no Fedora / RPM Fusion / vetted-COPR / Flathub home are built as *
 | `omedora/packaging/copr/swayosd.spec` | New | ✅ shipped | From-source (meson wrapping `cargo build`); ships server/client + libinput backend glue. Crate vendoring for hermetic builds is a follow-up |
 | `omedora/packaging/copr/terminaltexteffects.spec` | New | ✅ shipped | From-source Python via `pyproject-rpm-macros` (noarch); provides `tte` |
 | `omedora/packaging/copr/{glaze,hyprland-protocols,hyprutils,hyprwayland-scanner,hyprlang,hyprgraphics,hyprwire,hyprcursor,aquamarine,hyprtoolkit}.spec` | New | ✅ shipped | **The vendored Hyprland library tier (task #66).** From-source CMake/meson; pinned upstream releases; specs adapted from `solopasha/hyprlandRPM`. Listed in build order in `build-repo.sh`'s `SPECS` array (deep intra-stack `-devel` BuildRequires). hyprutils/hyprlang/hyprcursor/hyprgraphics out-version Fedora's stale copies so dnf upgrades cleanly; aquamarine exports `libaquamarine.so.11` for Hyprland 0.55.2. `glaze` pinned to 7.x (Hyprland needs ≥7,<8). |
-| `omedora/packaging/copr/hyprland.spec` | New | ✅ shipped | **The compositor (task #66).** Built from the release `source-v0.55.2.tar.gz` (bundles udis86 + hyprland-protocols subprojects). Ships `macros.hyprland` for hyprpm. Replaces the dropped `lionheartp/Hyprland` COPR. |
+| `omedora/packaging/copr/hyprland.spec` | New | ✅ shipped | **The compositor (task #66).** Built from the release `source-v0.55.2.tar.gz` (bundles udis86 + hyprland-protocols subprojects). Ships `macros.hyprland` for hyprpm. Built from omedora's own COPR — no third-party COPRs. |
 | `omedora/packaging/copr/{hyprland-guiutils,hyprlock,hypridle,hyprpicker,hyprsunset,hyprshot,xdg-desktop-portal-hyprland}.spec` | New | ✅ shipped | **The vendored Hyprland app/portal tier (task #66).** hyprland-guiutils (hyprtoolkit-based, successor to hyprland-qtutils, Obsoletes it) authored fresh; the rest adapted from `solopasha/hyprlandRPM`. hyprlock/hypridle/xdph use Fedora's system `sdbus-c++ 2.2.1` (no bundling). hyprpaper deliberately NOT vendored (omedora uses swaybg). |
 | `omedora/packaging/copr/macros.hyprland` | New | ✅ shipped | rpm macro file shipped by `hyprland.spec` exposing the hyprland version for hyprpm plugin builds |
 | `omedora/packaging/copr/build-local.sh` | New | ✅ shipped | Builds one spec via `rpmbuild -ba` in a `fedora:44` container → `output/`. Enables the local omedora repo inside the build container so `dnf builddep` resolves just-built sibling `-devel` packages (intra-stack deps); stages local (non-URL) Source files |
@@ -560,7 +560,7 @@ Per-file status as of the current tip of `dev`. The roadmap in `testing.md` §10
 | `bin/omarchy-dev-validate-fedora-packages` | New | ✅ shipped | Package-map validator; mirrors `bin/omarchy-dev-bin-metadata` shape |
 | `install/packages/fedora.toml` | New | ✅ shipped | Package map (44 entries; bulks out per testing.md step 10) |
 | `install/packages/installers/` | New | ✅ shipped | Source-installer tier **retired** — only `README.md` (a pointer to `omedora/packaging/copr/`) remains. New non-Fedora packages are RPMs (see [Packaging tier](#packaging-tier-rpmcopr)) |
-| `install/preflight/fedora-repos.sh` | New | ✅ shipped | RPM Fusion + Flathub remote enable. The lionheartp/Hyprland COPR block was removed in task #66 (the hyprwm stack is vendored under `omedora/packaging/copr/` and served from the omedora repo) |
+| `install/preflight/fedora-repos.sh` | New | ✅ shipped | RPM Fusion + Flathub remote enable. No third-party COPR block — task #66 vendored the hyprwm stack under `omedora/packaging/copr/`, served from the omedora repo |
 | `.github/workflows/test.yml` | New | ✅ shipped | CI workflow — four parallel jobs (shell-unit, arch-regression, fedora-integration, fedora-smoke) |
 | `install.sh` | Edit | planned (step 8) | Gate `login/all.sh` + `post-install/all.sh` behind Arch check; let preflight + packaging + config run on Fedora |
 | `install/preflight/all.sh` | Edit | planned (step 8) | Source `fedora-repos.sh` on Fedora; skip `pacman.sh` + `disable-mkinitcpio.sh` on Fedora |
