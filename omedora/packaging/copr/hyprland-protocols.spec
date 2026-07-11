@@ -2,8 +2,8 @@
 #
 # Pure protocol XML + pkgconfig; noarch. BuildRequired by hypridle/hyprsunset/
 # xdg-desktop-portal-hyprland and bundled by hyprland itself. Not in Fedora 44.
-# Adapted from solopasha/hyprlandRPM (the maintained Fedora spec set the dropped
-# lionheartp/Hyprland COPR forked). omedora conventions: pinned Version,
+# Adapted from solopasha/hyprlandRPM (the maintained Fedora spec set omedora's
+# hyprwm packaging is based on). omedora conventions: pinned Version,
 # explicit Release + changelog.
 
 Name:           hyprland-protocols
