@@ -64,6 +64,18 @@ echo "# auditing against pin: $PIN"
 # Arch branch of a Fedora-gate, so it shows up as a deletion at the old site.
 declare -A ALLOW
 
+# Root README.md is intentionally replaced wholesale with Omedora's friendly,
+# Fedora-facing landing page (the upstream file is a short Omarchy stub). Every
+# upstream line is therefore a deletion; allowlist them all. The Omedora landing
+# content lives in README.md; the omedora/ docs folder is indexed by omedora/README.md.
+ALLOW["README.md"]='# Omarchy
+Omarchy is a beautiful, modern & opinionated Linux distribution by DHH.
+Read more at [omarchy.org](https://omarchy.org).
+## Docs
+- [omarchy-shell](docs/omarchy-shell.md) — shell host, plugin manifest, IPC, `shell.json`, custom bar modules
+## License
+Omarchy is released under the [MIT License](https://opensource.org/licenses/MIT).'
+
 ALLOW["bin/omarchy-finalize-user"]='xdg-settings set default-web-browser chromium.desktop
 xdg-mime default HEY.desktop x-scheme-handler/mailto'
 
