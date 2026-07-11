@@ -2,7 +2,7 @@
 
 # Omedora Fedora bootstrap — the curl-able installer entry point.
 #
-#   curl -fsSL https://raw.githubusercontent.com/AndrewGaspar/omedora/omarchy-4-omedora/omedora/boot.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/AndrewGaspar/omedora/omedora-4/omedora/boot.sh | bash
 #
 # Omarchy 4 ships as packages (the omedora/omedora-settings RPMs from the
 # omedora COPR own /usr/share/omarchy and /usr/bin/omarchy-*), so this
@@ -12,13 +12,13 @@
 # hands off to omedora/install-4.sh, after which the installed
 # /usr/share/omarchy payload takes over.
 #
-# CHANNELS (set OMEDORA_REF): a branch or tag; default omarchy-4-omedora.
+# CHANNELS (set OMEDORA_REF): a branch or tag; default omedora-4.
 
 set -eEo pipefail
 
 export OMARCHY_BRAND="${OMARCHY_BRAND:-omedora}"
 OMEDORA_REPO="${OMEDORA_REPO:-AndrewGaspar/omedora}"
-OMEDORA_REF="${OMEDORA_REF:-omarchy-4-omedora}"
+OMEDORA_REF="${OMEDORA_REF:-omedora-4}"
 
 # Omedora wordmark — byte-for-byte copy of omedora/branding/logo.txt, inlined
 # because the banner prints before the repo is cloned.

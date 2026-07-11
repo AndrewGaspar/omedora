@@ -1,6 +1,6 @@
 # Omedora architecture
 
-> **Omarchy 4 port status (2026-07-03).** This branch (`omarchy-4-omedora`) sits on the
+> **Omarchy 4 port status (2026-07-03).** This branch (`omedora-4`) sits on the
 > upstream `omarchy-4` pin tag `omedora-base-20260703-omarchy4-1e996609` (upstream renamed
 > the active v4 branch `omarchy-4` → `quattro`; the pin now tracks `omarchy/quattro`). Omarchy 4 is a
 > re-architecture into a package-backed distro (no `install.sh`/`boot.sh`; `omarchy` +
@@ -11,9 +11,9 @@
 >
 > **origin/dev mining conclusion:** the archived `origin/dev` port attempt (95 omedora
 > commits on the *old-shape* `omarchy/dev` 4.0.0.alpha line) was audited before this port
-> began. Everything reusable from it already landed, refined, on `3.8.2-omedora` — the only
+> began. Everything reusable from it already landed, refined, on `omedora-3` — the only
 > dev-only extras were L4 golden-image tests targeting walker/waybar, which Omarchy 4
-> retires. **All porting here sources from `3.8.2-omedora`; do not mine origin/dev.**
+> retires. **All porting here sources from `omedora-3`; do not mine origin/dev.**
 
 This is the canonical technical design for omedora — the Fedora port of Omarchy. It is the spine of the patch stack: every code patch in this fork should trace back to one of the sections below, and every section names the concrete files (or file patterns) it touches. The [patch-stack map at the end](#15-patch-stack-map) is the rebase checklist.
 
