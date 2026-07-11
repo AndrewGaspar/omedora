@@ -100,6 +100,8 @@ sudo systemctl reboot
 Once you're in, Waybar, Mako, the wallpaper, and hypridle all start automatically.
 Press **`Super+Space`** to open Walker and you're off.
 
+For the complete install reference — manual install, verification, coexistence, and any known issues — see [`omedora/install.md`](omedora/install.md).
+
 ---
 
 ## Installing onto a machine you already use
@@ -135,43 +137,6 @@ omedora version             # e.g. "Omedora 0.1.7 (rebased on Omarchy 3.8.2)"
 `omedora update` refreshes the Omedora source and runs `dnf upgrade --refresh`,
 which picks up new COPR builds and your system updates. It never re-copies configs
 over your `~/.config` — those are yours; migrations handle any required changes.
-
----
-
-## Troubleshooting
-
-**Only "Hyprland" (no "Omedora") in the picker, and `omarchy-*`/Walker don't work.**
-You selected the plain Hyprland entry, which launches without `uwsm`, so
-`~/.local/share/omarchy/bin` isn't on your PATH. Pick **"Omedora"** instead. If the
-"Omedora" entry is missing, `sudo dnf reinstall hyprland-omedora` (it owns the
-entry), then log out and pick it.
-
-**A Flatpak app failed to install.** Flatpak needs a live user session bus. If you
-ran the installer from a bare TTY, re-run it from a GNOME terminal, or install the
-apps afterward:
-```bash
-flatpak install -y flathub org.signal.Signal md.obsidian.Obsidian com.spotify.Client io.typora.Typora org.localsend.localsend_app
-```
-
-**`walker`/`elephant` not found, or `dnf copr enable` failed.** Make sure the COPR
-is enabled and reinstall:
-```bash
-sudo dnf install -y dnf-plugins-core
-sudo dnf copr enable -y agaspar/omedora-3
-sudo dnf install -y walker elephant omedora-nerd-fonts swayosd
-```
-
-**First install stalls at the node step with a gnupg lock error**
-(`gpg: ... waiting for lock`). This happens if the machine's hostname changed after
-the lock was created. Clear the stale lock and continue — it's safe:
-```bash
-gpgconf --kill all
-rm -f ~/.gnupg/public-keys.d/pubring.db.lock ~/.gnupg/public-keys.d/.#lk*
-mise use -g node@latest
-```
-
-More install detail and known gaps live in
-[`omedora/install.md`](omedora/install.md).
 
 ---
 
