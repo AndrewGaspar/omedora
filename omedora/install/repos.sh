@@ -7,7 +7,7 @@
 # at the gate (OMEDORA_REPLACE_FOREIGN=1 — the swap needs the COPR enabled, so
 # it can't run at gate time).
 #
-# Ported from 3.8.2-omedora's install/preflight/fedora-repos.sh +
+# Ported from omedora-3's install/preflight/fedora-repos.sh +
 # fedora-swap.sh. Safe to re-run; every operation is idempotent.
 
 FEDORA_VERSION="$(. /etc/os-release && echo "$VERSION_ID")"

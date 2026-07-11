@@ -41,7 +41,7 @@ the top-level `boot.sh` stays Arch/pacman-only). Channel via `OMEDORA_REF`:
 | `<branch\|tag>` | that exact ref | pinning |
 
 **Maintainer contract:** keep the GitHub **default branch pointed at the current
-stable release line** (e.g. `3.8.2-omedora`), and cut `vX.Y.Z` tags on it with
+stable release line** (e.g. `omedora-3`), and cut `vX.Y.Z` tags on it with
 `omedora-release`. Then `stable` installs land on that line and update detection
 compares its tags.
 

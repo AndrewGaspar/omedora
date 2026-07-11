@@ -20,7 +20,7 @@ on:
     # file, so spec pushes here submit to the omedora-4 project (live since
     # 2026-06-11). version/omedora-version paths rebuild the self-sourced
     # omedora/omedora-settings packages on release bumps.
-    branches: [omarchy-4-omedora]
+    branches: [omedora-4]
     paths:
       - 'omedora/packaging/copr/**.spec'
       - 'omedora/packaging/copr/**.sources'
