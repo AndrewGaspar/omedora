@@ -161,4 +161,21 @@ assert_exit_code "doctor ignores foreign-repo non-owned packages (exit 0)" 0 \
 assert_exit_code "doctor treats rpmfusion as friendly (exit 0)" 0 \
   doctor_with_repoquery "hyprland 0.55.2 rpmfusion-free"
 
+# Regression: an owned package whose provenance is an OPAQUE hash id (image-base
+# build, or a removed repo definition — NOT a foreign COPR) must be treated as
+# benign, not flagged. Previously every unrecognized repo id was called foreign,
+# so a lived-in machine's stock packages carrying a hash from_repo spammed the
+# install plan with bogus "foreign Hyprland stack" warnings for jq/tmux/cups/etc.
+assert_exit_code "doctor ignores opaque hash-id provenance for a compositor pkg (exit 0)" 0 \
+  doctor_with_repoquery "hyprland 0.55.2 19278be6a81040f5b6cbc7bacea5148e"
+assert_exit_code "doctor ignores opaque hash-id provenance for a base pkg (exit 0)" 0 \
+  doctor_with_repoquery "tmux 3.6a 19278be6a81040f5b6cbc7bacea5148e"
+
+# But a genuine foreign COPR mixed in with opaque-provenance packages is still
+# caught (only the COPR package is the conflict).
+assert_exit_code "doctor still flags a foreign COPR alongside opaque-id pkgs (exit 1)" 1 \
+  doctor_with_repoquery \
+    "tmux 3.6a 19278be6a81040f5b6cbc7bacea5148e" \
+    "hyprland 0.56.0 copr:copr.fedorainfracloud.org:solopasha:hyprland"
+
 echo "# All coexistence tests passed."
