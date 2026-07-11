@@ -20,7 +20,7 @@ When omedora installs a package on Fedora, it picks an install source in this or
 | --- | --- | --- | --- |
 | 1 | **Fedora main repos / RPM Fusion** (`dnf install <name>`) | `dnf` | Default. If the package name is unchanged from Arch, no map entry needed. If the name differs, the map provides the Fedora name. RPM Fusion (enabled in preflight) is the same `dnf` codepath — for multimedia codecs and the handful of nonfree libs. |
 | 2 | **The omedora repo** (`dnf install <name>` from RPMs we build) | `dnf` | Packages that aren't anywhere in Fedora's ecosystem but that we build ourselves as RPMs under [`omedora/packaging/copr/`](#4-the-rpmcopr-tier-omedorapackagingcopr). Same `source = "dnf"` install path — the RPMs are served from a repo dnf already trusts (a local repo today, a published COPR later). The `names` point at the RPM's package name(s). |
-| 3 | **Vetted third-party COPR** (`dnf copr enable <copr>` then `dnf install <name>`) | `copr` | Third-party COPRs we don't maintain. Allowed COPRs are an explicit allowlist (see [§7](#7-review-checklist)). One deliberate exception: **`scottames/ghostty`** for `[ghostty]` — the ghostty-docs-endorsed canonical Fedora COPR, adopted because an in-house Zig build is blocked by ghostty's zig 0.15.x pin vs Fedora 44's zig 0.16 (TODO: revisit vendoring). It is enabled **lazily** — `pkg.py` runs `dnf copr enable` only when a package with a `copr` source is actually installed, and ghostty is on-demand (not a base package), so a machine gains the COPR only if the user picks Install > Terminal > Ghostty. (The former `lionheartp/Hyprland` entry was removed once the hyprwm stack was fully vendored under tier 2.) New COPRs require review. |
+| 3 | **Vetted third-party COPR** (`dnf copr enable <copr>` then `dnf install <name>`) | `copr` | Third-party COPRs we don't maintain. Allowed COPRs are an explicit allowlist (see [§7](#7-review-checklist)). One deliberate exception: **`scottames/ghostty`** for `[ghostty]` — the ghostty-docs-endorsed canonical Fedora COPR, adopted because an in-house Zig build is blocked by ghostty's zig 0.15.x pin vs Fedora 44's zig 0.16 (TODO: revisit vendoring). It is enabled **lazily** — `pkg.py` runs `dnf copr enable` only when a package with a `copr` source is actually installed, and ghostty is on-demand (not a base package), so a machine gains the COPR only if the user picks Install > Terminal > Ghostty. This is the *only* allowed third-party COPR — the base system enables none, since the whole hyprwm stack is vendored under tier 2 and built from omedora's own COPR. New COPRs require review. |
 | 4 | **Flathub** (`flatpak install -y flathub <app_id>`) | `flathub` | For proprietary or otherwise unpackaged GUI apps. Flathub remote is enabled in preflight. |
 | 5 | **Skip** (`source = "skip"`, logged) | `skip` | Not installed on Fedora at all — hardware/Arch-specific packages, bootloader components, or things still awaiting a packaging decision. Always carries a `reason`. |
 
@@ -99,9 +99,9 @@ names = ["swayosd"]
 reason = "Not in Fedora repos and ships no prebuilt binaries, so omedora/packaging/copr/swayosd.spec builds it from source (meson+cargo). Served from the omedora repo."
 
 # --- Hyprland stack (vendored omedora RPMs, served from the omedora repo) --
-# Formerly pulled from the third-party lionheartp/Hyprland COPR; that COPR was
-# retired in task #66 when the whole hyprwm stack was vendored under
-# omedora/packaging/copr/ and routed through source = "dnf" (the omedora repo).
+# The whole hyprwm stack is vendored under omedora/packaging/copr/, built from
+# omedora's own COPR, and routed through source = "dnf" (the omedora repo). No
+# third-party COPR is involved (task #66).
 
 [hyprland]
 source = "dnf"
@@ -273,7 +273,7 @@ When upstream Omarchy adds a new package to `omarchy-base.packages` or to a feat
 
 1. **Search Fedora main repos first.** `dnf search <name>`. If found under a slightly different name, add a `source = "dnf"` entry with the `names` translation.
 2. **If not in main, check RPM Fusion.** `dnf --enablerepo=rpmfusion-free,rpmfusion-nonfree search <name>`. Still uses `source = "dnf"` since RPM Fusion is enabled in preflight.
-3. **If not in RPM Fusion, check the allowed third-party COPRs.** The allowlist currently holds one deliberate exception, `scottames/ghostty` (for `[ghostty]`); `lionheartp/Hyprland` was retired in task #66. Adding a new COPR is a reviewed decision — prefer vendoring into our own COPR (tier 2) unless a Zig/complex build makes that impractical (the ghostty case). If a package is on an allowlisted COPR, add `source = "copr"` with the COPR identifier.
+3. **If not in RPM Fusion, check the allowed third-party COPRs.** The allowlist holds exactly one deliberate exception, `scottames/ghostty` (for `[ghostty]`), enabled only on-demand; the base system uses no third-party COPR. Adding a new COPR is a reviewed decision — prefer vendoring into our own COPR (tier 2) unless a Zig/complex build makes that impractical (the ghostty case). If a package is on an allowlisted COPR, add `source = "copr"` with the COPR identifier.
 4. **If not in a vetted COPR, check Flathub.** Browse https://flathub.org/. If a maintained Flatpak exists, add `source = "flathub"` with the app ID.
 5. **If none of the above, package it as an omedora RPM.** Write a spec under `omedora/packaging/copr/` (see [§4](#4-the-rpmcopr-tier-omedorapackagingcopr) and the workflow below) and route the entry to `source = "dnf"`. This replaces the old source-installer tier. If you can't get to a spec immediately, park the entry as `source = "skip"` with a TODO `reason` so `install.sh` still completes — but the spec is the destination.
 6. **If the package is fundamentally not appropriate on Fedora** (a kernel module, a bootloader component, an Arch-specific repo manager), use `source = "skip"` with a clear `reason`.
@@ -314,7 +314,7 @@ Before merging a new map entry — agents and humans both run through this:
 | --- | --- | --- |
 | _(none)_ | — | No third-party COPRs are currently in use. |
 
-**Retired:** `lionheartp/Hyprland` (Hyprland + hypridle/hyprlock/hyprpaper/hyprpicker/hyprsunset/xdg-desktop-portal-hyprland). Retired in task #66: the entire hyprwm stack is now vendored as omedora RPMs under [`omedora/packaging/copr/`](#4-the-rpmcopr-tier-omedorapackagingcopr) (specs adapted from the maintained `solopasha/hyprlandRPM` spec set) and resolved via `source = "dnf"` from the omedora repo. `hyprpaper` was dropped entirely (omedora uses swaybg).
+**Retired third-party Hyprland COPR:** the Hyprland stack (Hyprland + hypridle/hyprlock/hyprpaper/hyprpicker/hyprsunset/xdg-desktop-portal-hyprland) used to come from a third-party COPR. Retired in task #66: the entire hyprwm stack is now vendored as omedora RPMs under [`omedora/packaging/copr/`](#4-the-rpmcopr-tier-omedorapackagingcopr) (specs adapted from the maintained `solopasha/hyprlandRPM` spec set), built from omedora's own COPR and resolved via `source = "dnf"` from the omedora repo. `hyprpaper` was dropped entirely (omedora uses swaybg).
 
 This allowlist is for **third-party** COPRs only. The omedora repo (our own RPMs in [`omedora/packaging/copr/`](#4-the-rpmcopr-tier-omedorapackagingcopr), eventually a published omedora COPR) is not a third-party trust decision — those specs are reviewed as ordinary source in this repo — so it doesn't appear here.
 
