@@ -6,7 +6,7 @@
 # and is never touched). Best-effort: a snapshot failure warns but does NOT
 # abort the install.
 #
-# Ported from 3.8.2-omedora's install/preflight/fedora-snapshot.sh.
+# Ported from omedora-3's install/preflight/fedora-snapshot.sh.
 
 if [[ -n ${OMEDORA_SNAPSHOT:-} ]]; then
   echo -e "\e[32mOmedora: taking a pre-install btrfs snapshot (you opted in at the gate)\e[0m"
