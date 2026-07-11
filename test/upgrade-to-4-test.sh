@@ -132,7 +132,7 @@ done
 
 # --- a fake 3.8.2-line $HOME ---------------------------------------------------
 # Legacy file contents are synthesized (CI checkouts are shallow; no `git show
-# 3.8.2-omedora:` available). Hash-matched fixtures use files this repo ships
+# omedora-3:` available). Hash-matched fixtures use files this repo ships
 # whose sha256 IS in the upgrader's known-default table (verified):
 #   config/btop/btop.conf        -> a known `refresh` hash
 #   etc/fastfetch/config.jsonc   -> a known `retire` hash

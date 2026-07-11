@@ -6,9 +6,9 @@ name: Test
 
 on:
   push:
-    branches: [omarchy-4-omedora]
+    branches: [omedora-4]
   pull_request:
-    branches: [omarchy-4-omedora]
+    branches: [omedora-4]
   workflow_dispatch:
 
 # Cancel in-progress runs when a new commit lands on the same ref.
