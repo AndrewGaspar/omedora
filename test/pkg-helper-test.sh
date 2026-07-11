@@ -29,10 +29,10 @@ cat >"$FIXTURE_MAP" <<'EOF'
 source = "dnf"
 names = ["jetbrains-mono-fonts-all"]
 
-[hyprland]
+[ghostty]
 source = "copr"
-copr = "lionheartp/Hyprland"
-names = ["hyprland"]
+copr = "scottames/ghostty"
+names = ["ghostty"]
 
 [obsidian]
 source = "flathub"
@@ -91,18 +91,18 @@ fi
 # --- omarchy-pkg-add: COPR enable + install ---
 
 reset_log
-"$ROOT/bin/omarchy-pkg-add" hyprland >/dev/null 2>&1 || true
-if log_contains "sudo dnf copr enable -y lionheartp/Hyprland"; then
-  pass "pkg-add hyprland enables lionheartp/Hyprland COPR"
+"$ROOT/bin/omarchy-pkg-add" ghostty >/dev/null 2>&1 || true
+if log_contains "sudo dnf copr enable -y scottames/ghostty"; then
+  pass "pkg-add ghostty enables scottames/ghostty COPR"
 else
   cat "$MOCK_LOG" >&2
-  fail "pkg-add hyprland → expected COPR enable call"
+  fail "pkg-add ghostty → expected COPR enable call"
 fi
-if log_contains "sudo dnf install -y --setopt=install_weak_deps=False hyprland"; then
-  pass "pkg-add hyprland → install after COPR enable"
+if log_contains "sudo dnf install -y --setopt=install_weak_deps=False ghostty"; then
+  pass "pkg-add ghostty → install after COPR enable"
 else
   cat "$MOCK_LOG" >&2
-  fail "pkg-add hyprland → expected dnf install after COPR enable"
+  fail "pkg-add ghostty → expected dnf install after COPR enable"
 fi
 
 # --- omarchy-pkg-add: flathub install ---

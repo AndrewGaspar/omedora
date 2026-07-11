@@ -236,8 +236,8 @@ reason = "AUR helper; AUR doesn't exist on Fedora. omedora-pkg-aur-add on Fedora
 # --- Hyprland ecosystem (vendored omedora RPMs, served from the omedora repo) -
 # The whole hyprwm stack is now packaged under omedora/packaging/copr/ and
 # resolved via source = "dnf" from the omedora repo (the walker/elephant model).
-# This replaces the dropped third-party lionheartp/Hyprland COPR (task #66). The
-# foundational libs (hyprutils/hyprlang/hyprcursor/hyprgraphics/aquamarine/
+# The whole stack is built from omedora's own COPR — no third-party COPR (task
+# #66). The foundational libs (hyprutils/hyprlang/hyprcursor/hyprgraphics/aquamarine/
 # hyprwire/hyprtoolkit/hyprwayland-scanner/hyprland-protocols/glaze) come in
 # transitively as dependencies, so only the user-facing names are mapped here.
 
@@ -258,27 +258,27 @@ reason = "Referenced by name in install/omarchy-base.packages but previously unm
 [hyprpicker]
 source = "dnf"
 names = ["hyprpicker"]
-reason = "Vendored as omedora/packaging/copr/hyprpicker.spec (0.4.7); served from the omedora repo. Replaces lionheartp/Hyprland."
+reason = "Vendored as omedora/packaging/copr/hyprpicker.spec (0.4.7); built from omedora's own COPR and served from the omedora repo."
 
 [hyprsunset]
 source = "dnf"
 names = ["hyprsunset"]
-reason = "Vendored as omedora/packaging/copr/hyprsunset.spec (0.3.3); served from the omedora repo. Replaces lionheartp/Hyprland."
+reason = "Vendored as omedora/packaging/copr/hyprsunset.spec (0.3.3); built from omedora's own COPR and served from the omedora repo."
 
 [xdg-desktop-portal-hyprland]
 source = "dnf"
 names = ["xdg-desktop-portal-hyprland"]
-reason = "Vendored as omedora/packaging/copr/xdg-desktop-portal-hyprland.spec (1.3.12); served from the omedora repo. Replaces lionheartp/Hyprland."
+reason = "Vendored as omedora/packaging/copr/xdg-desktop-portal-hyprland.spec (1.3.12); built from omedora's own COPR and served from the omedora repo."
 
 [uwsm]
 source = "dnf"
 names = ["uwsm"]
-reason = "Universal Wayland Session Manager — omedora's session launches through `uwsm start`. Not in Fedora main/RPM Fusion; it was implicitly provided by the dropped lionheartp/Hyprland COPR. Vendored as omedora/packaging/copr/uwsm.spec (0.23.3, noarch, adapted from solopasha/hyprlandRPM); served from the omedora repo. Without an entry it falls through to plain dnf and aborts the base install (No match for argument: uwsm)."
+reason = "Universal Wayland Session Manager — omedora's session launches through `uwsm start`. Not in Fedora main/RPM Fusion. Vendored as omedora/packaging/copr/uwsm.spec (0.23.3, noarch, adapted from solopasha/hyprlandRPM); built from omedora's own COPR and served from the omedora repo. Without an entry it falls through to plain dnf and aborts the base install (No match for argument: uwsm)."
 
 [gpu-screen-recorder]
 source = "dnf"
 names = ["gpu-screen-recorder"]
-reason = "GPU-accelerated screen recorder (NVENC/VAAPI/Vulkan) that omarchy's screenrecord flow (bin/omarchy-capture-screenrecording) and the Quickshell bar indicator are hardcoded to (`gpu-screen-recorder` binary / `pgrep -f '^gpu-screen-recorder'`); skip-mapping it made recording a silent no-op. Was implicitly provided by the dropped lionheartp/Hyprland COPR, not Fedora main or RPM Fusion. Built FROM SOURCE (Meson) as omedora/packaging/copr/gpu-screen-recorder.spec (5.14.1, GPL-3.0-only, git.dec05eba.com) and served from the omedora repo. Builds against Fedora main's ffmpeg-free-devel (VAAPI/NVENC/Vulkan encode, not libx264) — NO RPM Fusion needed at build or runtime; all deps resolve from Fedora main. Ships /usr/bin/gpu-screen-recorder + the gsr-kms-server KMS helper (granted CAP_SYS_ADMIN via %post setcap)."
+reason = "GPU-accelerated screen recorder (NVENC/VAAPI/Vulkan) that omarchy's screenrecord flow (bin/omarchy-capture-screenrecording) and the Quickshell bar indicator are hardcoded to (`gpu-screen-recorder` binary / `pgrep -f '^gpu-screen-recorder'`); skip-mapping it made recording a silent no-op. Not in Fedora main or RPM Fusion. Built FROM SOURCE (Meson) as omedora/packaging/copr/gpu-screen-recorder.spec (5.14.1, GPL-3.0-only, git.dec05eba.com) and served from the omedora repo. Builds against Fedora main's ffmpeg-free-devel (VAAPI/NVENC/Vulkan encode, not libx264) — NO RPM Fusion needed at build or runtime; all deps resolve from Fedora main. Ships /usr/bin/gpu-screen-recorder + the gsr-kms-server KMS helper (granted CAP_SYS_ADMIN via %post setcap)."
 
 # --- quickshell (vendored omedora RPM, served from the omedora repo) ----------
 
