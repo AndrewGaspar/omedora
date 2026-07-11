@@ -73,14 +73,14 @@ SPECS=(
   # The spec + .sources are retired in place (see their header) for reference.
   # task #66: the vendored Hyprland stack, IN BUILD ORDER (deep intra-stack
   # BuildRequires — each -devel must be in the local repo before the next
-  # builds). Replaces the dropped third-party lionheartp/Hyprland COPR.
+  # builds). The whole stack is built from omedora's own COPR.
   glaze.spec hyprland-protocols.spec hyprutils.spec hyprwayland-scanner.spec
   hyprlang.spec hyprgraphics.spec hyprwire.spec hyprcursor.spec aquamarine.spec
   hyprtoolkit.spec hyprland.spec hyprland-guiutils.spec
   hyprpicker.spec hyprsunset.spec
   xdg-desktop-portal-hyprland.spec
-  # uwsm (the session manager omedora launches through) was ALSO provided by
-  # the dropped lionheartp/Hyprland COPR, not Fedora — so it's vendored too.
+  # uwsm (the session manager omedora launches through) is not in Fedora — so
+  # it's vendored and built from omedora's own COPR too.
   uwsm.spec
   # hyprland-omedora (the 3.8.2-era session-entry shim) is RETIRED on the 4.x
   # line: omedora-settings ships the omedora.desktop session entry and

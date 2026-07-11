@@ -57,7 +57,7 @@ The testing investment is therefore *larger* than upstream's, but the pyramid be
 | Hardware-config 1-line guards | L1 | Source the script with `OMARCHY_DISTRO=fedora` and assert early-return |
 | `bin/omarchy-migrate` runner | L1+L2 | L1: drop fixture migrations, run, check state markers. L2: include a fixture that calls `omarchy-pkg-add` and verify it actually installed |
 | Real `dnf install` of package-map entries | L2 | Container with real dnf; install `jq` (small, fast), verify `rpm -q jq` |
-| Real `dnf copr enable lionheartp/Hyprland` | L2 | Container; verify `dnf info hyprland` succeeds afterward |
+| Real `dnf copr enable` of the omedora COPR | L2 | Container; verify `dnf info hyprland` succeeds afterward |
 | `omarchy-update-perform-fedora` orchestration | L2 | Seed `~/.local/state/omedora/last-fedora-version`, run, assert which `update-fedora-*` siblings were called |
 | `omarchy-update-fedora-version-check` | L2 | Seed marker file, assert `fedora-upgrade.sh` runs on mismatch and not on match |
 | `omarchy-update-restart` kernel detection on Fedora | L2 | Container has `/usr/lib/modules/*/vmlinuz` and real `rpm -qf`; assert no crash on absent `pacman` |
@@ -310,7 +310,7 @@ run-session.sh --headless
 | `xdg_wm_base` **version 6** | ✗ (v5 → *"invalid version for global xdg_wm_base"*) | ✗ (v5) | ✓ |
 | `zwp_linux_dmabuf_v1` | ✗ (headless backend never exports it, any renderer → *"Missing protocols"*) | ✓ | ✓ |
 
-labwc (wlroots 0.19) is the lightest Fedora 44 compositor that satisfies both: it runs its GLES2 renderer over a DRM render node and exports linux-dmabuf + xdg-shell v6. (Hyprland's *own* headless backend `AQ_BACKENDS=headless` is absent from the lionheartp build — `CBackend::create() failed!` — so a separate nesting host is required regardless.)
+labwc (wlroots 0.19) is the lightest Fedora 44 compositor that satisfies both: it runs its GLES2 renderer over a DRM render node and exports linux-dmabuf + xdg-shell v6. (Hyprland's *own* headless backend `AQ_BACKENDS=headless` is absent from omedora's Hyprland build — `CBackend::create() failed!` — so a separate nesting host is required regardless.)
 
 **The recipe** (all proven empirically):
 
@@ -328,7 +328,7 @@ The full autostart chain (waybar, mako, swaybg, hypridle, fcitx5) comes up exact
 
 **Knobs:** `OMEDORA_RENDER_NODE` (pin a render node), `OMEDORA_HEADLESS_RES` (default `1920x1080`), `OMEDORA_HEADLESS_KEEP` (return after the session is up instead of blocking — for scripted/CI driving).
 
-**Limitations:** software rendering (llvmpipe / vkms) is slow — fine for smoke assertions and screenshots, not for perf testing. The lionheartp Hyprland build's `hyprctl monitors` intermittently returns `unknown request` before the explicit output is created (the launcher works around it). `hyprctl dispatch exec …` needs the Lua quoting form `hl.dispatch("exec","<cmd>")`; launching clients directly with `WAYLAND_DISPLAY` set to Hyprland's socket is simpler for scripted driving.
+**Limitations:** software rendering (llvmpipe / vkms) is slow — fine for smoke assertions and screenshots, not for perf testing. omedora's Hyprland build's `hyprctl monitors` intermittently returns `unknown request` before the explicit output is created (the launcher works around it). `hyprctl dispatch exec …` needs the Lua quoting form `hl.dispatch("exec","<cmd>")`; launching clients directly with `WAYLAND_DISPLAY` set to Hyprland's socket is simpler for scripted driving.
 
 ### L4-headless automated test suite (`omedora/test/fedora/headless/`)
 
@@ -537,7 +537,7 @@ Specific friction points worth knowing about before writing tests:
 | **`omarchy-update-restart`** uses `pacman -Qo` for kernel detection. Pacman isn't in Fedora containers. | The Fedora-arm patch lives on the patch-stack map. Until it lands, the test that runs `omarchy-update-restart` on Fedora will fail. That's a feature: the test is the forcing function. |
 | **Network from CI runners.** GitHub Actions can reach `dl.fedoraproject.org`, `copr.fedoraproject.org`, `dl.flathub.org`. Bandwidth is fine. | If we hit rate limits on COPR, add backoff/retry to the test script. Not a current concern. |
 | **grim against the nested wayland-N socket hangs.** When Hyprland uses the `wayland` aquamarine backend, the wlr-screencopy protocol doesn't complete cleanly inside the nested compositor — `grim` from inside the container blocks indefinitely. | Drive smoke assertions via `hyprctl` only (clients, monitors, getoption). If a screenshot is genuinely needed, capture the nested *window* from the host with `grim -g <geometry>` against the host compositor. |
-| **`AQ_BACKENDS=headless` fails** on Hyprland 0.55.2 (lionheartp COPR build): `CBackend::create() failed!` — the headless aquamarine backend isn't built in. | Use the `wayland` backend (nest under the host compositor) for local dev. A CI-runnable headless path needs Xvfb + `AQ_BACKENDS=x11` (planned). |
+| **`AQ_BACKENDS=headless` fails** on Hyprland 0.55.2 (omedora COPR build): `CBackend::create() failed!` — the headless aquamarine backend isn't built in. | Use the `wayland` backend (nest under the host compositor) for local dev. A CI-runnable headless path needs Xvfb + `AQ_BACKENDS=x11` (planned). |
 | **`uwsm start` aborts in a container** — its env preloader asks `loginctl` for the session on the foreground VT and fails ("Could not determine session on foreground VT"); a container has no seat0/VTs. | L4-nested launches `Hyprland` directly under the logind session. The autostart's per-app `uwsm-app -- <cmd>` still works via the real `systemd --user` ([§6](#6-l4-nested-container-design)). |
 | **Rootless podman maps omedora to a subuid**, so it can't connect to the host's `0755` Wayland socket. | `run-session.sh` (which owns the socket) widens it to `0777` for the session and restores the mode on exit. GPU needs no juggling — the render node is world-rw. |
 
