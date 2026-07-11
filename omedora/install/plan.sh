@@ -1,7 +1,7 @@
 # Omedora install plan gate — the ONE up-front "here is everything this install
 # will do — proceed?" prompt. Runs BEFORE any change is made to the system:
 # before any repo is enabled, before any package lands, before any config is
-# written. Ported from 3.8.2-omedora's install/preflight/fedora-plan.sh and
+# written. Ported from omedora-3's install/preflight/fedora-plan.sh and
 # reworked for the Omarchy 4 package-backed flow (no install.sh upstream; the
 # omedora/omedora-settings RPMs own the payload).
 #
