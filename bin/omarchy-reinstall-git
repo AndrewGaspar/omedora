@@ -12,7 +12,7 @@ reinstall_repo="https://github.com/basecamp/omarchy.git"
 reinstall_branch="master"
 if [[ "$(omarchy-distro 2>/dev/null || echo arch)" == "fedora" ]]; then
   reinstall_repo="https://github.com/AndrewGaspar/omedora.git"
-  reinstall_branch="${OMARCHY_REF:-3.8.2-omedora}"
+  reinstall_branch="${OMARCHY_REF:-omedora-3}"
 fi
 
 git clone --depth=1 --branch "$reinstall_branch" "$reinstall_repo" ~/.local/share/omarchy-new >/dev/null

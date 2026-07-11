@@ -16,7 +16,7 @@ name: COPR build
 
 on:
   push:
-    branches: [3.8.2-omedora]
+    branches: [omedora-3]
     paths:
       - 'omedora/packaging/copr/**.spec'
       - 'omedora/packaging/copr/**.sources'
@@ -82,7 +82,7 @@ jobs:
         if: steps.gate.outputs.skip == 'false' && steps.pkgs.outputs.list != ''
         env:
           # Keep these in lockstep with omedora/packaging/copr/copr-submit.sh.
-          BRANCH: 3.8.2-omedora
+          BRANCH: omedora-3
           CLONE_URL: https://github.com/AndrewGaspar/omedora.git
           SUBDIR: omedora/packaging/copr
         run: |

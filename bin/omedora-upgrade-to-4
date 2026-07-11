@@ -5,7 +5,7 @@
 # omarchy:examples=omedora upgrade to 4 | omedora-upgrade-to-4 --yes --reboot
 # omarchy:requires-sudo=true
 
-# In-place upgrade: omedora v0.1.x (the 3.8.2-omedora line: a git clone at
+# In-place upgrade: omedora v0.1.x (the omedora-3 line: a git clone at
 # ~/.local/share/omarchy + RPMs from the agaspar/omedora-3 COPR) -> omedora 4
 # (the omedora/omedora-settings RPMs from agaspar/omedora-4, payload at
 # /usr/share/omarchy, Quickshell shell replacing waybar/walker/mako/swayosd).
@@ -16,7 +16,7 @@
 #     (the omedora/install/plan.sh idiom, incl. the /dev/tty-only prompt rule)
 #   - backup-then-write everywhere: every user file that exists and differs
 #     from a KNOWN SHIPPED DEFAULT (upstream's hash table — verified to cover
-#     the 3.8.2-omedora-shipped variants byte-for-byte) is backed up to
+#     the omedora-3-shipped variants byte-for-byte) is backed up to
 #     <file>.pre-omedora-4-<ts> before being replaced; customized files stay
 #     ACTIVE (hash-mismatch == never refreshed)
 #   - never touched: /etc/os-release, nsswitch, faillock, existing pam.d
@@ -839,7 +839,7 @@ hyprland_session_live() {
 
 # Fill the overlay's default/hypr with the 3.8.2-line .conf defaults the live
 # session still sources. Priority: the just-made local backup (guaranteed to
-# match what the session loaded), then a sparse clone of the 3.8.2-omedora
+# match what the session loaded), then a sparse clone of the omedora-3
 # branch, then the GitHub tarball.
 populate_legacy_hypr_defaults() {
   local shim_hypr_dir="$1" backup="$2" tmp_dir clone_dir archive_dir
@@ -855,7 +855,7 @@ populate_legacy_hypr_defaults() {
     tmp_dir=$(mktemp -d)
     clone_dir="$tmp_dir/omedora"
     if command -v git >/dev/null 2>&1; then
-      if git clone --depth 1 --branch 3.8.2-omedora --single-branch --filter=blob:none --sparse \
+      if git clone --depth 1 --branch omedora-3 --single-branch --filter=blob:none --sparse \
            https://github.com/AndrewGaspar/omedora.git "$clone_dir" >/dev/null 2>&1 &&
          git -C "$clone_dir" sparse-checkout set default/hypr >/dev/null 2>&1 &&
          [[ -d $clone_dir/default/hypr ]]; then
@@ -866,10 +866,10 @@ populate_legacy_hypr_defaults() {
       archive_dir="$tmp_dir/archive"
       mkdir -p "$archive_dir"
       if command -v curl >/dev/null 2>&1 && command -v tar >/dev/null 2>&1 &&
-         curl -fsSL https://github.com/AndrewGaspar/omedora/archive/refs/heads/3.8.2-omedora.tar.gz |
+         curl -fsSL https://github.com/AndrewGaspar/omedora/archive/refs/heads/omedora-3.tar.gz |
            tar -xz -C "$archive_dir" 2>/dev/null; then
-        if [[ -d $archive_dir/omedora-3.8.2-omedora/default/hypr ]]; then
-          cp -a "$archive_dir/omedora-3.8.2-omedora/default/hypr/." "$shim_hypr_dir/"
+        if [[ -d $archive_dir/omedora-omedora-3/default/hypr ]]; then
+          cp -a "$archive_dir/omedora-omedora-3/default/hypr/." "$shim_hypr_dir/"
         fi
       fi
     fi
