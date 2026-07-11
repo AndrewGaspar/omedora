@@ -60,23 +60,6 @@ if [[ ${OMEDORA_REPOQUERY_CMD:+set} != set ]] &&
   exit 0
 fi
 
-# Friendly *base* repo identifiers (matched against the leading repo token, not
-# loose substrings — a COPR's id literally contains "copr.fedorainfracloud.org",
-# which would false-match a naive "fedora" substring). These are the standard
-# Fedora repos plus RPM Fusion. The omedora repo is handled separately below so
-# both its local-repo name and a future omedora COPR count as friendly.
-FRIENDLY_REPO_PREFIXES=(
-  "fedora"        # fedora, fedora-modular, fedora-cisco-openh264
-  "updates"       # updates, updates-testing, updates-modular
-  "rawhide"
-  "anaconda"      # installed from the Fedora install media
-  "koji"          # Fedora build-system override repo
-  "@system"       # @System pseudo-repo: installed, provenance not tracked
-  "@commandline"  # locally-installed rpm via dnf install ./foo.rpm
-  "rpmfusion-free"
-  "rpmfusion-nonfree"
-)
-
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 # Resolve the owned Fedora package names.
@@ -99,29 +82,34 @@ repoquery_installed() {
   fi
 }
 
+# A repo is "foreign" ONLY when we can positively identify it as a third-party
+# COPR that isn't omedora's own. Everything else is benign: the standard Fedora
+# repos (fedora/updates/rawhide), RPM Fusion, @System/@commandline/anaconda, AND
+# — crucially — packages whose provenance dnf records as an opaque id (an
+# image-base build hash, or a repo definition that has since been removed). We
+# only ever want to catch the real conflict: a Hyprland-stack package pulled from
+# a foreign COPR. Treating every UNRECOGNIZED repo id as foreign mis-flagged
+# stock Fedora packages on lived-in machines — e.g. a base install whose packages
+# carry a hash from_repo like `19278…` — as "foreign Hyprland stack" conflicts,
+# spamming the install plan with dozens of bogus warnings for jq/tmux/cups/etc.
 is_friendly_repo() {
   local repo_lc
   repo_lc="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
 
-  # The omedora repo (local name) and any future omedora COPR are friendly.
+  # omedora's own repo (local name) and any omedora COPR are friendly.
   case "$repo_lc" in
     omedora | omedora-*) return 0 ;;
     *omedora*copr* | *copr*omedora*) return 0 ;;  # an omedora COPR id
   esac
 
-  # Any other COPR is foreign by definition.
+  # A (non-omedora) COPR is the one provenance we treat as foreign.
   case "$repo_lc" in
     copr:* | @copr:* | *copr.fedorainfracloud.org*) return 1 ;;
   esac
 
-  # Otherwise match against the friendly base-repo prefixes.
-  local pat
-  for pat in "${FRIENDLY_REPO_PREFIXES[@]}"; do
-    if [[ $repo_lc == "$pat" || $repo_lc == "$pat"-* ]]; then
-      return 0
-    fi
-  done
-  return 1
+  # Anything else — standard repos, install media, @System, or an opaque/lost
+  # provenance id — is benign.
+  return 0
 }
 
 # Run the scan. Prints warnings to stderr; returns 1 if any conflict found.
