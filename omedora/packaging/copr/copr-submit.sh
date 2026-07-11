@@ -30,7 +30,7 @@ REPO_ROOT=$(cd -- "$COPR_DIR/../../.." && pwd)
 # from the Omarchy base version), stripping the owner/ prefix; override with
 # PROJECT=... for a one-off (e.g. a new base line before `version` is bumped).
 PROJECT="${PROJECT:-$(OMARCHY_PATH="$REPO_ROOT" "$REPO_ROOT/bin/omedora-copr" | cut -d/ -f2)}"
-BRANCH="${BRANCH:-omarchy-4-omedora}"
+BRANCH="${BRANCH:-omedora-4}"
 CLONE_URL="${CLONE_URL:-https://github.com/AndrewGaspar/omedora.git}"
 SUBDIR="omedora/packaging/copr"
 
