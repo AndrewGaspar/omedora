@@ -72,7 +72,7 @@ When upstream adds a package to `omarchy-base.packages` or to a feature install 
 
 1. Check Fedora main repos: `dnf search <name>`.
 2. Check RPM Fusion: `dnf --enablerepo=rpmfusion-free,rpmfusion-nonfree search <name>`.
-3. Check the allowed third-party COPRs (see the allowlist in [`packages.md` §7](packages.md#7-review-checklist)). The allowlist is currently empty (`lionheartp/Hyprland` was retired in task #66 when the hyprwm stack was vendored).
+3. Check the allowed third-party COPRs (see the allowlist in [`packages.md` §7](packages.md#7-review-checklist)). The allowlist holds exactly one entry, `scottames/ghostty` — enabled only on-demand for the optional Ghostty terminal (Install > Terminal > Ghostty); the base system has zero third-party COPRs.
 4. Check Flathub: search https://flathub.org/.
 5. Only if all four fail: package it as an omedora RPM under `omedora/packaging/copr/` and route the entry to `source = "dnf"` (see [`packages.md` §4](packages.md#4-the-rpmcopr-tier-omedorapackagingcopr)). The source-installer tier is retired. If a spec isn't feasible right now, park the entry as `source = "skip"` with a TODO.
 
@@ -150,7 +150,7 @@ Land work as **logical, self-contained commits, pushed as you go** — one coher
 
 When you learn something that future-you will want to remember about omedora maintenance, write it to this project's memory directory (`/home/ajg/.claude/projects/-home-ajg-code-omedora/memory/`). Specifically:
 
-- **Fedora packaging surprises:** "swayosd moved into Fedora main repos as of F45 — drop the COPR check." "The `lionheartp/Hyprland` COPR was unreachable for 48 hours in March 2026; users hit `omedora update` failures."
+- **Fedora packaging surprises:** "swayosd moved into Fedora main repos as of F45 — drop the COPR check." "The `scottames/ghostty` COPR was unreachable for 48 hours in March 2026; users hit `omedora update` failures."
 - **Rebase patterns that aren't yet in [`rebase-workflow.md`](rebase-workflow.md):** if you encounter a new conflict pattern, save it as a `feedback` memory and update the doc in the next session.
 - **User preferences specific to this fork:** if the maintainer says "always cite the upstream Omarchy issue when filing a related omedora bug," save that as a feedback memory.
 

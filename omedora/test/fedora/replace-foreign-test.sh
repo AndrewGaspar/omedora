@@ -7,8 +7,8 @@
 # cannot cover because it stubs dnf with a logger. It exercises the actual
 # `dnf swap` file-conflict resolution and provenance move:
 #
-#   1. Install a real FOREIGN Hyprland from lionheartp/Hyprland (omedora's old
-#      upstream COPR) — a genuine third-party `hyprland` that owns /usr/bin/Hyprland.
+#   1. Install a real FOREIGN Hyprland from an example third-party COPR
+#      (solopasha/hyprland) — a genuine foreign `hyprland` that owns /usr/bin/Hyprland.
 #   2. `omarchy-doctor` must DETECT it as foreign-repo (real `dnf repoquery`).
 #   3. `omedora-replace-foreign --yes` must `dnf swap` it for omedora's
 #      hyprland-omedora (+ hyprland-no-session, which owns the same binary) from
@@ -35,7 +35,8 @@
 set -uo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
-FOREIGN_COPR="${REPLACE_FOREIGN_COPR:-lionheartp/Hyprland}"
+# A neutral example foreign Hyprland COPR (any non-omedora source works here).
+FOREIGN_COPR="${REPLACE_FOREIGN_COPR:-solopasha/hyprland}"
 OMEDORA_COPR="${REPLACE_OMEDORA_COPR:-$(OMARCHY_PATH="$REPO" "$REPO/bin/omedora-copr")}"
 FOREIGN_REPO_ID="copr:copr.fedorainfracloud.org:${FOREIGN_COPR/\//:}"
 OMEDORA_REPO_ID="copr:copr.fedorainfracloud.org:${OMEDORA_COPR/\//:}"
