@@ -26,8 +26,8 @@
 #
 # Runtime dep note: `Requires: xdg-desktop-portal-hyprland` now resolves from
 # the omedora repo (vendored as omedora/packaging/copr/xdg-desktop-portal-
-# hyprland.spec). It used to come from the lionheartp/Hyprland COPR, which was
-# retired in task #66.
+# hyprland.spec) and is built from omedora's own COPR (task #66 vendored the
+# whole hyprwm stack).
 
 %global protocols_commit 3a5c2bda1c1a4e55cc1330c782547695a93f05b2
 

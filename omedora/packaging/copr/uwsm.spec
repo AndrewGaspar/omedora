@@ -1,8 +1,8 @@
-# Adapted from solopasha/hyprlandRPM (uwsm/uwsm.spec) — the spec set the
-# lionheartp/Hyprland COPR forked. uwsm (Universal Wayland Session Manager) is
-# what omedora's session launches through (`uwsm start ... hyprland.desktop`);
-# it was implicitly provided by that COPR, so vendoring the Hyprland stack
-# (task #66) means owning uwsm too. All BuildRequires are in Fedora main.
+# Adapted from solopasha/hyprlandRPM (uwsm/uwsm.spec) — the maintained spec set
+# omedora's hyprwm packaging is based on. uwsm (Universal Wayland Session
+# Manager) is what omedora's session launches through (`uwsm start ...
+# hyprland.desktop`); vendoring the Hyprland stack (task #66) means owning uwsm
+# too, so it's built from omedora's own COPR. All BuildRequires are in Fedora main.
 Name:           uwsm
 Version:        0.26.5
 Release:        1%{?dist}
@@ -126,5 +126,5 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/*.desktop
   now produce 6 clean separate dispatches.
 
 * Sat May 30 2026 Andrew Gaspar <andrew.gaspar@outlook.com> - 0.23.3-1
-- Initial omedora package (adapted from solopasha/hyprlandRPM) after dropping
-  the lionheartp/Hyprland COPR, which previously provided uwsm.
+- Initial omedora package (adapted from solopasha/hyprlandRPM); uwsm is now
+  vendored and built from omedora's own COPR alongside the rest of the stack.
