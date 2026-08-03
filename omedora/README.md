@@ -29,7 +29,7 @@ Read these in roughly this order:
 | [`testing.md`](testing.md) | The test pyramid (shell unit → Fedora container integration → smoke → L4-nested full session). Includes the L4-headless automated suite. |
 | [`versioning.md`](versioning.md) | Omedora's SemVer + release-tag scheme, the version-scoped COPR, and the two-channel (git + dnf) update flow. |
 | [`update-and-upgrade.md`](update-and-upgrade.md) | The `omedora update` flow on the package-backed Omarchy 4 base and what happens at Fedora major-version upgrades. |
-| [`rebase-workflow.md`](rebase-workflow.md) | How to rebase onto a new upstream Omarchy release: branching, conflict triage, verification matrix. |
+| [`rebase-workflow.md`](rebase-workflow.md) | How to resync onto a newer upstream `quattro`: the pin-tag rebase + force-push recipe (correct on this package-backed line, forbidden on omedora-3), conflict triage, byte-identity ALLOW maintenance, verification matrix. |
 | [`branding.md`](branding.md) | Where "Omedora" surfaces vs where "Omarchy" remains, and the ASCII logo. |
 | [`AGENTS.md`](AGENTS.md) | Supplemental rules for Claude (and humans) working on this fork. Read alongside the root [`../AGENTS.md`](../AGENTS.md). |
 
