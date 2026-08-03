@@ -39,10 +39,6 @@ names = ["google-noto-sans-cjk-fonts", "google-noto-serif-cjk-fonts"]
 source = "dnf"
 names = ["google-noto-emoji-fonts"]
 
-[nvim]
-source = "dnf"
-names = ["neovim"]
-
 [github-cli]
 source = "dnf"
 names = ["gh"]
@@ -110,6 +106,27 @@ reason = "On Fedora it's qemu-user-static (the package includes the binfmt setup
 [tesseract-data-eng]
 source = "dnf"
 names = ["tesseract-langpack-eng"]
+
+[sof-firmware]
+source = "dnf"
+names = ["alsa-sof-firmware"]
+reason = "Fedora namespaces the Sound Open Firmware blobs under the ALSA subsystem. Requested by install/config/hardware/intel/sof-firmware.sh and migrations/1783834201.sh whenever omarchy-hw-intel-sof sees an Intel audio DSP; without the DSP firmware PipeWire exposes only a Dummy Output."
+
+# Fedora keeps every Mesa Vulkan ICD in one package instead of Arch's
+# per-vendor split, so both driver names land on it. install/config/hardware/
+# vulkan.sh and migrations/1783625095.sh add one entry per detected GPU vendor,
+# so a hybrid Intel+AMD box asks for mesa-vulkan-drivers twice — dnf dedupes.
+[vulkan-intel]
+source = "dnf"
+names = ["mesa-vulkan-drivers"]
+
+[vulkan-radeon]
+source = "dnf"
+names = ["mesa-vulkan-drivers"]
+
+[vulkan-asahi]
+source = "skip"
+reason = "Apple-silicon Macs are not an omedora target: the Asahi Vulkan driver only exists in Fedora Asahi Remix's aarch64 Mesa, not in standard Fedora repos. Needs an entry regardless because vulkan.sh / migrations/1783625095.sh request it on any machine whose lspci reports an Apple display controller (T2 Intel Macs included), and an unmapped name would abort the dnf transaction."
 
 # --- Flathub apps (currently unmapped) -----------------------------------
 
