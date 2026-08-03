@@ -169,11 +169,15 @@ assert_screenshot_matches() {
   magick "$cand"      -fill black "${draw[@]}" "$cand_m" 2>/dev/null
   magick "$reference" -fill black "${draw[@]}" "$ref_m"  2>/dev/null
 
-  # compare -metric AE prints "<count> (<normalized-fraction>)"; the normalized
-  # fraction is differing-pixels / total-pixels — exactly the % we threshold on.
-  local out frac pct
-  out=$(magick compare -metric AE -fuzz "$fuzz" "$ref_m" "$cand_m" "$diffimg" 2>&1) || true
-  frac=$(printf '%s\n' "$out" | grep -oE '\(([0-9.eE+-]+)\)' | tr -d '()' | head -1)
+  # ImageMagick 7.1.2 prints AE as "<count> (<count>)" — the parenthesised slot
+  # is NOT a normalised fraction (older IM printed one), so trusting it yields
+  # absurd percentages and an unconditional failure on any non-zero diff. Keep
+  # `compare` only for the diff image (artifacts); compute the differing-pixel
+  # fraction directly.
+  local frac pct
+  magick compare -metric AE -fuzz "$fuzz" "$ref_m" "$cand_m" "$diffimg" >/dev/null 2>&1 || true
+  frac=$(magick "$ref_m" "$cand_m" -compose difference -composite \
+                -colorspace Gray -threshold "$fuzz" -format '%[fx:mean]' info: 2>/dev/null)
   [[ -n $frac ]] || frac=1   # unparseable => treat as fully different
   pct=$(python3 -c "print(f'{float('$frac')*100:.4f}')" 2>/dev/null || echo 100)
 

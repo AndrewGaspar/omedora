@@ -76,6 +76,10 @@ REFERENCE="$(dirname -- "${BASH_SOURCE[0]}")/../fixtures/40-menu-reference.png"
 # 1920x1080 output; mask the search-field row (blinking text cursor).
 EXCLUSIONS=(
   "690,55,320,65"   # "Go…" search-field row: blinking text cursor is nondeterministic
+  "840,52,1080,68"  # Hyprland 0.56.1 per-login ".conf goes away in 0.57" banner:
+                    # compositor-drawn (makoctl cannot dismiss it), right-aligned
+                    # under the waybar. Accepted + documented behavior
+                    # (omedora/install.md §6), so it must not fail the gate.
 )
 
 # Trigger the menu exactly the way the SUPER+ALT+SPACE bind does: run

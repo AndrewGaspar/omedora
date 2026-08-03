@@ -80,6 +80,10 @@ EXCLUSIONS=(
   "20,0,272,52"     # left: omarchy menu glyph + workspaces (active-ws marker is state-dependent)
   "825,0,285,52"    # center: clock (changes every minute) + weather/update/recording/idle indicators
   "1645,0,260,52"   # right: tray + bluetooth/network/pulseaudio/cpu/battery (state-dependent)
+  "840,52,1080,68"  # Hyprland 0.56.1 per-login ".conf goes away in 0.57" banner:
+                    # compositor-drawn (makoctl cannot dismiss it), right-aligned
+                    # under the waybar. Accepted + documented behavior
+                    # (omedora/install.md §6), so it must not fail the gate.
 )
 
 # The waybar + wallpaper layers can come up slightly after Hyprland IPC; give

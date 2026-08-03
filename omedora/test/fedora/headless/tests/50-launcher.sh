@@ -76,6 +76,10 @@ REFERENCE="$(dirname -- "${BASH_SOURCE[0]}")/../fixtures/50-launcher-reference.p
 # the 1920x1080 output; mask the search-field row (blinking text cursor).
 EXCLUSIONS=(
   "360,180,1000,70"   # "Search…" search-field row: blinking text cursor is nondeterministic
+  "840,52,1080,68"    # Hyprland 0.56.1 per-login ".conf goes away in 0.57" banner:
+                      # compositor-drawn (makoctl cannot dismiss it), right-aligned
+                      # under the waybar. Accepted + documented behavior
+                      # (omedora/install.md §6), so it must not fail the gate.
 )
 
 # Trigger the launcher exactly the way the SUPER+SPACE bind does: run
@@ -93,6 +97,11 @@ if ! wait_for_layer walker 10; then
   _fail_with_artifacts "walker launcher (Super+Space) maps a walker layer"
   exit 1
 fi
+# Clear the first-run welcome notifications: the committed baseline was captured
+# after `makoctl dismiss --all` (same as 30-visual), and a lingering mako stack
+# overlaps the launcher panel region.
+command -v makoctl >/dev/null && makoctl dismiss --all >/dev/null 2>&1 || true
+
 # Let the surface finish painting its rows before we judge it.
 sleep 1
 
