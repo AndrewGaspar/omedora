@@ -232,3 +232,69 @@ else
   cat "$MOCK_LOG" >&2
   fail "Arch path leaked a dnf call"
 fi
+
+# --- Resolution against the SHIPPED map, not the fixture --------------------
+#
+# The fixture above covers tier routing generically. These cover the specific
+# Arch->Fedora translations that the hardware install steps and the migrations
+# depend on, because a gap there is invisible on Arch and fatal on Fedora: dnf
+# aborts the entire transaction on a single unmatched argument, so one missing
+# mapping takes down the whole install or `omarchy update` run.
+
+REAL_MAP="$ROOT/install/packages/fedora.toml"
+
+# Runs a helper against the real map with the mocks still on PATH.
+real_pkg() {
+  local helper="$1"
+  shift
+  reset_log
+  OMARCHY_DISTRO=fedora OMARCHY_FEDORA_MAP="$REAL_MAP" \
+    "$ROOT/bin/omarchy-$helper" "$@" >/dev/null 2>&1
+}
+
+assert_real_install() {
+  local description="$1"
+  local expected="$2"
+  shift 2
+  real_pkg pkg-add "$@" || true
+  if log_contains "sudo dnf install -y --setopt=install_weak_deps=False $expected"; then
+    pass "$description"
+  else
+    cat "$MOCK_LOG" >&2
+    fail "$description"
+  fi
+}
+
+# install/config/hardware/vulkan.sh + migrations/1783625095.sh: Fedora ships a
+# single Mesa ICD package where Arch splits per GPU vendor.
+assert_real_install "pkg-add vulkan-intel → mesa-vulkan-drivers (real map)" \
+  "mesa-vulkan-drivers" vulkan-intel
+assert_real_install "pkg-add vulkan-radeon → mesa-vulkan-drivers (real map)" \
+  "mesa-vulkan-drivers" vulkan-radeon
+
+# install/config/hardware/intel/sof-firmware.sh + migrations/1783834201.sh.
+assert_real_install "pkg-add sof-firmware → alsa-sof-firmware (real map)" \
+  "alsa-sof-firmware" sof-firmware
+
+# install/omarchy-base.packages calls this 'neovim' as of upstream 3.8.4, and
+# Fedora's package has the same name — so it must pass through unmapped rather
+# than miss (the retired [nvim] alias would silently stop applying).
+assert_real_install "pkg-add neovim → neovim passthrough (real map)" \
+  "neovim" neovim
+
+# vulkan-asahi has no counterpart in standard Fedora repos: it must skip
+# quietly, never reach dnf, and never register as missing (which would make
+# the migration retry it forever).
+real_pkg pkg-add vulkan-asahi || true
+if log_lacks "dnf install"; then
+  pass "pkg-add vulkan-asahi (skip) → no dnf install (real map)"
+else
+  cat "$MOCK_LOG" >&2
+  fail "pkg-add vulkan-asahi → unexpectedly reached dnf"
+fi
+
+set +e
+real_pkg pkg-missing vulkan-asahi
+exit_code=$?
+set -e
+assert_equals "pkg-missing vulkan-asahi (skip) → exit 1 (not missing)" "$exit_code" "1"
