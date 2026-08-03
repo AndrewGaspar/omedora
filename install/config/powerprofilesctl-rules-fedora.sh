@@ -29,8 +29,8 @@ if omarchy-battery-present; then
   fi
 
   cat <<EOF | sudo tee "/etc/udev/rules.d/99-power-profile.rules"
-SUBSYSTEM=="power_supply", ATTR{type}=="Mains", RUN+="/usr/bin/systemd-run --no-block --collect --unit=omarchy-power-profile --property=After=$ppd_after $HOME/.local/share/omarchy/bin/omarchy-powerprofiles-set"
-SUBSYSTEM=="power_supply", ATTR{type}=="USB", RUN+="/usr/bin/systemd-run --no-block --collect --unit=omarchy-power-profile --property=After=$ppd_after $HOME/.local/share/omarchy/bin/omarchy-powerprofiles-set"
+SUBSYSTEM=="power_supply", ATTR{type}=="Mains", RUN+="/usr/bin/systemd-run --no-block --collect --property=After=$ppd_after $HOME/.local/share/omarchy/bin/omarchy-powerprofiles-set"
+SUBSYSTEM=="power_supply", ATTR{type}=="USB", RUN+="/usr/bin/systemd-run --no-block --collect --property=After=$ppd_after $HOME/.local/share/omarchy/bin/omarchy-powerprofiles-set"
 EOF
 
   # power-profiles-daemon ships disabled and must be enabled; tuned-ppd ships
