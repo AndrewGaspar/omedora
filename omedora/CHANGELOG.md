@@ -1,3 +1,44 @@
+## v0.1.8 — 2026-08-03 (Omarchy 3.8.4)
+
+- fix(l4): repair the golden gate for IM 7.1.2 + mask the 0.56.1 .conf banner
+- docs(install): note Hyprland 0.56.1's per-login .conf notice is informational on Omedora
+- Retune opacity for Hyprland 0.56's corrected alpha premultiplication
+- Parse plain hyprctl binds output to survive Hyprland 0.56's broken JSON
+- chore(copr): rebuild the unversioned hypr* libs against hyprutils 0.14 (SONAME 13)
+- chore(copr): Hyprland 0.56.1 wave — hyprutils 0.14, aquamarine 0.14, XDPH 1.4.1
+- docs(sync): document the append-only cherry-pick strategy for omedora-3
+- test(pkg): resolve the 3.8.4 mappings against the shipped fedora.toml
+- fix(power): drop the fixed unit name from the Fedora power-profile udev rule
+- feat(fedora): map the packages the 3.8.4 migrations install
+- chore(base): record Omarchy 3.8.4 as the rebased-on version
+- Package name is now neovim
+- Fix Neovim theme symlink pointing at the Omarchy 4 theme location (#6318)
+- Fix Foot text bindings migration
+- Remove the dropped packages preventing installation
+- New waybar won't die without a pkill -9
+- Only promote firmware during kernel transitions
+- Address upgrade migration review feedback
+- Make package removal ignore providers
+- Nudge XPS 13 text scaling down just ever so slightly
+- Drop fixed unit name from power-profile udev rule to prevent wakeup failures
+- Bundle vconsole.conf in the initramfs so Plymouth uses the right keymap at the LUKS prompt
+- Backfill Mesa Vulkan drivers for systems installed before vulkan.sh
+- Append the terminal feature instead of just ovewrwritting the 3
+- Add mup alias for updating mise without the release age guard
+- Add cy alias for codex
+- Widen sof-firmware install to all Intel SOF audio platforms
+- Bump version
+- Add migration for easier tmux pane controls
+- Make sure Intel wildcat machines get sof-firmware for working audio
+- Use titles for better remote server identification with hyprland groups
+- Add easier tmux pane controls
+- Fix repeated fingerprint setup
+- fix(doctor): stop flagging stock packages with opaque provenance as foreign
+- docs(readme): drop bespoke troubleshooting from the landing page
+- chore(branch): rename 3.8.2-omedora->omedora-3 in tree refs
+- docs(readme): friendly install-focused root README + omedora/ docs index
+- chore(copr): remove stale lionheartp/Hyprland references (all COPRs are now our own)
+
 ## v0.1.7 — 2026-06-20 (Omarchy 3.8.2)
 
 - test(install): cover the Fedora Package picker + AUR no-op
