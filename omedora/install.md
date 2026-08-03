@@ -133,6 +133,14 @@ After the session is running, confirm the key Omedora surfaces work:
 
 ## 6. Troubleshooting and known gaps
 
+**A 15-second warning appears at login: ".conf config format… will be removed in Hyprland 0.57"**
+Informational only — safe to ignore on Omedora. Hyprland 0.56.1 shows this notice
+at every compositor start on `.conf`-based configs (there is no setting to
+suppress it). On Omedora the warning has no deadline behind it: your Hyprland
+version comes from Omedora's own COPR, so 0.57 cannot arrive until Omedora ships
+it, and the config-format migration (to Hyprland's new Lua format) comes with the
+Omedora 4 line, which handles the cutover for you. Nothing to do until then.
+
 **Only "Hyprland" (no "Omedora") in the session picker — and `omarchy-*`/Walker don't work**
 A bare "Hyprland" entry (the plain `hyprland.desktop`, `Exec=Hyprland`, no uwsm)
 launches without `~/.config/uwsm/env`, so `~/.local/share/omarchy/bin` is missing
