@@ -10,7 +10,7 @@
 # whole vendored hypr* stack (glaze-static, hyprwayland-scanner, +the libs),
 # all resolved from the omedora local repo at build time.
 #
-# Deviation from solopasha (whose pinned commit predated it): Hyprland 0.55.x
+# Deviation from solopasha (whose pinned commit predated it): Hyprland 0.55.x+
 # REQUIRES Lua 5.5 (pkg_search_module REQUIRED lua>=5.5,<5.6, for hyprpm plugin
 # compilation), but Fedora 44 ships only Lua 5.4. We bundle the upstream Lua
 # 5.5.0 release (Source2), build it static in %build, and expose a lua5.5.pc via
@@ -21,7 +21,7 @@
 %global lua_version 5.5.0
 
 Name:           hyprland
-Version:        0.55.4
+Version:        0.56.1
 Release:        1%{?dist}
 Summary:        Dynamic tiling Wayland compositor that doesn't sacrifice on its looks
 
@@ -47,6 +47,10 @@ BuildRequires:  cmake
 BuildRequires:  gcc-c++
 BuildRequires:  meson
 BuildRequires:  ninja-build
+# 0.56.x find_package(glaze 7...<8) in hyprland core itself (0.55.x only needed
+# it via `start`). Our glaze-devel Provides glaze-static and ships the CMake
+# config package find_package looks for; 7.8.2 is inside the required range.
+# Without it CMake FetchContent-clones glaze — fatal in an offline build root.
 BuildRequires:  glaze-static
 BuildRequires:  glslang-devel
 BuildRequires:  pkgconfig(aquamarine)
@@ -65,7 +69,10 @@ BuildRequires:  pkgconfig(hyprwayland-scanner)
 BuildRequires:  cmake(hyprwayland-scanner)
 BuildRequires:  pkgconfig(libdisplay-info)
 BuildRequires:  pkgconfig(libdrm)
-BuildRequires:  pkgconfig(libinput) >= 1.28
+# 0.56.x added libeis (emulated input, for the RemoteDesktop portal path);
+# Fedora ships it in libei-devel.
+BuildRequires:  pkgconfig(libeis-1.0)
+BuildRequires:  pkgconfig(libinput) >= 1.29
 BuildRequires:  pkgconfig(libliftoff)
 BuildRequires:  pkgconfig(libseat)
 BuildRequires:  pkgconfig(libudev)
@@ -80,7 +87,7 @@ BuildRequires:  pkgconfig(systemd)
 BuildRequires:  pkgconfig(tomlplusplus)
 BuildRequires:  pkgconfig(uuid)
 BuildRequires:  pkgconfig(wayland-client)
-BuildRequires:  pkgconfig(wayland-protocols) >= 1.45
+BuildRequires:  pkgconfig(wayland-protocols) >= 1.49
 BuildRequires:  pkgconfig(wayland-scanner)
 BuildRequires:  pkgconfig(wayland-server)
 BuildRequires:  pkgconfig(xcb-composite)
@@ -154,7 +161,7 @@ Requires:       aquamarine%{?_isa} >= 0.9.3
 Requires:       hyprcursor%{?_isa} >= 0.1.7
 Requires:       hyprgraphics%{?_isa} >= 0.5.1
 Requires:       hyprlang%{?_isa} >= 0.6.7
-Requires:       hyprutils%{?_isa} >= 0.13.1
+Requires:       hyprutils%{?_isa} >= 0.14.0
 # Used in the default configuration / for a working graphical session.
 # NOTE: deliberately NO `Recommends: hyprland-uwsm` here — the base must not
 # pull the visible uwsm session entry (omedora ships hyprland-omedora instead).
@@ -243,6 +250,9 @@ install -Dpm644 %{SOURCE1} -t %{buildroot}%{macrosdir}
 %{_bindir}/start-hyprland
 %{_bindir}/hyprctl
 %{_bindir}/hyprpm
+# Directory glob — 0.56.x added share/hypr/hyprland.lua (the default Lua config)
+# and share/hypr/stubs/hl.meta.lua (LuaLS stubs) alongside the installable
+# assets; all of them are owned here, so no %%files change was needed.
 %{_datadir}/hypr/
 %{_datadir}/xdg-desktop-portal/hyprland-portals.conf
 %{_mandir}/man1/hyprctl.1*
@@ -260,6 +270,20 @@ install -Dpm644 %{SOURCE1} -t %{buildroot}%{macrosdir}
 %{macrosdir}/macros.hyprland
 
 %changelog
+* Mon Aug 03 2026 omedora <noreply@omedora> - 0.56.1-1
+- Update to Hyprland 0.56.1.
+- Requires hyprutils >= 0.14.0 (hard upstream minimum, HYPRUTILS_MINIMUM_VERSION)
+  and aquamarine 0.14.0 (libaquamarine.so.13); the whole hypr* stack is rebuilt
+  in the same wave. The aquamarine floor stays 0.9.3 (unchanged upstream).
+- New BuildRequires: pkgconfig(libeis-1.0) (Fedora libei-devel); glaze is now
+  find_package'd by hyprland core itself, not just by `start` — the existing
+  glaze-static BR (7.8.2, inside the required [7,8) range) covers it.
+- Bumped the libinput (>= 1.29) and wayland-protocols (>= 1.49) BR floors to
+  match upstream's CMake minimums.
+- New install artifacts share/hypr/hyprland.lua and share/hypr/stubs/hl.meta.lua
+  are already owned by hyprland-no-session's %%{_datadir}/hypr/ glob; the
+  no-session/full/uwsm/devel split is unchanged.
+
 * Tue Jun 16 2026 omedora <noreply@omedora> - 0.55.4-1
 - Bump to upstream 0.55.4. CMakeLists dependency floors are unchanged from
   0.55.2 (aquamarine>=0.9.3, hyprlang>=0.6.7, hyprcursor>=0.1.7,

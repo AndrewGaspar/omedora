@@ -1,13 +1,13 @@
 # aquamarine.spec — light Linux rendering/backend library for Hyprland (omedora).
 #
-# Hyprland's rendering backend. 0.12.0 exports libaquamarine.so.11 — the SONAME
-# Hyprland 0.55.2 links against, and the one the omedora L4 nested backend
+# Hyprland's rendering backend. 0.14.0 exports libaquamarine.so.13 — the SONAME
+# Hyprland 0.56.1 links against, and the one the omedora L4 nested backend
 # expects (nesting behavior unchanged). Not in Fedora 44. Adapted from
 # solopasha/hyprlandRPM. omedora conventions: pinned Version, explicit Release +
 # changelog, soname via glob.
 
 Name:           aquamarine
-Version:        0.12.1
+Version:        0.14.0
 Release:        1%{?dist}
 Summary:        A very light linux rendering backend library
 
@@ -65,6 +65,10 @@ Development files for %{name}.
 %{_libdir}/pkgconfig/%{name}.pc
 
 %changelog
+* Mon Aug 03 2026 omedora <noreply@omedora> - 0.14.0-1
+- Update to aquamarine 0.14.0, the ABI pair for Hyprland 0.56.1.
+- Exports libaquamarine.so.13; rebuilt against hyprutils 0.14.0.
+
 * Tue Jun 16 2026 omedora <noreply@omedora> - 0.12.1-1
 - Bump to upstream 0.12.1 (part of the Hyprland 0.55.4 wave; SONAME unchanged).
 

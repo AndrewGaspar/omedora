@@ -7,7 +7,7 @@
 # config; the daemon is the same binary).
 
 Name:           hypridle
-Version:        0.1.7
+Version:        0.1.8
 Release:        1%{?dist}
 Summary:        Hyprland's idle daemon
 License:        BSD-3-Clause
@@ -61,6 +61,10 @@ rm %{buildroot}%{_datadir}/hypr/hypridle.conf
 %systemd_user_postun %{name}.service
 
 %changelog
+* Mon Aug 03 2026 omedora <noreply@omedora> - 0.1.8-1
+- Update to hypridle 0.1.8 (Hyprland 0.56.1 wave).
+- Rebuilt against hyprutils 0.14.0 (SONAME 13).
+
 * Sat May 30 2026 omedora <noreply@omedora> - 0.1.7-1
 - Initial omedora build of hypridle 0.1.7 (adapted from solopasha/hyprlandRPM).
 - Uses Fedora's system sdbus-c++ 2.2.1 instead of bundling sdbus-cpp.

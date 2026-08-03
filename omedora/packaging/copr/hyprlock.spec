@@ -6,7 +6,7 @@
 # pinned Version, explicit Release + changelog.
 
 Name:           hyprlock
-Version:        0.9.5
+Version:        0.9.6
 Release:        1%{?dist}
 Summary:        Hyprland's GPU-accelerated screen locking utility
 License:        BSD-3-Clause
@@ -59,6 +59,10 @@ rm %{buildroot}%{_datadir}/hypr/%{name}.conf
 %config(noreplace) %{_sysconfdir}/pam.d/%{name}
 
 %changelog
+* Mon Aug 03 2026 omedora <noreply@omedora> - 0.9.6-1
+- Update to hyprlock 0.9.6 (Hyprland 0.56.1 wave).
+- Rebuilt against hyprutils 0.14.0 (SONAME 13).
+
 * Sat May 30 2026 omedora <noreply@omedora> - 0.9.5-1
 - Initial omedora build of hyprlock 0.9.5 (adapted from solopasha/hyprlandRPM).
 - Uses Fedora's system sdbus-c++ 2.2.1 instead of bundling sdbus-cpp.
