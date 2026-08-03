@@ -17,7 +17,7 @@ That posture is appropriate for them: single distro, rolling release, trust-the-
 Omedora is different in three ways that change the calculus:
 
 1. **Dual-distro contract.** The same tree must work on both Arch and Fedora. Inside shared helpers, the Arch code path must remain byte-for-byte identical to upstream's behavior (see [`architecture.md` §1](architecture.md#1-dual-distro-patch-model)). The only mechanical way to enforce that is to *run* the Arch path and assert it didn't drift.
-2. **Rebased onto upstream stable.** Every Omarchy release prompts a rebase ([`rebase-workflow.md`](rebase-workflow.md)). Conflicts get resolved by humans or agents; sometimes a resolution looks plausible but introduces a regression. Tests are the safety net.
+2. **Synced to upstream stable.** Every Omarchy release prompts an append-only cherry-pick sync ([`rebase-workflow.md`](rebase-workflow.md)). Conflicts get resolved by humans or agents; sometimes a resolution looks plausible but introduces a regression. Tests are the safety net.
 3. **Downstream + opinionated stack.** When users hit issues, "did Omarchy break?" and "did omedora break?" need separate answers. A test suite that fails on a specific behavioral regression — instead of a vague "Hyprland won't start on my Fedora 44 box" — is the difference between a 10-minute fix and a 10-hour bisect.
 
 The testing investment is therefore *larger* than upstream's, but the pyramid below keeps it bounded.
