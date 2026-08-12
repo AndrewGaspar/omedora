@@ -4,7 +4,7 @@
 # explicit Release + changelog.
 
 Name:           hyprsunset
-Version:        0.3.3
+Version:        0.4.0
 Release:        1%{?dist}
 Summary:        An application to enable a blue-light filter on Hyprland
 License:        BSD-3-Clause
@@ -51,5 +51,9 @@ BuildRequires:  pkgconfig(wayland-protocols)
 %{_userunitdir}/%{name}.service
 
 %changelog
+* Mon Aug 03 2026 omedora <noreply@omedora> - 0.4.0-1
+- Update to hyprsunset 0.4.0 (Hyprland 0.56.1 wave).
+- Rebuilt against hyprutils 0.14.0 (SONAME 13).
+
 * Sat May 30 2026 omedora <noreply@omedora> - 0.3.3-1
 - Initial omedora build of hyprsunset 0.3.3 (adapted from solopasha/hyprlandRPM).

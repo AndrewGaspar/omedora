@@ -1,0 +1,19 @@
+[Unit]
+Description=Monado XREAL Air OpenXR runtime for HypXRland
+Documentation=https://github.com/AndrewGaspar/Hyprland
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+Environment=XRT_COMPOSITOR_FORCE_WAYLAND=1
+Environment=XRT_NO_STDIN=1
+ExecStart=/usr/libexec/monado-xreal/monado-service
+Restart=no
+KillSignal=SIGKILL
+KillMode=mixed
+TimeoutStopSec=10
+SuccessExitStatus=SIGKILL
+
+[Install]
+WantedBy=graphical-session.target

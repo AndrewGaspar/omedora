@@ -1,0 +1,50 @@
+HypXRland stack on Omedora 4
+============================
+
+Installing hypxrland-omedora pulls in this complete runtime stack and keeps the
+ordinary Omedora Hyprland session installed as a fallback. Select "Omedora XR"
+at the display manager; it loads ~/.config/hypr/hyprland-xr.conf.
+
+The RPMs do not overwrite files in your home directory. A source-tree setup
+that hard-codes development binaries should be changed to the packaged paths:
+
+  hypxrvoicectl      /usr/bin/hypxrvoicectl
+  hypxrva-watcher    /usr/bin/hypxrva-watcher
+  hypxrpaper         /usr/bin/hypxrpaper
+  WiVRn runtime      /usr/share/openxr/1/openxr_wivrn.json
+
+The Omedora XR launcher selects the packaged hypxrva driver automatically.
+WiVRn pairing and component configuration remain per-user state.
+The package does not alter firewalld policy; WiVRn uses TCP and UDP port 9757.
+
+HypXRland's OpenXR directives still use classic hyprlang. The package therefore
+installs Omedora 3's immutable default *.conf tree beside Quattro's Lua files;
+the stable Omedora session continues using Lua, while Omedora XR can source the
+classic tree through ~/.local/share/omarchy/default/hypr. Keep a standalone
+~/.config/hypr/hyprland-xr.conf; the RPM never overwrites it.
+
+This WiVRn build deliberately has no x264 software fallback. Fedora's
+ffmpeg-free exposes VAAPI and NVENC encoders, but the machine still needs at
+least one working VAAPI, NVENC, or experimental Vulkan Video backend. VAAPI is
+the normal AMD/Intel path: H.264/H.265 normally need RPM Fusion's
+mesa-va-drivers-freeworld on AMD or its full intel-media-driver on Intel.
+NVIDIA needs the proprietary driver 565.77 or newer for NVENC, and AMD should
+use Mesa RADV rather than AMDVLK/AMDGPU-PRO. Diagnose with `vainfo`,
+`ffmpeg -hide_banner -encoders`, and `nvidia-smi` as applicable.
+Because the XR launcher selects hypxrva only for the compositor, set WiVRn's
+real GPU device, VA driver, and library path in a per-user wivrn.service drop-in
+when the machine requires an override.
+
+The voice and HUD battery services can be enabled for the user with:
+
+  systemctl --user enable --now hypxrvoiced.service hypxrhud-battery.service
+
+hypxrhud itself is also D-Bus activated. The XR config normally starts
+wivrn.service only for the XR session instead of enabling it globally.
+
+XREAL Air users can additionally install monado-xreal. Its runtime manifest is
+/usr/share/openxr/1/openxr_monado-xreal.json and its private user unit is
+monado-xreal.service. GPU selection and direct-mode connector settings remain
+machine-specific systemd user drop-ins. The RPM requires Fedora's xr-hardware
+udev rules; reconnect the glasses after first installation so seat access is
+applied.
