@@ -177,8 +177,9 @@ package_path="$payload/bin:/usr/local/bin:/usr/bin:/bin:$HOME/.local/bin"
 v4_kept_packages=(
   omedora omedora-settings
   quickshell
-  omedora-nerd-fonts python3-terminaltexteffects
-  lazygit lazydocker mise starship usage satty tensaku omacut omawrite
+  omedora-nerd-fonts
+  lazygit lazydocker mise starship usage satty tensaku omacut omawrite omacalc
+  ttfx herdr
   gpu-screen-recorder
   hyprland-preview-share-picker
   glaze glaze-devel
@@ -777,6 +778,16 @@ install_new_base_packages() {
     warn "Some base packages could not be installed; re-run 'omarchy update' later to retry."
 }
 
+upgrade_managed_base_packages() {
+  # pkg.py intentionally skips RPM names that are already installed. That is
+  # right for most of the Fedora base set, but Quattro requires Omedora's exact
+  # post-0.3.0 Quickshell snapshot: its synchronous `kill` behavior is part of
+  # omarchy-restart-shell's contract. Force the repository transition even
+  # when an older Fedora Quickshell was present before this upgrade.
+  log "Upgrading version-pinned Omedora base packages"
+  sudo dnf upgrade -y --refresh quickshell
+}
+
 remove_retired_packages() {
   # Re-probe installed-ness: the disclosed list was computed BEFORE the package
   # phase, and the omedora-settings install already swapped hyprland-omedora
@@ -811,6 +822,7 @@ enable_omedora_4_copr
 install_omedora_4_packages
 migrate_installed_v4_survivors
 install_new_base_packages
+upgrade_managed_base_packages
 remove_retired_packages
 disable_omedora_3_copr
 
