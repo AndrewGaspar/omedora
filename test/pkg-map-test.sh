@@ -47,6 +47,7 @@ with open(sys.argv[1], "rb") as file:
   package_map = tomllib.load(file)
 
 expected = {
+  "dotnet-runtime": ["dotnet-runtime-10.0"],
   "herdr": ["herdr"],
   "libvips": ["vips-tools"],
   "omacalc": ["omacalc"],
