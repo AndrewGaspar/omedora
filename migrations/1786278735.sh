@@ -1,5 +1,7 @@
 echo "Detect dropped SSH connections quickly instead of leaving terminals hung"
 
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 conf="/etc/ssh/ssh_config.d/20-omarchy-keepalive.conf"
 
 if [[ ! -f $conf ]]; then
