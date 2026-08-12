@@ -20,8 +20,8 @@
 Name:           omedora
 # Version is normally read from the repo's omedora/version file; hardcoded here
 # for now — a follow-up wires .copr/srpm.sh to substitute it at SRPM-gen time.
-Version:        0.2.0~alpha.0
-Release:        2%{?dist}
+Version:        0.2.0~beta.1
+Release:        1%{?dist}
 Summary:        Omedora runtime: omarchy commands, installer, migrations, themes, Quickshell desktop
 
 License:        MIT
@@ -126,6 +126,7 @@ cp -a shell %{buildroot}%{_datadir}/omarchy/shell
 # omarchy-update-available).
 install -pm644 version %{buildroot}%{_datadir}/omarchy/version
 install -Dpm644 omedora/version %{buildroot}%{_datadir}/omarchy/omedora/version
+install -Dpm644 omedora/base-version %{buildroot}%{_datadir}/omarchy/omedora/base-version
 
 # omedora helper binaries that live under the payload (not /usr/bin) because
 # they're sourced/copied by install steps via $OMARCHY_PATH, not run as
@@ -187,6 +188,7 @@ fi
 %{_datadir}/omarchy/version
 %dir %{_datadir}/omarchy/omedora
 %{_datadir}/omarchy/omedora/version
+%{_datadir}/omarchy/omedora/base-version
 %dir %{_datadir}/omarchy/omedora/bin
 %{_datadir}/omarchy/omedora/bin/powerprofilesctl-shim
 %{_datadir}/omarchy/omedora/bin/tensaku-edit
@@ -194,6 +196,10 @@ fi
 /etc/skel/.local/
 
 %changelog
+* Wed Aug 12 2026 omedora <noreply@omedora> - 0.2.0~beta.1-1
+- Rebase onto the current Quattro beta branch and adapt its provisioning flow.
+- Add the Omedora 3 to Omedora 4 package-backed upgrade path.
+
 * Thu Jun 11 2026 omedora <noreply@omedora> - 0.2.0~alpha.0-1
 - Initial Fedora analogue of upstream's omarchy Arch package, transliterated
   from docs/file-layout.md's build-time map: bin/ (+ bin/fedora dnf backends),
