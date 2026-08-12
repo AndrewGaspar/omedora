@@ -6,7 +6,8 @@
 # an Omedora XR stack installed from the live omedora-3 COPR:
 #   1. build the FROM state: the live agaspar/omedora-3 COPR + the 3.8.2-era
 #      RPM set (hyprland-omedora, walker/elephant, swayosd, hypridle/hyprlock/
-#      hyprshot, gazelle-tui, HypXRland + its mandatory runtimes, the optional
+#      hyprshot, gazelle-tui, the retired Python terminal-effects runtime,
+#      HypXRland + its mandatory runtimes, the optional
 #      monado-xreal runtime, and the Fedora-proper waybar/mako/swaybg), and the
 #      omedora v0.1.3 git checkout at ~/.local/share/omarchy with its config
 #      seeding replayed (omedora-seed-config — what the 3.8.2 installer ran)
@@ -67,6 +68,16 @@ echo "# --- FROM state: a 3.8.2-line omedora v0.1.3 install ---"
 timeout 300 dnf -y copr enable agaspar/omedora-3 >/tmp/from-repos.log 2>&1 \
   || bail "could not enable the omedora-3 COPR ($(tail -2 /tmp/from-repos.log))"
 
+# Seed Fedora's older Quickshell explicitly. The upgrade must replace an
+# already-installed distro build, not merely install Omedora's snapshot when
+# the name is absent. Keep both the old COPR and any injected O4 local repo out
+# of this one transaction so the FROM provenance is unambiguous.
+timeout 300 dnf install -y --setopt=install_weak_deps=False \
+  "${from_repo_args[@]}" \
+  --disablerepo='copr:copr.fedorainfracloud.org:agaspar:omedora-3' \
+  quickshell >/tmp/from-quickshell.log 2>&1 \
+  || bail "could not install Fedora's pre-Quattro Quickshell ($(tail -3 /tmp/from-quickshell.log))"
+
 # The 3.8.2-era package set this scenario asserts retirement or migration on.
 # hyprland-omedora pulls hyprland-no-session + uwsm + the vendored stable
 # stack. hypxrland-omedora pulls the mandatory XR stack; monado-xreal remains
@@ -75,7 +86,8 @@ timeout 300 dnf -y copr enable agaspar/omedora-3 >/tmp/from-repos.log 2>&1 \
 timeout 1800 dnf install -y --setopt=install_weak_deps=False \
   "${from_repo_args[@]}" \
   hyprland-omedora walker elephant swayosd hypridle hyprlock hyprshot \
-  gazelle-tui waybar mako swaybg hypxrland-omedora monado-xreal \
+  gazelle-tui waybar mako swaybg python3-terminaltexteffects \
+  hypxrland-omedora monado-xreal \
   >/tmp/from-pkgs.log 2>&1 \
   || bail "could not install the 3.8.2-era package set ($(tail -3 /tmp/from-pkgs.log))"
 echo "from-state packages installed"
@@ -155,6 +167,17 @@ echo "v0.1.3 checkout + config seeding in place"
 
 check "FROM: walker installed" rpm -q walker
 check "FROM: hyprland-omedora installed" rpm -q hyprland-omedora
+check "FROM: Python terminal effects installed" rpm -q python3-terminaltexteffects
+check "FROM: Fedora Quickshell installed" rpm -q quickshell
+dnf repoquery --installed --qf '%{from_repo}' quickshell 2>/dev/null \
+  | grep -Eq '^(fedora|updates)$' \
+  && ok "FROM: Quickshell came from Fedora" \
+  || nok "FROM: Quickshell came from Fedora" \
+    "repo: $(dnf repoquery --installed --qf '%{from_repo}' quickshell 2>/dev/null || true)"
+[[ $(rpm -q --qf '%{VERSION}' quickshell 2>/dev/null) != "0.3.0^20.git28771c7" ]] \
+  && ok "FROM: Quickshell predates the Quattro beta snapshot" \
+  || nok "FROM: Quickshell predates the Quattro beta snapshot" \
+    "version: $(rpm -q --qf '%{VERSION}' quickshell 2>/dev/null || true)"
 for package in "${xr_o3_packages[@]}" monado-xreal; do
   check "FROM: XR package installed: $package" rpm -q "$package"
 done
@@ -197,8 +220,24 @@ for p in walker elephant swayosd hypridle hyprlock hyprshot gazelle-tui \
 done
 check "kept: hyprland-no-session still installed" rpm -q hyprland-no-session
 check "kept: uwsm still installed" rpm -q uwsm
-check "new base dep installed: quickshell" rpm -q quickshell
+[[ $(rpm -q --qf '%{VERSION}' quickshell 2>/dev/null) == "0.3.0^20.git28771c7" ]] \
+  && ok "Quickshell matches the Quattro beta snapshot" \
+  || nok "Quickshell matches the Quattro beta snapshot" \
+    "version: $(rpm -q --qf '%{VERSION}' quickshell 2>/dev/null || true)"
 check "new base dep installed: foot" rpm -q foot
+for package in vips-tools omacalc ttfx herdr; do
+  check "new Quattro base dep installed: $package" rpm -q "$package"
+done
+if rpm -q python3-terminaltexteffects >/dev/null 2>&1; then
+  nok "ttfx retires python3-terminaltexteffects" "$(rpm -q python3-terminaltexteffects)"
+else
+  ok "ttfx retires python3-terminaltexteffects"
+fi
+if grep -q "Some base packages could not be installed" /tmp/upgrade.log; then
+  nok "all Quattro base packages installed without fallback warning"
+else
+  ok "all Quattro base packages installed without fallback warning"
+fi
 
 # Every mandatory XR leaf/meta/session package must remain installed and be
 # resolvable with the old COPR disabled. Equal-NEVR leaves can legitimately
@@ -380,7 +419,8 @@ echo "# --- L1 suites post-upgrade ---"
 # NOT in this set: it belongs to the Arch-contract CI job and needs an
 # unversioned `python`, which Fedora doesn't ship by default.
 for t in test/distro-test.sh test/pkg-map-test.sh test/pkg-helper-test.sh \
-         test/update-flow-test.sh test/upgrade-to-4-test.sh; do
+         test/quickshell-spec-test.sh test/update-flow-test.sh \
+         test/upgrade-to-4-test.sh; do
   if as_user "bash $REPO/$t" >/tmp/l1.log 2>&1; then
     ok "post-upgrade L1: $t"
   else
