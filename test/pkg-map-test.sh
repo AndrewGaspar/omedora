@@ -39,6 +39,30 @@ run_validator() {
 real_output=$("$VALIDATOR" 2>&1)
 assert_output_contains "real fedora.toml validates clean" "$real_output" "package(s) ok"
 
+python3 - "$ROOT/install/packages/fedora.toml" <<'PY'
+import sys
+import tomllib
+
+with open(sys.argv[1], "rb") as file:
+  package_map = tomllib.load(file)
+
+expected = {
+  "herdr": ["herdr"],
+  "libvips": ["vips-tools"],
+  "omacalc": ["omacalc"],
+  "ttfx": ["ttfx"],
+  "quickshell-git": ["quickshell"],
+}
+for package, names in expected.items():
+  entry = package_map.get(package)
+  assert entry is not None, f"{package} is missing from the Fedora package map"
+  assert entry.get("source") == "dnf", f"{package} should resolve through dnf"
+  assert entry.get("names") == names, (
+    f"{package} should resolve to {names}, got {entry.get('names')}"
+  )
+PY
+pass "Quattro base additions have explicit Fedora dnf mappings"
+
 # --- Valid fixtures: one of each tier --------------------------------------
 
 valid=$(write_map valid '
