@@ -6,7 +6,7 @@
 
 Name:           hyprtoolkit
 Version:        0.5.4
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        A modern C++ Wayland-native GUI toolkit
 
 License:        BSD-3-Clause
@@ -70,5 +70,8 @@ Development files for %{name}.
 %{_libdir}/pkgconfig/%{name}.pc
 
 %changelog
+* Mon Aug 03 2026 omedora <noreply@omedora> - 0.5.4-2
+- Rebuild against hyprutils 0.14.0 and aquamarine 0.14.0 (both SONAME 13).
+
 * Sat May 30 2026 omedora <noreply@omedora> - 0.5.4-1
 - Initial omedora build of hyprtoolkit 0.5.4 (adapted from solopasha/hyprlandRPM).
