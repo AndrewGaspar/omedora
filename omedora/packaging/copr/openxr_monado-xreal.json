@@ -1,0 +1,8 @@
+{
+  "file_format_version": "1.0.0",
+  "runtime": {
+    "name": "Monado XREAL for HypXRland",
+    "library_path": "/usr/lib64/monado-xreal/libopenxr_monado_xreal.so",
+    "MND_libmonado_path": "/usr/lib64/monado-xreal/libmonado.so.25.1.0"
+  }
+}

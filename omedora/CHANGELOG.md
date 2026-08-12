@@ -48,3 +48,10 @@ Initial public release — **Omarchy for stable Fedora Workstation**.
 - **Verified end-to-end on a real Fedora 44 Workstation VM:** provision GNOME+GDM
   → install from the live COPR → boot the Omedora/Hyprland session on a real seat
   → full assertion suite green.
+
+## v0.2.0-beta.1 — 2026-08-12 (Omarchy Quattro beta3+13)
+
+- Rebase the Omedora 4 patch stack onto `quattro` at `106320ab`.
+- Adapt Fedora provisioning and migration gates to the current beta layout.
+- Port the complete parallel HypXRland package stack to `agaspar/omedora-4`.
+- Expand and revalidate the package-backed Omedora 3 to Omedora 4 upgrade path.

@@ -2,13 +2,13 @@
 #
 # Foundational library: nearly every other hypr* component BuildRequires
 # hyprutils-devel. Fedora 44 ships a STALE 0.7.1; omedora vendors the current
-# 0.13.1 (newer EVR ⇒ dnf upgrades the stale copy automatically, so the rest of
+# 0.14.0 (newer EVR ⇒ dnf upgrades the stale copy automatically, so the rest of
 # our stack — which needs the new ABI — is installable). Adapted from
 # solopasha/hyprlandRPM. omedora conventions: pinned Version, explicit Release +
 # changelog, soname owned via glob (self-adjusting across releases).
 
 Name:           hyprutils
-Version:        0.13.1
+Version:        0.14.0
 Release:        1%{?dist}
 Summary:        Hyprland utilities library used across the ecosystem
 
@@ -58,6 +58,10 @@ Development files for %{name}.
 %{_libdir}/pkgconfig/%{name}.pc
 
 %changelog
+* Mon Aug 03 2026 omedora <noreply@omedora> - 0.14.0-1
+- Update to hyprutils 0.14.0 (hard minimum for Hyprland 0.56.x).
+- SONAME 12 -> 13: every consumer in the stack is rebuilt in the same wave.
+
 * Sat May 30 2026 omedora <noreply@omedora> - 0.13.1-1
 - Initial omedora build of hyprutils 0.13.1 (adapted from solopasha/hyprlandRPM).
 - Out-versions Fedora's stale 0.7.1 so the vendored Hyprland stack is installable.

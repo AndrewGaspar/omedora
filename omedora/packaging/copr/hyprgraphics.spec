@@ -7,7 +7,7 @@
 
 Name:           hyprgraphics
 Version:        0.5.1
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Hyprland graphics / resource utilities
 
 License:        BSD-3-Clause
@@ -75,6 +75,9 @@ Development files for %{name}.
 %{_libdir}/pkgconfig/%{name}.pc
 
 %changelog
+* Mon Aug 03 2026 omedora <noreply@omedora> - 0.5.1-2
+- Rebuild against hyprutils 0.14.0 (libhyprutils SONAME 12 -> 13).
+
 * Sat May 30 2026 omedora <noreply@omedora> - 0.5.1-1
 - Initial omedora build of hyprgraphics 0.5.1 (adapted from solopasha/hyprlandRPM).
 - Out-versions Fedora's stale 0.1.5.

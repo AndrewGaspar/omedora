@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -euo pipefail
+
+config_home=${XDG_CONFIG_HOME:-$HOME/.config}
+user_config="$config_home/hypxrvoice/config.toml"
+
+if [[ -r $user_config ]]; then
+  exec /usr/bin/hypxrvoiced --config "$user_config"
+else
+  exec /usr/bin/hypxrvoiced --config /usr/share/hypxrvoice/config.toml
+fi

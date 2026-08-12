@@ -7,7 +7,7 @@
 
 Name:           hyprcursor
 Version:        0.1.13
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        The hyprland cursor format, library and utilities
 
 License:        BSD-3-Clause
@@ -58,6 +58,10 @@ Development files for %{name}.
 %{_libdir}/pkgconfig/%{name}.pc
 
 %changelog
+* Mon Aug 03 2026 omedora <noreply@omedora> - 0.1.13-2
+- Rebuild against hyprutils 0.14.0 (libhyprutils SONAME 12 -> 13), pulled in
+  transitively via hyprlang.
+
 * Sat May 30 2026 omedora <noreply@omedora> - 0.1.13-1
 - Initial omedora build of hyprcursor 0.1.13 (adapted from solopasha/hyprlandRPM).
 - Out-versions Fedora's stale 0.1.11.

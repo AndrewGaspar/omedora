@@ -6,7 +6,7 @@
 
 Name:           hyprwire
 Version:        0.3.1
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        A fast and consistent wire protocol for IPC
 
 License:        BSD-3-Clause
@@ -58,5 +58,8 @@ Development files for %{name}.
 %{_libdir}/pkgconfig/%{name}-scanner.pc
 
 %changelog
+* Mon Aug 03 2026 omedora <noreply@omedora> - 0.3.1-2
+- Rebuild against hyprutils 0.14.0 (libhyprutils SONAME 12 -> 13).
+
 * Sat May 30 2026 omedora <noreply@omedora> - 0.3.1-1
 - Initial omedora build of hyprwire 0.3.1 (adapted from solopasha/hyprlandRPM).

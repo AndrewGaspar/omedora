@@ -8,7 +8,7 @@
 
 Name:           hyprlang
 Version:        0.6.8
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        The official implementation library for the hypr config language
 
 License:        LGPL-3.0-only
@@ -55,6 +55,9 @@ Development files for %{name}.
 %{_libdir}/pkgconfig/hyprlang.pc
 
 %changelog
+* Mon Aug 03 2026 omedora <noreply@omedora> - 0.6.8-2
+- Rebuild against hyprutils 0.14.0 (libhyprutils SONAME 12 -> 13).
+
 * Sat May 30 2026 omedora <noreply@omedora> - 0.6.8-1
 - Initial omedora build of hyprlang 0.6.8 (adapted from solopasha/hyprlandRPM).
 - Out-versions Fedora's stale 0.6.4.
