@@ -76,7 +76,7 @@ Read more at [omarchy.org](https://omarchy.org).
 ## License
 Omarchy is released under the [MIT License](https://opensource.org/licenses/MIT).'
 
-ALLOW["bin/omarchy-finalize-user"]='xdg-settings set default-web-browser chromium.desktop
+ALLOW["bin/omarchy-provision-user"]='env -u BROWSER xdg-settings set default-web-browser chromium.desktop
 xdg-mime default HEY.desktop x-scheme-handler/mailto'
 
 # voxtype install: the upstream unconditional package line moved into the Arch
@@ -124,8 +124,8 @@ exec setsid uwsm-app -- $(sed -n '"'"'s/^Exec=\([^ ]*\).*/\1/p'"'"' {~/.local,~/
 #  2. The Menu > Update entry is rebranded Omarchy -> Omedora (user-facing
 #     label). learn.omarchy keeps "Omarchy" (it is the actual Omarchy manual).
 #     Unwind if the pin ever ships an Omedora-branded menu.
-ALLOW["default/omarchy/omarchy-menu.jsonc"]='  "install.aur": {"icon":"󰣇","label":"AUR","keywords":"package","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install"},
-  "update.omarchy": {"icon":"","iconFont":"omarchy","label":"Omarchy","keywords":"system","action":"omarchy-launch-floating-terminal-with-presentation omarchy-update"},'
+ALLOW["default/omarchy/omarchy-menu.jsonc"]='  "install.aur": {"icon":"󰣇","label":"AUR","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install"},
+  "update.omarchy": {"icon":"","iconFont":"omarchy","label":"Omarchy","action":"omarchy-launch-floating-terminal-with-presentation omarchy-update"},'
 # --- the audit ---------------------------------------------------------------
 # Modified upstream files = files that differ from the pin AND exist on the pin
 # (so omedora-ADDED files like bin/omedora-* are out of scope — they have no

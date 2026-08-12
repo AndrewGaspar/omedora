@@ -68,7 +68,7 @@ EMPTY="$TMP/empty-omarchy"; mkdir -p "$EMPTY"
   || fail "missing shim source is a graceful no-op (nothing written)"
 
 # --- finalize-user wiring: the Fedora block sources the shim step ------------
-grep -q 'tensaku-edit-shim-fedora.sh' "$ROOT/bin/omarchy-finalize-user" \
+grep -q 'tensaku-edit-shim-fedora.sh' "$ROOT/bin/omarchy-provision-user" \
   && pass "finalize-user sources the tensaku-edit shim step on Fedora" \
   || fail "finalize-user sources the tensaku-edit shim step on Fedora"
 

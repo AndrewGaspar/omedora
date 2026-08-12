@@ -1,5 +1,7 @@
 echo "Stop waiting for the network before showing the desktop"
 
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 as_root() {
   if (( EUID == 0 )); then
     "$@"
