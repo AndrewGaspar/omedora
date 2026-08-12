@@ -30,13 +30,11 @@ IMAGE="${OMEDORA_RPMBUILD_IMAGE:-registry.fedoraproject.org/fedora:44}"
 # shell/ (idle/lock/OSD/launcher/notifications) or by NetworkManager/bluez,
 # and verified unreferenced by any omarchy-4 bin (see omedora/packages.md §10).
 SPECS=(
-  # quickshell: vendored because Fedora 44 ships only a STALLED Feb-2026 snapshot
-  # (0.2.1^git20260209.dacfa9d) that lacks omarchy-4-needed APIs (the QsWindow
-  # `updatesEnabled` property -> broken wallpaper). We ship upstream's real 0.3.0
-  # release (2026-05-04). No intra-stack BuildRequires on our other specs (it's a
-  # Qt6 build), so order is flexible — kept near the top for visibility.
+  # quickshell: exact Omarchy 4 beta snapshot; Fedora's stalled snapshot and
+  # upstream 0.3.0 both lack the synchronous kill semantics Quattro requires.
+  # No intra-stack BuildRequires, so order is flexible — kept near the top.
   quickshell.spec
-  omedora-nerd-fonts.spec terminaltexteffects.spec
+  omedora-nerd-fonts.spec
   # task #59 back-fill (all build-tested):
   lazygit.spec lazydocker.spec mise.spec starship.spec usage.spec
   satty.spec hyprland-preview-share-picker.spec
@@ -51,7 +49,13 @@ SPECS=(
   # video-trim tool (ships /usr/bin/omacut, needs ffmpeg at runtime); omawrite is
   # a Markdown writing app bound to SUPER+SHIFT+W (ships /usr/bin/omawrite). No
   # intra-stack BuildRequires, so order is flexible.
-  omacut.spec omawrite.spec
+  omacut.spec omawrite.spec omacalc.spec
+  # ttfx is the native terminal-effects engine used by Quattro's screensaver
+  # and first-run provisioner. Its Rust dependency set is vendored for COPR.
+  ttfx.spec
+  # Herdr is the optional-but-integrated terminal workspace manager in the
+  # beta base set. It uses a vendored Rust tree and exact Zig 0.15.2 cache.
+  herdr.spec
   # gpu-screen-recorder: the GPU-accelerated screen recorder omarchy's screenrecord
   # flow + Quickshell bar indicator are hardcoded to. From-source Meson C/C++ build
   # (git.dec05eba.com, GPL-3.0-only); builds against Fedora main's ffmpeg-free-devel

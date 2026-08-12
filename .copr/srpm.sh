@@ -79,6 +79,11 @@ grep -iE '^Source[0-9]*:' "$spec_dir/$spec_base" | sed -E 's/^[^:]+:[[:space:]]*
   esac
 done || true   # never trip set -e on a URL-only spec
 
+# Stage local patches alongside local Sources.
+grep -iE '^Patch[0-9]*:' "$spec_dir/$spec_base" | sed -E 's/^[^:]+:[[:space:]]*//' | while read -r patch_file; do
+  [[ -f "$spec_dir/$patch_file" ]] && cp "$spec_dir/$patch_file" "$TOPDIR/SOURCES/"
+done || true
+
 # Fetch every URL SourceN declared in the spec into SOURCES/.
 spectool -g -R "$TOPDIR/SPECS/$spec_base"
 
@@ -134,12 +139,54 @@ grep -iE '^Source[0-9]*:' "$spec_dir/$spec_base" | sed -E 's/^[^:]+:[[:space:]]*
       src0_file="$TOPDIR/SOURCES/$(basename "$src0")"
       tar -C "$work" -xf "$src0_file"
       crate_top=$(find "$work" -mindepth 1 -maxdepth 1 -type d | head -n1)
-      # No --locked: swayosd's lock pins its own root version below its Cargo.toml,
-      # which --locked rejects; the lock still governs the dependency set.
-      ( cd "$crate_top" && cargo vendor vendor >/dev/null )
+      # Keep the release lock immutable. SwayOSD is the one historical
+      # exception: its lock pins its own root version below Cargo.toml.
+      vendor_dir=vendor
+      [[ -d "$crate_top/vendor/portable-pty" ]] && vendor_dir=cargo-vendor
+      if [[ $nv_name == "swayosd" ]]; then
+        ( cd "$crate_top" && cargo vendor "$vendor_dir" >/dev/null )
+      else
+        ( cd "$crate_top" && cargo vendor --locked "$vendor_dir" >/dev/null )
+      fi
       # Reproducible tar (normalized metadata) so re-runs are byte-identical.
       tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner \
-        -C "$crate_top" -caf "$vendor_tar" vendor
+        -C "$crate_top" -caf "$vendor_tar" "$vendor_dir"
+      rm -rf "$work"
+      ;;
+  esac
+done
+
+# Herdr's vendored libghostty-vt uses Zig's package manager. Seal its global
+# dependency cache in the networked SRPM phase when requested by Source3, using
+# the exact Zig Source2 declared and checksum-pinned by the spec.
+grep -iE '^Source[0-9]*:' "$spec_dir/$spec_base" | sed -E 's/^[^:]+:[[:space:]]*//' | while read -r src; do
+  case "$src" in
+    *-zig-cache.tar.*)
+      read -r nv_name nv_version < <(rpmspec -q --srpm --qf '%{name} %{version}\n' "$spec_dir/$spec_base")
+      zig_cache_tar="$TOPDIR/SOURCES/${nv_name}-${nv_version}-zig-cache.tar.zst"
+      [[ -f "$zig_cache_tar" ]] && continue
+      echo "==> Generating Zig dependency cache: $(basename "$zig_cache_tar")"
+      work=$(mktemp -d)
+      src0=$(rpmspec -P "$spec_dir/$spec_base" | sed -nE 's/^Source0:[[:space:]]*//p' | head -n1)
+      src2=$(rpmspec -P "$spec_dir/$spec_base" | sed -nE 's/^Source2:[[:space:]]*//p' | head -n1)
+      tar -C "$work" -xf "$TOPDIR/SOURCES/$(basename "$src0")"
+      tar -C "$work" -xf "$TOPDIR/SOURCES/$(basename "$src2")"
+      crate_top=$(find "$work" -mindepth 1 -maxdepth 1 -type d -name "${nv_name}-*" | head -n1)
+      zig_top=$(find "$work" -mindepth 1 -maxdepth 1 -type d -name 'zig-*' | head -n1)
+      patch -d "$crate_top" -p1 <"$spec_dir/herdr-libvt-only.patch"
+      mkdir -p "$crate_top/zig-cache"
+      # Execute the exact lib-vt graph once while network is available. Zig
+      # resolves lazy packages only while running the graph. Keep only the
+      # immutable package store; compiler state may embed temporary paths.
+      ( cd "$crate_top/vendor/libghostty-vt" && \
+        ZIG_GLOBAL_CACHE_DIR="$crate_top/zig-cache" "$zig_top/zig" build \
+          -Demit-lib-vt -Doptimize=ReleaseFast -Dsimd=true \
+          -Dtarget=x86_64-linux-gnu -Dversion-string=0.8.0 \
+          -Demit-xcframework=false )
+      find "$crate_top/zig-cache" -mindepth 1 -maxdepth 1 ! -name p \
+        -exec rm -rf -- {} +
+      tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner \
+        -C "$crate_top" -caf "$zig_cache_tar" zig-cache
       rm -rf "$work"
       ;;
   esac

@@ -104,6 +104,9 @@ jobs:
       - name: Run omawrite-spec static guard
         run: bash test/omawrite-spec-test.sh
 
+      - name: Run quickshell-spec static guard
+        run: bash test/quickshell-spec-test.sh
+
       - name: Run gpu-screen-recorder-spec static guard
         run: bash test/gpu-screen-recorder-spec-test.sh
 
