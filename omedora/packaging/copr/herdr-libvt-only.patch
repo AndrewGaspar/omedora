@@ -1,0 +1,76 @@
+--- a/vendor/libghostty-vt/build.zig
++++ b/vendor/libghostty-vt/build.zig
+@@ -56,6 +56,51 @@ pub fn build(b: *std.Build) !void {
+         &deps,
+     );
+ 
++    // libghostty-vt is an embeddable terminal-state library and does not
++    // require the application, GUI, resources, docs, or distribution graph.
++    // Return before initializing those graphs so their lazy dependencies are
++    // not resolved for an emit-lib-vt-only build.
++    if (config.emit_lib_vt) {
++        const lib_shared = shared: {
++            if (config.target.result.cpu.arch.isWasm()) {
++                break :shared try buildpkg.GhosttyLibVt.initWasm(b, &mod);
++            }
++
++            break :shared try buildpkg.GhosttyLibVt.initShared(b, &mod);
++        };
++        lib_shared.install(b.getInstallStep());
++
++        const lib_static = try buildpkg.GhosttyLibVt.initStatic(b, &mod);
++        if (config.is_dep) {
++            lib_static.install(b.getInstallStep());
++        } else {
++            const static_lib_name = if (config.target.result.os.tag == .windows)
++                "ghostty-vt-static.lib"
++            else
++                "libghostty-vt.a";
++            b.getInstallStep().dependOn(&b.addInstallLibFile(
++                lib_static.output,
++                static_lib_name,
++            ).step);
++        }
++
++        if (config.emit_xcframework and
++            builtin.os.tag.isDarwin() and
++            config.target.result.os.tag.isDarwin())
++        {
++            const apple_libs = try buildpkg.GhosttyLibVt.initStaticAppleUniversal(
++                b,
++                &config,
++                &deps,
++                &mod,
++            );
++            const xcframework = buildpkg.GhosttyLibVt.xcframework(&apple_libs, b);
++            b.getInstallStep().dependOn(xcframework.step);
++        }
++
++        return;
++    }
++
+     // All our steps which we'll hook up later. The steps are shown
+     // up here just so that they are more self-documenting.
+     const run_step = b.step("run", "Run the app");
+--- a/vendor/libghostty-vt/src/build/SharedDeps.zig
++++ b/vendor/libghostty-vt/src/build/SharedDeps.zig
+@@ -17,6 +17,6 @@ help_strings: HelpStrings,
+ metallib: ?*MetallibStep,
+ unicode_tables: UnicodeTables,
+-framedata: GhosttyFrameData,
++framedata: ?GhosttyFrameData,
+ uucode_tables: std.Build.LazyPath,
+ 
+ /// Used to keep track of a list of file sources.
+@@ -35,7 +35,7 @@ pub fn init(b: *std.Build, cfg: *const Config) !SharedDeps {
+         .config = cfg,
+         .help_strings = try .init(b, cfg),
+         .unicode_tables = try .init(b, uucode_tables),
+-        .framedata = try .init(b),
++        .framedata = if (cfg.emit_lib_vt) null else try .init(b),
+         .uucode_tables = uucode_tables,
+ 
+         // Setup by retarget
+@@ -613 +613 @@
+-    self.framedata.addImport(step);
++    self.framedata.?.addImport(step);
