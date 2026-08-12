@@ -89,6 +89,12 @@ reason = "Not in Fedora main repos; Flathub is the upstream-blessed install path
 [imagemagick]
 source = "dnf"
 names = ["ImageMagick"]
+
+[libvips]
+source = "dnf"
+names = ["vips-tools"]
+reason = "Arch's libvips package includes the command-line tools. Fedora splits them into vips-tools, which owns /usr/bin/vipsthumbnail used by omarchy-menu-images and the Quickshell image picker thumbnail cache."
+
 [qemu-user-static-binfmt]
 source = "dnf"
 names = ["qemu-user-static"]
@@ -152,6 +158,22 @@ reason = "Dead-simple video length trimmer (Qt6/QML + ffmpeg; github.com/omacom-
 source = "dnf"
 names = ["omawrite"]
 reason = "Dead-simple Markdown writing app bound to SUPER+SHIFT+W (Qt6/QML; github.com/omacom-io/omawrite, MIT), a quattro-line omarchy-family app. Not in Fedora repos/RPM Fusion; built from source by omedora/packaging/copr/omawrite.spec (plain qmake6 build, no vendoring). Ships /usr/bin/omawrite. Upstream's Arch package pulls the proprietary ttf-ia-writer font, which omedora skip-maps ([ttf-ia-writer]); this RPM deliberately does NOT require it (Qt substitutes a fallback monospace by family name), so the app installs and runs without it — wiring the font is a separate deferred item."
+
+[omacalc]
+source = "dnf"
+names = ["omacalc"]
+reason = "Quattro's Qt Quick calculator (omacom-io/omacalc), invoked directly by the calculator keybindings. Not in Fedora main/RPM Fusion; built from source by omedora/packaging/copr/omacalc.spec and served from the omedora repo."
+
+[ttfx]
+source = "dnf"
+names = ["ttfx"]
+reason = "Native Rust terminal-effects engine used directly by Quattro's screensaver and first-boot provisioner. Not in Fedora main/RPM Fusion; built from source by omedora/packaging/copr/ttfx.spec and served from the omedora repo. Replaces the older python3-terminaltexteffects runtime."
+
+[herdr]
+source = "dnf"
+names = ["herdr"]
+reason = "Terminal workspace manager built from Omarchy's pinned omacom-io/herdr fork. Not in Fedora main/RPM Fusion; built from source by omedora/packaging/copr/herdr.spec and served from the omedora repo alongside tmux."
+
 [hyprland-preview-share-picker]
 source = "dnf"
 names = ["hyprland-preview-share-picker"]
@@ -285,7 +307,12 @@ reason = "GPU-accelerated screen recorder (NVENC/VAAPI/Vulkan) that omarchy's sc
 [quickshell]
 source = "dnf"
 names = ["quickshell"]
-reason = "QtQuick desktop-shell toolkit used by the omarchy-4 Quickshell desktop (e.g. the image selector). Fedora 44 ships only a STALLED Feb-2026 git snapshot (0.2.1^git20260209.dacfa9d, identical on stable/updates/testing/rawhide) that lacks omarchy-4-needed APIs — notably the QsWindow `updatesEnabled` property (its absence breaks the wallpaper/Background component). Vendored as omedora/packaging/copr/quickshell.spec (upstream 0.3.0 release, 2026-05-04) and served from the omedora repo."
+reason = "QtQuick desktop-shell toolkit used by the Omarchy 4 desktop. Fedora 44's stalled Feb-2026 snapshot and upstream 0.3.0 both predate the synchronous `quickshell kill` behavior required by Quattro's shell restart path. Vendored at Omarchy beta's exact 28771c7 snapshot and served from the Omedora repo."
+
+[quickshell-git]
+source = "dnf"
+names = ["quickshell"]
+reason = "Arch rolling-package name for Quickshell. Omedora maps it to the vendored RPM at Omarchy beta's exact 28771c7 snapshot; the Fedora-gated migration skips Arch's package-replacement transaction."
 
 # --- Flathub (proprietary or unpackaged GUI apps) ------------------------
 
