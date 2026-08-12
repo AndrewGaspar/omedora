@@ -195,6 +195,10 @@ v4_kept_packages=(
   hyprland-guiutils hyprpicker hyprsunset
   xdg-desktop-portal-hyprland
   uwsm
+  hypxrpaper hypxrva hypxrhud
+  hypxrvoice hypxrvoice-model-base-en
+  wivrn-hypxr monado-xreal
+  hypxrland-legacy-config hypxrland hypxrland-stack hypxrland-omedora
 )
 
 # The known 3.8.2-era COPR set, used only when `dnf repoquery --installed`
@@ -217,15 +221,20 @@ is_kept_on_v4() {
 }
 
 retired_packages=()
+installed_v4_survivors=()
 compute_retired_packages() {
   retired_packages=()
+  installed_v4_survivors=()
   local got_query=0 name repo pkg
 
   while read -r name repo _; do
     [[ -n ${name:-} && -n ${repo:-} ]] || continue
     got_query=1
     [[ $repo == "$old_repo_id" ]] || continue
-    is_kept_on_v4 "$name" && continue
+    if is_kept_on_v4 "$name"; then
+      installed_v4_survivors+=("$name")
+      continue
+    fi
     retired_packages+=("$name")
   done < <("$dnf_query" repoquery --installed \
              --queryformat '%{name} %{from_repo}\n' 2>/dev/null || true)
@@ -234,6 +243,9 @@ compute_retired_packages() {
     warn "dnf repoquery unavailable; probing the known 3.8.2-era COPR package set instead."
     for pkg in "${retired_copr_fallback[@]}"; do
       rpm -q "$pkg" >/dev/null 2>&1 && retired_packages+=("$pkg")
+    done
+    for pkg in "${v4_kept_packages[@]}"; do
+      rpm -q "$pkg" >/dev/null 2>&1 && installed_v4_survivors+=("$pkg")
     done
   fi
 
@@ -254,6 +266,9 @@ compute_retired_packages() {
 
   if ((${#retired_packages[@]})); then
     mapfile -t retired_packages < <(printf '%s\n' "${retired_packages[@]}" | sort -u)
+  fi
+  if ((${#installed_v4_survivors[@]})); then
+    mapfile -t installed_v4_survivors < <(printf '%s\n' "${installed_v4_survivors[@]}" | sort -u)
   fi
 
   # Cascade guard: unlike pacman (which refuses), `dnf remove -y` takes
@@ -469,7 +484,6 @@ always_copy_config_files=(
   hypr/input.lua
   hypr/looknfeel.lua
   hypr/monitors.lua
-  omarchy/bar.json
   omarchy/extensions/omarchy-menu.jsonc
   omarchy/hooks/pre-refresh-pacman.d/add-custom-repo.sample
   omarchy/shell.json
@@ -530,6 +544,12 @@ omedora_upgrade_plan_summary() {
   echo "        so the session entry is never absent)"
   echo "      • install any NEW v4 base packages not yet present (quickshell, foot,"
   echo "        ...) resolved through the v4 package map"
+  if ((${#installed_v4_survivors[@]})); then
+    echo "      • migrate ${#installed_v4_survivors[@]} installed package(s) that continue on v4"
+    echo "        to the omedora-4 COPR before the old COPR is disabled:"
+    printf '%s\n' "${installed_v4_survivors[@]}" | tr '\n' ' ' | fold -s -w 68 | sed 's/^/          /'
+    echo
+  fi
   if ((${#retired_packages[@]})); then
     echo -e "\033[33m      • remove ${#retired_packages[@]} retired package(s) (replaced by the Quickshell shell"
     echo -e "        or by NetworkManager/bluez; removal failures are tolerated):\033[0m"
@@ -560,7 +580,7 @@ omedora_upgrade_plan_summary() {
   ((${#plan_override[@]})) &&
     { echo "      ${#plan_override[@]} customized retired file(s) backed up; your copy STAYS active as an override:"
       printf '          ~/.config/%s\n' "${plan_override[@]}"; }
-  echo "      v4 config entry points written (hypr/*.lua, omarchy/bar.json, omarchy/shell.json):"
+  echo "      v4 config entry points written (hypr/*.lua and omarchy/shell.json):"
   if ((${#plan_always[@]})); then
     echo "        these existing files at those paths will be backed up first:"
     printf '          ~/.config/%s\n' "${plan_always[@]}"
@@ -717,6 +737,15 @@ install_omedora_4_packages() {
     warn "/usr/share/wayland-sessions/omedora.desktop is missing — the GDM session entry did not land; check the dnf output above."
 }
 
+migrate_installed_v4_survivors() {
+  ((${#installed_v4_survivors[@]})) || return 0
+  log "Migrating installed packages that continue on omedora 4"
+  # This transaction is intentionally fatal. The old COPR must not be disabled
+  # until every installed survivor is resolvable from the new one; higher O4
+  # releases also replace payloads whose package names continue unchanged.
+  sudo dnf install -y --refresh "${installed_v4_survivors[@]}"
+}
+
 # Fedora desktop baseline the 4.x installer adds (omedora/install/
 # fedora-baseline.packages); a 3.8.2 install already has all but xdg-user-dirs,
 # and the resolver below only installs what's missing anyway.
@@ -776,6 +805,7 @@ disable_omedora_3_copr() {
 
 enable_omedora_4_copr
 install_omedora_4_packages
+migrate_installed_v4_survivors
 install_new_base_packages
 remove_retired_packages
 disable_omedora_3_copr
@@ -1051,6 +1081,76 @@ migrate_uwsm_env_customizations() {
   rm -f "$tmp"
 }
 
+browser_is_running() {
+  pgrep -x 'chromium|chrome|brave|msedge|vivaldi-bin|vivaldi|opera|helium' >/dev/null 2>&1
+}
+
+repair_chromium_copy_url_shortcuts() {
+  local profile_root preferences
+  local -a profile_roots=(
+    "$HOME/.config/chromium"
+    "$HOME/.config/google-chrome"
+    "$HOME/.config/google-chrome-beta"
+    "$HOME/.config/BraveSoftware/Brave-Browser"
+    "$HOME/.config/BraveSoftware/Brave-Browser-Beta"
+    "$HOME/.config/microsoft-edge"
+    "$HOME/.config/microsoft-edge-beta"
+    "$HOME/.config/vivaldi"
+    "$HOME/.config/opera"
+    "$HOME/.config/helium"
+  )
+  local -a pending=()
+
+  for profile_root in "${profile_roots[@]}"; do
+    [[ -d $profile_root ]] || continue
+    for preferences in "$profile_root"/*/Preferences; do
+      [[ -f $preferences ]] || continue
+      grep -qF 'bocglpkldciamkbmlphanhkfnhpmnbma' "$preferences" || continue
+      pending+=("$preferences")
+    done
+  done
+  ((${#pending[@]})) || return 0
+
+  if browser_is_running && (( ! yes )) && [[ -r /dev/tty ]]; then
+    if ! gum confirm "Close all browser windows before the Copy URL shortcut is repaired, then continue" </dev/tty; then
+      warn "Skipped Copy URL shortcut repair; re-run the upgrade after closing the browser."
+      return 0
+    fi
+  fi
+
+  for preferences in "${pending[@]}"; do
+    python3 - "$preferences" "$preferences.$backup_tag.bak" <<'PY'
+import json
+import shutil
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+backup_path = Path(sys.argv[2])
+old_id = "bocglpkldciamkbmlphanhkfnhpmnbma"
+new_id = "bgpiichlckmfanooecilcjemknkcpngb"
+data = json.loads(path.read_text())
+extensions = data.get("extensions", {})
+commands = extensions.get("commands", {})
+changed = False
+
+for command in commands.values():
+  if command.get("extension") == old_id and command.get("command_name") == "copy-url":
+    command["extension"] = new_id
+    changed = True
+
+if changed:
+  settings = extensions.get("settings", {})
+  settings.get(old_id, {}).get("commands", {}).get("copy-url", {}).pop("was_assigned", None)
+  new_command = settings.get(new_id, {}).get("commands", {}).get("copy-url", {})
+  if new_command:
+    new_command["was_assigned"] = True
+  shutil.copy2(path, backup_path)
+  path.write_text(json.dumps(data, separators=(",", ":")))
+PY
+  done
+}
+
 apply_user_transition() {
   log "Applying the omedora 4 user transition"
   [[ -d $payload ]] || fail "$payload was not installed."
@@ -1110,6 +1210,7 @@ apply_user_transition() {
   local flag_file
   for flag_file in chromium-flags.conf chrome-flags.conf google-chrome-flags.conf \
       google-chrome-stable-flags.conf brave-flags.conf brave-browser-flags.conf \
+      brave-origin-beta-flags.conf \
       microsoft-edge-flags.conf microsoft-edge-stable-flags.conf opera-flags.conf \
       vivaldi-flags.conf helium-flags.conf; do
     file="$HOME/.config/$flag_file"
@@ -1122,6 +1223,7 @@ apply_user_transition() {
       -e "s|$HOME/.local/share/omarchy/default/chromium/extensions/copy-url|/usr/share/omarchy/default/chromium/extensions/copy-url|g" \
       "$file"
   done
+  repair_chromium_copy_url_shortcuts
 
   # Carry over user-added theme backgrounds from the checkout backup, then drop
   # ~/.config/omarchy/themes symlinks into the pre-4 checkout (v4 reads stock
@@ -1182,12 +1284,12 @@ apply_user_transition() {
   done
 
   # Agent skill symlinks (same set the v4 finalize creates).
-  if [[ -d $payload/default/omarchy-skill ]]; then
+  if [[ -d $payload/default/agents/skills/omarchy ]]; then
     mkdir -p "$HOME/.agents/skills" "$HOME/.claude/skills" "$HOME/.codex/skills" "$HOME/.pi/agent/skills"
-    ln -sfn "$payload/default/omarchy-skill" "$HOME/.agents/skills/omarchy"
-    ln -sfn "$payload/default/omarchy-skill" "$HOME/.claude/skills/omarchy"
-    ln -sfn "$payload/default/omarchy-skill" "$HOME/.codex/skills/omarchy"
-    ln -sfn "$payload/default/omarchy-skill" "$HOME/.pi/agent/skills/omarchy"
+    ln -sfn "$payload/default/agents/skills/omarchy" "$HOME/.agents/skills/omarchy"
+    ln -sfn "$payload/default/agents/skills/omarchy" "$HOME/.claude/skills/omarchy"
+    ln -sfn "$payload/default/agents/skills/omarchy" "$HOME/.codex/skills/omarchy"
+    ln -sfn "$payload/default/agents/skills/omarchy" "$HOME/.pi/agent/skills/omarchy"
   fi
 
   # v4 toggle state. Legacy .conf entry points source toggles/hypr/*.conf —
@@ -1223,13 +1325,63 @@ include "/usr/share/omarchy/default/xcompose"
 EOF
   fi
 
+  # Quattro moved the active theme state out of ~/.config. Preserve the old
+  # state, merge conservatively if a new state directory already exists, and
+  # rewrite known references before installing the new theme plumbing.
+  local legacy_current_dir="$HOME/.config/omarchy/current"
+  local current_state_dir="$state_dir/current"
+  if [[ -e $legacy_current_dir || -L $legacy_current_dir ]]; then
+    if [[ ! -e $current_state_dir && ! -L $current_state_dir ]]; then
+      mv "$legacy_current_dir" "$current_state_dir"
+    else
+      if [[ -d $legacy_current_dir && -d $current_state_dir ]]; then
+        cp -an "$legacy_current_dir/." "$current_state_dir/" 2>/dev/null || true
+      fi
+      mv "$legacy_current_dir" "$legacy_current_dir.$backup_tag.bak"
+    fi
+  fi
+
+  replace_legacy_current_path() {
+    local target="$1"
+    [[ -f $target ]] || return 0
+    grep -qE '(~|/[^ ]*)?/\.config/omarchy/current|\.\./omarchy/current' "$target" || return 0
+    backup_config_file "$target"
+    python3 - "$target" "$HOME" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+home = sys.argv[2]
+text = path.read_text()
+replacements = {
+  f"{home}/.config/omarchy/current": f"{home}/.local/state/omarchy/current",
+  "~/.config/omarchy/current": "~/.local/state/omarchy/current",
+  "../omarchy/current": "../../.local/state/omarchy/current",
+}
+for old, new in replacements.items():
+  text = text.replace(old, new)
+path.write_text(text)
+PY
+  }
+  for file in \
+    "$HOME/.config/alacritty/alacritty.toml" \
+    "$HOME/.config/foot/foot.ini" \
+    "$HOME/.config/ghostty/config" \
+    "$HOME/.config/hypr/hyprland.conf" \
+    "$HOME/.config/hypr/hyprland-xr.conf" \
+    "$HOME/.config/hypr/hyprland.lua" \
+    "$HOME/.config/hyprland-preview-share-picker/config.yaml" \
+    "$HOME/.config/kitty/kitty.conf"; do
+    replace_legacy_current_path "$file"
+  done
+
   # Theme plumbing: btop theme symlink + a current background if none chosen.
   mkdir -p "$HOME/.config/omarchy/themes" "$HOME/.config/btop/themes"
-  ln -snf "$HOME/.config/omarchy/current/theme/btop.theme" "$HOME/.config/btop/themes/current.theme"
+  ln -snf "$current_state_dir/theme/btop.theme" "$HOME/.config/btop/themes/current.theme"
 
   # Wireplumber bluetooth autoconnect (v4 default; backup-then-write).
   seed_payload_file \
-    "$payload/default/wireplumber/wireplumber.conf.d/bluetooth-a2dp-autoconnect.conf" \
+    "$payload/config/wireplumber/wireplumber.conf.d/bluetooth-a2dp-autoconnect.conf" \
     "$HOME/.config/wireplumber/wireplumber.conf.d/bluetooth-a2dp-autoconnect.conf"
 
   # Enable the v4 user units (static symlinks — no session bus required).
@@ -1288,7 +1440,9 @@ EOF
   # the 3.8.2 install already claimed them only-if-unset, and the user's
   # current choices stand (omedora policy; upstream sets them unconditionally).
 
-  touch "$state_dir/finalize-user.done"
+  mkdir -p "$state_dir/done"
+  touch "$state_dir/done/first-run-user" "$state_dir/done/finalize-user"
+  rm -f "$state_dir/first-run-user.done" "$state_dir/finalize-user.done"
 }
 apply_user_transition
 
@@ -1311,7 +1465,19 @@ apply_system_transition() {
 }
 apply_system_transition
 
-# --- 7. theme refresh (regenerate theme-generated config with v4 templates) ------
+# --- 7. pending beta migrations -------------------------------------------------
+
+run_post_upgrade_migrations() {
+  command -v omarchy-migrate >/dev/null 2>&1 || [[ -x $payload/bin/omarchy-migrate ]] || return 0
+  log "Running pending Omedora 4 migrations"
+  if ! env OMARCHY_PATH="$payload" OMARCHY_DISTRO=fedora \
+    OMARCHY_UPGRADE_TO_QUATTRO_LIVE=1 PATH="$package_path" omarchy-migrate; then
+    warn "Could not run all Omedora migrations; they remain pending and will retry after login."
+  fi
+}
+run_post_upgrade_migrations
+
+# --- 8. theme refresh (regenerate theme-generated config with v4 templates) ------
 
 write_legacy_theme_hyprland_conf() {
   # The legacy ~/.config/hypr/hyprland.conf sources current/theme/hyprland.conf.
@@ -1321,7 +1487,7 @@ write_legacy_theme_hyprland_conf() {
   [[ -f $hyprland_conf ]] || return 0
   grep -q 'current/theme/hyprland.conf' "$hyprland_conf" || return 0
 
-  local theme_dir="$HOME/.config/omarchy/current/theme"
+  local theme_dir="$HOME/.local/state/omarchy/current/theme"
   local colors="$theme_dir/colors.toml" target="$theme_dir/hyprland.conf"
   mkdir -p "$theme_dir"
   local accent="7aa2f7" parsed
@@ -1345,8 +1511,12 @@ EOF
 
 refresh_current_theme_after_upgrade() {
   local theme_name="" runtime_dir
-  if [[ -f $HOME/.config/omarchy/current/theme.name ]]; then
+  if [[ -f $HOME/.local/state/omarchy/current/theme.name ]]; then
+    read -r theme_name <"$HOME/.local/state/omarchy/current/theme.name" || true
+  elif [[ -f $HOME/.config/omarchy/current/theme.name ]]; then
     read -r theme_name <"$HOME/.config/omarchy/current/theme.name" || true
+  elif [[ -L $HOME/.local/state/omarchy/current/theme ]]; then
+    theme_name=$(basename -- "$(readlink "$HOME/.local/state/omarchy/current/theme")")
   elif [[ -L $HOME/.config/omarchy/current/theme ]]; then
     theme_name=$(basename -- "$(readlink "$HOME/.config/omarchy/current/theme")")
   fi
@@ -1368,11 +1538,11 @@ refresh_current_theme_after_upgrade() {
 
   write_legacy_theme_hyprland_conf
 
-  if [[ ! -e $HOME/.config/omarchy/current/background && -d $HOME/.config/omarchy/current/theme/backgrounds ]]; then
+  if [[ ! -e $HOME/.local/state/omarchy/current/background && -d $HOME/.local/state/omarchy/current/theme/backgrounds ]]; then
     local background
-    background=$(find "$HOME/.config/omarchy/current/theme/backgrounds" -maxdepth 1 -type f \
+    background=$(find "$HOME/.local/state/omarchy/current/theme/backgrounds" -maxdepth 1 -type f \
       \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) | sort | head -n1)
-    [[ -n ${background:-} ]] && ln -snf "$background" "$HOME/.config/omarchy/current/background"
+    [[ -n ${background:-} ]] && ln -snf "$background" "$HOME/.local/state/omarchy/current/background"
   fi
 
   # Poke terminals so the active upgrade terminal picks up regenerated files.
@@ -1381,7 +1551,7 @@ refresh_current_theme_after_upgrade() {
 }
 refresh_current_theme_after_upgrade
 
-# --- 8. quickshell hot-start (keep the live session usable until reboot) ---------
+# --- 9. quickshell hot-start (keep the live session usable until reboot) ---------
 
 valid_wayland_display() { [[ -n ${1:-} && -S $target_runtime_dir/$1 ]]; }
 
@@ -1518,7 +1688,7 @@ else
   fi
 fi
 
-# --- 9. wrap-up -------------------------------------------------------------------
+# --- 10. wrap-up ------------------------------------------------------------------
 
 cat <<EOF
 

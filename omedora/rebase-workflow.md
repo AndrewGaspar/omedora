@@ -64,7 +64,7 @@ git fetch --all --tags
 
 ### The pin tag
 
-There is no "upstream release" to rebase onto — Omarchy 4 ships from a moving branch. So the base is an **immutable annotated tag we cut ourselves** at the upstream commit we rebased onto:
+Omedora follows the moving `quattro` branch, which can advance beyond its prerelease tags. The base is therefore an **immutable annotated tag we cut ourselves** at the exact upstream commit we rebased onto:
 
 ```
 omedora-base-<YYYYMMDD>-omarchy4-<sha8>
@@ -86,7 +86,7 @@ We never **merge** upstream into `omedora-4`. We always **rebase**, so the stack
 
 ## 2. Per-resync rebase recipe
 
-Upstream `quattro` moves continuously (476 commits past the current pin as of this writing). Resync when the drift is worth paying for — a needed fix, a new base package, or before a release.
+Upstream `quattro` moves continuously. Measure current drift with `git rev-list --count "$PIN^{commit}"..omarchy/quattro`; resync when it is worth paying for — a needed fix, a new base package, or before a release.
 
 ### Step 1 — Fetch and classify the move
 
@@ -389,11 +389,11 @@ If the rebase touched any hardware-detection or hardware-config code:
 
 Versioning is authoritative in [versioning.md](versioning.md); the v4-specific summary:
 
-- **Two numbers, two files.** `omedora/version` is omedora's own SemVer, tagged `vX.Y.Z` by `bin/omedora-release`; the top-level `version` file records the Omarchy base — **`4.0.0.alpha`** on this line. The base's *major* is what selects the COPR via `bin/omedora-copr`, which is why v4 lives in the isolated `agaspar/omedora-4` project and can never push an ABI-incompatible rebuild at an omedora-3 install.
-- **`omarchy-version` prints both** on Fedora: `Omedora <omedora/version> (Omarchy 4.0.0.alpha)`.
-- **This line has cut no releases yet.** `v0.1.0`–`v0.1.4` all belong to omedora-3 (none is an ancestor of `omedora-4`), and `omedora/version` here is inherited from that line. The first v4 tag is an alpha; expect `0.2.0`-era numbers to continue from where the RPM specs already sit.
-- **Known drift to fix at the first release cut:** `omedora.spec` / `omedora-settings.spec` hardcode `Version: 0.2.0~alpha.0` rather than reading `omedora/version` (the spec comment records the follow-up: have `.copr/srpm.sh` substitute it at SRPM-gen time). Until that lands, a release bump must touch both.
-- **Cadence is decoupled from upstream.** There is no upstream v4 release to follow — `quattro` is a moving branch. Release when there's something to ship (a resync, a packaging fix, a COPR bump). A resync does not by itself require a release.
+- **Omedora release and base labels are separate.** `omedora/version` is Omedora's own SemVer, tagged `vX.Y.Z` by `bin/omedora-release`; `omedora/base-version` is the human-readable label for the immutable upstream pin. The top-level upstream-owned `version` file remains historical metadata. Its major still selects the COPR via `bin/omedora-copr`, which is why v4 lives in the isolated `agaspar/omedora-4` project and cannot push an ABI-incompatible rebuild at an omedora-3 install.
+- **`omarchy-version` prints the release and actual pin label** on Fedora: `Omedora 0.2.0-beta.1 (rebased on Omarchy 4.0.0-beta3+13)`.
+- **The first v4 package identity is `0.2.0-beta.1`.** `v0.1.0`–`v0.1.4` belong to omedora-3 and are not ancestors of this line. RPM prereleases use `0.2.0~beta.1` so they sort below the eventual `0.2.0`.
+- **The upstream `version` file is historical metadata, not the pin label.** It still says `4.0.0.alpha` at the current beta branch tip. Omedora records the actual base with its immutable pin tag and reports that pin separately; do not patch the upstream-owned file.
+- **Cadence is decoupled from upstream.** Quattro has prerelease tags, but the branch continues moving beyond them. Release when there is something to ship (a resync, packaging fix, or COPR bump); a resync does not itself require a release.
 - **Rebase, then release** — never the reverse (see [§2 step 7](#step-7--promote-and-push-force-push-is-expected)).
 - **Base pin tags are a v4 mechanism.** omedora-3 records its base in the `version` file only and cuts no `omedora-base-*` tags.
 

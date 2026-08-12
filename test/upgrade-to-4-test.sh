@@ -45,7 +45,9 @@ stub sudo 'printf "sudo %s\n" "$*" >>"$MOCK_LOG"
 while [[ ${1:-} == -* ]]; do shift; done   # swallow sudo flags (-n/-v probes)
 [[ $# -gt 0 ]] || exit 0
 exec "$@"'
-stub dnf  'printf "dnf %s\n" "$*" >>"$MOCK_LOG"; exit 0'
+stub dnf  'printf "dnf %s\n" "$*" >>"$MOCK_LOG"
+[[ -n ${DNF_FAIL_REFRESH:-} && " $* " == *" install -y --refresh "* ]] && exit 42
+exit 0'
 # rpm stub: `-q <name>` consults $RPM_STATE (installed names, one per line);
 # `-q --whatrequires <name>` consults $WHATREQ_STATE ("<name> <dependent>"
 # pairs) and mimics rpm's "no package requires X" + exit 1 otherwise.
@@ -88,7 +90,7 @@ printf 'ID=fedora\nVERSION_ID=44\n' >"$SCRATCH/os-fedora"
 printf 'ID=arch\n' >"$SCRATCH/os-arch"
 
 # Mocked installed state: omedora-3 COPR serves walker/swayosd (retired on the
-# 4 line) AND hyprland/hyprutils (kept — same names continue on omedora-4);
+# 4 line) AND hyprland/hyprutils/HypXRland (kept — same names continue on 4);
 # git/bash come from Fedora repos and must never be touched.
 copr3="copr:copr.fedorainfracloud.org:agaspar:omedora-3"
 cat >"$REPOQUERY_OUT" <<EOF
@@ -97,13 +99,27 @@ elephant $copr3
 swayosd $copr3
 hyprland $copr3
 hyprutils $copr3
+hypxrpaper $copr3
+hypxrva $copr3
+hypxrhud $copr3
+hypxrvoice $copr3
+hypxrvoice-model-base-en $copr3
+wivrn-hypxr $copr3
+monado-xreal $copr3
+hypxrland $copr3
+hypxrland-stack $copr3
+hypxrland-omedora $copr3
 git updates
 bash anaconda
 EOF
 # rpm -q state (must agree with the repoquery state above): the COPR set +
 # the 3.8.2-era Fedora-proper extras that v4 retires + iwd + polkit-kde,
 # which a coexisting KDE Plasma still requires (cascade guard).
-printf 'walker\nelephant\nswayosd\nhyprland\nhyprutils\nwaybar\nmako\niwd\npolkit-kde\n' >"$RPM_STATE"
+printf '%s\n' \
+  walker elephant swayosd hyprland hyprutils \
+  hypxrpaper hypxrva hypxrhud hypxrvoice hypxrvoice-model-base-en \
+  wivrn-hypxr monado-xreal hypxrland hypxrland-stack hypxrland-omedora \
+  waybar mako iwd polkit-kde >"$RPM_STATE"
 # whatrequires pairs: plasma-workspace (OUTSIDE the retired set) requires
 # polkit-kde; walker (INSIDE the set) requires elephant — intra-set deps must
 # not block removal.
@@ -112,7 +128,7 @@ printf 'polkit-kde plasma-workspace\nelephant walker\n' >"$WHATREQ_STATE"
 # --- the fixture v4 payload (the OMEDORA_UPGRADE_PAYLOAD seam) ----------------
 PAYLOAD="$SCRATCH/payload"
 mkdir -p "$PAYLOAD/install/packages" "$PAYLOAD/bin/fedora" \
-  "$PAYLOAD/default/hypr/toggles" "$PAYLOAD/default/omarchy-skill" \
+  "$PAYLOAD/default/hypr/toggles" "$PAYLOAD/default/agents/skills/omarchy" \
   "$PAYLOAD/applications" "$PAYLOAD/shell"
 cp -r "$ROOT/config" "$PAYLOAD/config"
 cp -r "$ROOT/default/systemd" "$PAYLOAD/default/systemd"
@@ -122,10 +138,10 @@ cp "$ROOT/bin/fedora/pkg.py" "$PAYLOAD/bin/fedora/pkg.py"
 printf 'quickshell\nfoot\n' >"$PAYLOAD/install/omarchy-base.packages"
 printf 'icon\n' >"$PAYLOAD/icon.txt"
 printf 'logo\n' >"$PAYLOAD/logo.txt"
-touch "$PAYLOAD/default/omarchy-skill/SKILL.md"
+touch "$PAYLOAD/default/agents/skills/omarchy/SKILL.md"
 printf '[Desktop Entry]\nName=Fixture\nType=Application\nExec=true\n' \
   >"$PAYLOAD/applications/Fixture.desktop"
-for b in omarchy-setup-system omarchy-theme-set omarchy-restart-terminal; do
+for b in omarchy-setup-system omarchy-theme-set omarchy-restart-terminal omarchy-migrate; do
   printf '#!/bin/bash\nprintf "%s %%s\\n" "$*" >>"$MOCK_LOG"\nexit 0\n' "$b" >"$PAYLOAD/bin/$b"
   chmod +x "$PAYLOAD/bin/$b"
 done
@@ -138,7 +154,12 @@ done
 #   etc/fastfetch/config.jsonc   -> a known `retire` hash
 make_home() {
   local h="$1"
-  mkdir -p "$h/.config/hypr" "$h/.config/systemd/user" "$h/.local/share" "$h/.local/bin"
+  mkdir -p \
+    "$h/.config/hypr" "$h/.config/systemd/user" "$h/.local/share" "$h/.local/bin" \
+    "$h/.config/omarchy/current/theme" "$h/.config/hypxr" "$h/.config/hypxrvoice" \
+    "$h/.config/hypxrhud" "$h/.config/wivrn" "$h/.config/openxr/1" \
+    "$h/.config/chromium/Default" \
+    "$h/.config/systemd/user/wivrn.service.d" "$h/.config/systemd/user/monado-xreal.service.d"
 
   # The legacy git checkout with a snapshot stub inside.
   git init -q "$h/.local/share/omarchy"
@@ -154,6 +175,48 @@ source = ~/.config/omarchy/current/theme/hyprland.conf
 source = ~/.config/hypr/bindings.conf
 EOF
   printf '# my custom binds\nbind = SUPER, Z, exec, true\n' >"$h/.config/hypr/bindings.conf"
+  cat >"$h/.config/hypr/hyprland-xr.conf" <<'EOF'
+source = ~/.config/hypr/hyprland.conf
+openxr {
+  enabled = true
+}
+EOF
+
+  # XR pairing, model, runtime, and machine-specific service state is user
+  # data. The upgrade must preserve each byte-for-byte.
+  printf 'GPU_DEVICE=/dev/dri/renderD128\n' >"$h/.config/hypxr/setup.env"
+  printf '[intent]\nbackend = "rules"\n' >"$h/.config/hypxrvoice/config.toml"
+  printf 'anchor = "desk"\n' >"$h/.config/hypxrhud/hypxrhud.toml"
+  printf '{"encoder":"vaapi"}\n' >"$h/.config/wivrn/config.json"
+  printf '{"headset":"paired-key"}\n' >"$h/.config/wivrn/known_keys.json"
+  printf '{"runtime":"wivrn"}\n' >"$h/.config/openxr/1/active_runtime.json"
+  printf '[Service]\nEnvironment=LIBVA_DRIVER_NAME=radeonsi\n' >"$h/.config/systemd/user/wivrn.service.d/override.conf"
+  printf '[Service]\nEnvironment=VK_ICD_FILENAMES=/machine/icd.json\n' >"$h/.config/systemd/user/monado-xreal.service.d/override.conf"
+
+  printf 'Tokyo Night\n' >"$h/.config/omarchy/current/theme.name"
+  printf 'accent = "#7aa2f7"\n' >"$h/.config/omarchy/current/theme/colors.toml"
+  printf 'legacy btop theme\n' >"$h/.config/omarchy/current/theme/btop.theme"
+  printf '{"custom":"keep"}\n' >"$h/.config/omarchy/bar.json"
+  cat >"$h/.config/chromium/Default/Preferences" <<'EOF'
+{
+  "extensions": {
+    "commands": {
+      "copy": {
+        "extension": "bocglpkldciamkbmlphanhkfnhpmnbma",
+        "command_name": "copy-url"
+      }
+    },
+    "settings": {
+      "bocglpkldciamkbmlphanhkfnhpmnbma": {
+        "commands": {"copy-url": {"was_assigned": true}}
+      },
+      "bgpiichlckmfanooecilcjemknkcpngb": {
+        "commands": {"copy-url": {}}
+      }
+    }
+  }
+}
+EOF
 
   # Hash-matched shipped default -> must be refreshed (stays the v4 default).
   mkdir -p "$h/.config/btop"
@@ -196,6 +259,20 @@ fi
 # <<< omedora <<<
 # user content below
 EOF
+
+  local xr_rel
+  for xr_rel in \
+    .config/hypr/hyprland-xr.conf \
+    .config/hypxr/setup.env \
+    .config/hypxrvoice/config.toml \
+    .config/hypxrhud/hypxrhud.toml \
+    .config/wivrn/config.json \
+    .config/wivrn/known_keys.json \
+    .config/openxr/1/active_runtime.json \
+    .config/systemd/user/wivrn.service.d/override.conf \
+    .config/systemd/user/monado-xreal.service.d/override.conf; do
+    cp "$h/$xr_rel" "$h/$xr_rel.pretest"
+  done
 }
 
 # Common invocation: fedora os-release, fixture payload, mocked queries.
@@ -210,6 +287,7 @@ run_upgrade() {
     RPM_STATE="$RPM_STATE" \
     WHATREQ_STATE="$WHATREQ_STATE" \
     REPOQUERY_OUT="$REPOQUERY_OUT" \
+    DNF_FAIL_REFRESH="${DNF_FAIL_REFRESH:-}" \
     IWD_ACTIVE_RC="${IWD_ACTIVE_RC:-3}" \
     OMEDORA_OS_RELEASE="$SCRATCH/os-fedora" \
     OMEDORA_DNF_CMD="$FAKE_DNF_QUERY" \
@@ -259,7 +337,9 @@ assert_output_contains "plan lists computed retired package walker" "$out" "walk
 assert_output_contains "plan lists computed retired package swayosd" "$out" "swayosd"
 assert_output_contains "plan lists installed extra waybar" "$out" "waybar"
 assert_output_contains "plan lists iwd (installed, inactive)" "$out" "iwd"
-assert_output_lacks "plan keeps hyprland (still served on omedora-4)" "$out" $'\nhyprland '
+assert_output_contains "plan discloses v4 survivor migration" "$out" "migrate 12 installed package(s)"
+assert_output_contains "plan lists surviving stable Hyprland" "$out" "hyprland"
+assert_output_contains "plan lists surviving HypXRland" "$out" "hypxrland"
 assert_output_contains "plan keeps polkit-kde for its outside dependent" "$out" \
   "polkit-kde (required by: plasma-workspace)"
 assert_output_contains "plan discloses the checkout retirement backup" "$out" ".pre-omedora-4-"
@@ -281,6 +361,18 @@ grep -qE 'dnf (install|remove|mark)|copr (enable|disable)|systemctl (enable|disa
 out=$(echo n | run_upgrade "$H1" OMEDORA_PLAN_FORCE_INTERACTIVE=1 2>&1) && rc=0 || rc=$?
 assert_equals "interactive decline aborts" "1" "$rc"
 assert_output_contains "interactive decline message" "$out" "aborted at your request"
+
+H_FAIL="$SCRATCH/home-failed-survivor"; make_home "$H_FAIL"
+: >"$MOCK_LOG"
+out=$(DNF_FAIL_REFRESH=1 run_upgrade "$H_FAIL" OMEDORA_PLAN_AUTOCONFIRM=1 \
+  OMEDORA_PLAN_FORCE_NONINTERACTIVE=1 2>&1) && rc=0 || rc=$?
+assert_equals "failed survivor migration aborts" "42" "$rc"
+grep -q "copr disable agaspar/omedora-3" "$MOCK_LOG" \
+  && fail "failed survivor migration keeps old COPR enabled" \
+  || pass "failed survivor migration keeps old COPR enabled"
+[[ -d $H_FAIL/.local/share/omarchy/.git && ! -L $H_FAIL/.local/share/omarchy ]] \
+  && pass "failed survivor migration keeps legacy checkout active" \
+  || fail "failed survivor migration keeps legacy checkout active"
 
 # ===========================================================================
 echo "# --- PART 3: the full mocked upgrade (autoconfirm seam) ---"
@@ -304,6 +396,18 @@ grep -q "dnf install -y omedora omedora-settings" "$MOCK_LOG" \
   || fail "omedora + omedora-settings in ONE transaction"
 grep -q "dnf mark user omedora omedora-settings" "$MOCK_LOG" \
   && pass "packages marked user-installed" || fail "packages marked user-installed"
+survivor_line=$(grep "dnf install -y --refresh" "$MOCK_LOG" | head -1)
+for package in \
+  hyprland hyprutils hypxrpaper hypxrva hypxrhud hypxrvoice \
+  hypxrvoice-model-base-en wivrn-hypxr monado-xreal hypxrland \
+  hypxrland-stack hypxrland-omedora; do
+  assert_output_contains "survivor transaction includes $package" "$survivor_line" "$package"
+done
+survivor_lineno=$(grep -n "dnf install -y --refresh" "$MOCK_LOG" | head -1 | cut -d: -f1)
+disable_lineno=$(grep -n "dnf -y copr disable agaspar/omedora-3" "$MOCK_LOG" | head -1 | cut -d: -f1)
+(( survivor_lineno < disable_lineno )) \
+  && pass "survivors migrate before old COPR disable" \
+  || fail "survivors migrate before old COPR disable"
 grep -q "dnf -y copr disable agaspar/omedora-3" "$MOCK_LOG" \
   && pass "omedora-3 COPR disabled after success" || fail "omedora-3 COPR disabled after success"
 
@@ -317,6 +421,8 @@ assert_output_contains "retired removal includes elephant (intra-set dependent o
 assert_output_lacks "retired removal keeps polkit-kde (outside dependent)" "$remove_line" "polkit-kde"
 assert_output_lacks "retired removal keeps hyprland" "$remove_line" "hyprland"
 assert_output_lacks "retired removal keeps hyprutils" "$remove_line" "hyprutils"
+assert_output_lacks "retired removal keeps hypxrland" "$remove_line" "hypxrland"
+assert_output_lacks "retired removal keeps Omedora XR session" "$remove_line" "hypxrland-omedora"
 assert_output_lacks "retired removal never touches git" "$remove_line" " git"
 
 # New base deps resolved through the v4 map (pkg.py dry-run seam).
@@ -385,7 +491,10 @@ assert_file_exists "branding about.txt seeded" "$H1/.config/omarchy/branding/abo
 assert_file_exists "XCompose created when absent" "$H1/.XCompose"
 assert_file_exists "shipped desktop launcher copied" \
   "$H1/.local/share/applications/Fixture.desktop"
-assert_file_exists "finalize-user.done marker" "$H1/.local/state/omarchy/finalize-user.done"
+assert_file_exists "finalize-user marker" "$H1/.local/state/omarchy/done/finalize-user"
+assert_file_exists "first-run-user marker" "$H1/.local/state/omarchy/done/first-run-user"
+[[ ! -e $H1/.local/state/omarchy/finalize-user.done ]] \
+  && pass "legacy finalize marker absent" || fail "legacy finalize marker absent"
 [[ ! -e $H1/.config/git/config ]] \
   && pass "git/config never created (protected)" || fail "git/config never created (protected)"
 compgen -G "$H1/.config/systemd/user/*.wants/omarchy-sleep-lock.service" >/dev/null \
@@ -399,7 +508,53 @@ grep -q "user content below" "$H1/.bashrc" && grep -q ">>> omedora >>>" "$H1/.ba
 grep -q "omarchy-theme-set" "$MOCK_LOG" \
   && pass "theme refreshed with v4 templates" || fail "theme refreshed with v4 templates"
 assert_file_exists "legacy theme hyprland.conf shim written" \
-  "$H1/.config/omarchy/current/theme/hyprland.conf"
+  "$H1/.local/state/omarchy/current/theme/hyprland.conf"
+assert_file_exists "theme state moved to local state" \
+  "$H1/.local/state/omarchy/current/theme.name"
+[[ ! -e $H1/.config/omarchy/current ]] \
+  && pass "legacy theme state path retired" || fail "legacy theme state path retired"
+assert_equals "btop theme follows beta state path" \
+  "$(readlink "$H1/.config/btop/themes/current.theme")" \
+  "$H1/.local/state/omarchy/current/theme/btop.theme"
+grep -q '~/.local/state/omarchy/current/theme/hyprland.conf' "$H1/.config/hypr/hyprland.conf" \
+  && pass "legacy Hyprland theme source rewritten" \
+  || fail "legacy Hyprland theme source rewritten"
+assert_file_exists "rewritten Hyprland config backed up" \
+  "$(compgen -G "$H1/.config/hypr/hyprland.conf.pre-omedora-4-*.bak" | head -1)"
+grep -q '"custom":"keep"' "$H1/.config/omarchy/bar.json" \
+  && pass "obsolete bar.json remains user-owned" || fail "obsolete bar.json remains user-owned"
+grep -q '"extension":"bgpiichlckmfanooecilcjemknkcpngb"' \
+  "$H1/.config/chromium/Default/Preferences" \
+  && pass "Chromium Copy URL shortcut migrated to beta extension" \
+  || fail "Chromium Copy URL shortcut migrated to beta extension"
+compgen -G "$H1/.config/chromium/Default/Preferences.pre-omedora-4-*.bak" >/dev/null \
+  && pass "Chromium shortcut preferences backed up" \
+  || fail "Chromium shortcut preferences backed up"
+
+for skill_root in .agents/skills .claude/skills .codex/skills .pi/agent/skills; do
+  assert_equals "$skill_root uses beta skill tree" \
+    "$(readlink "$H1/$skill_root/omarchy")" \
+    "$PAYLOAD/default/agents/skills/omarchy"
+done
+assert_file_exists "WirePlumber beta default seeded" \
+  "$H1/.config/wireplumber/wireplumber.conf.d/bluetooth-a2dp-autoconnect.conf"
+grep -q 'omarchy-migrate' "$MOCK_LOG" \
+  && pass "pending beta migrations invoked" || fail "pending beta migrations invoked"
+
+# XR state and the standalone XR entry point survive byte-for-byte.
+for xr_rel in \
+  .config/hypr/hyprland-xr.conf \
+  .config/hypxr/setup.env \
+  .config/hypxrvoice/config.toml \
+  .config/hypxrhud/hypxrhud.toml \
+  .config/wivrn/config.json \
+  .config/wivrn/known_keys.json \
+  .config/openxr/1/active_runtime.json \
+  .config/systemd/user/wivrn.service.d/override.conf \
+  .config/systemd/user/monado-xreal.service.d/override.conf; do
+  cmp -s "$H1/$xr_rel" "$H1/$xr_rel.pretest" \
+    && pass "XR state preserved: $xr_rel" || fail "XR state preserved: $xr_rel"
+done
 
 # System transition handed to the installed, Fedora-gated setup.
 grep -q -- "omarchy-setup-system --install-user $(id -un) --upgrade" "$MOCK_LOG" \

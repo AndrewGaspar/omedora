@@ -56,7 +56,7 @@ if ! git -C "$REPO" diff --quiet || ! git -C "$REPO" diff --cached --quiet; then
   exit 1
 fi
 
-base="$(cat "$REPO/version")"
+base="$(cat "$REPO/omedora/base-version" 2>/dev/null || cat "$REPO/version")"
 tag="v$new"
 if git -C "$REPO" rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
   echo "omedora-release: tag $tag already exists" >&2
