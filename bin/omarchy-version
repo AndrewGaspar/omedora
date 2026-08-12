@@ -23,12 +23,13 @@ fi
 case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
   fedora)
     omedora_version=$(cat "$omarchy_path/omedora/version" 2>/dev/null || true)
-    base_version=$(cat "$omarchy_path/version" 2>/dev/null || true)
+    base_version=$(cat "$omarchy_path/omedora/base-version" 2>/dev/null || true)
+    [[ -n $base_version ]] || base_version=$(cat "$omarchy_path/version" 2>/dev/null || true)
     # Fall back to the RPM's version if the shipped file is somehow absent.
     [[ -n $omedora_version ]] || omedora_version=$(rpm -q --qf '%{VERSION}' omedora 2>/dev/null || true)
     [[ -n $omedora_version ]] || exit 1
     if [[ -n $base_version ]]; then
-      echo "Omedora $omedora_version (Omarchy $base_version)"
+      echo "Omedora $omedora_version (rebased on Omarchy $base_version)"
     else
       echo "Omedora $omedora_version"
     fi
