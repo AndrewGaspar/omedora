@@ -109,7 +109,7 @@ omedora_nvim_bootstrap() {
   # Link the active omarchy theme (as omarchy-nvim-setup does). The target is
   # created/repointed by omarchy's theme machinery; link unconditionally so it
   # resolves once a theme is set.
-  ln -snf "$HOME/.config/omarchy/current/theme/neovim.lua" \
+  ln -snf "$HOME/.local/state/omarchy/current/theme/neovim.lua" \
     "$CONFIG_DIR/lua/plugins/theme.lua"
 
   # Download + install all plugins now (network available at install time), so
