@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Omedora XR
+Comment=Omedora HypXRland session managed by uwsm
+Exec=/usr/bin/hypxrland-session
+TryExec=/usr/bin/hypxrland-session
+Type=Application
+Keywords=tiling;wayland;compositor;openxr;vr;
