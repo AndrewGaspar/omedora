@@ -6,7 +6,7 @@
 #
 # xdg-utils            xdg-settings/xdg-mime/xdg-open — the default-browser +
 #                      MIME setup and omarchy-launch-browser need them.
-# xdg-user-dirs        xdg-user-dirs-update — omarchy-finalize-user hard-
+# xdg-user-dirs        xdg-user-dirs-update — omarchy-provision-user hard-
 #                      requires it for the Templates/Public/Desktop cleanup.
 # pipewire             the audio server daemon (Fedora minimal ships only
 #                      wireplumber).

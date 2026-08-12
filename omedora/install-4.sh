@@ -8,7 +8,7 @@
 # Upstream Omarchy 4 has no install.sh — fresh installs are ISO-built on Arch.
 # On Fedora, omedora installs onto an EXISTING Fedora system instead, so this
 # orchestrator does what the ISO does (packages -> setup-system ->
-# finalize-user) but coexistence-first: one up-front plan gate before any
+# provision-user) but coexistence-first: one up-front plan gate before any
 # change, backup-then-write for user configs, only-if-unset for defaults.
 #
 # Sequence (each step an omedora-owned script in omedora/install/):
@@ -18,8 +18,8 @@
 #   4. packages.sh  dnf install omedora, then the mapped omarchy-base set
 #   5. system.sh    sudo omarchy-setup-system (Fedora-gated upstream scripts)
 #   6. adopt.sh     omedora-adopt-user (skel replay, backup-then-write)
-#   7. finalize.sh  omarchy-finalize-user --force --first-install
-#   8. first-run.sh omarchy-first-run, only if a user session bus is live
+#   7. finalize.sh  omarchy-provision-user --force --first-install
+#   8. first-run.sh omarchy-provision-first-run, only with a live user bus
 #
 # Env:
 #   OMEDORA_PLAN_AUTOCONFIRM=1  proceed past the gate without prompting (CI)

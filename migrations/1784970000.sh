@@ -1,5 +1,7 @@
 echo "Give the pre-suspend lock a window it can actually finish in"
 
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # logind's five second default expires while Quickshell is still securing the
 # session on lid close, and it suspends regardless. The shipped drop-in raises
 # InhibitDelayMaxSec, but logind only reads it on reload.

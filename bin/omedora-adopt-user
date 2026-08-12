@@ -31,7 +31,7 @@
 #          same pass — existing files still get backed up, never destroyed.
 # --skel   Override the skel source tree (tests).
 #
-# Deliberately NOT here: omarchy-finalize-user / omarchy-first-run. The
+# Deliberately NOT here: omarchy-provision-user / omarchy-provision-first-run. The
 # bootstrap sequences those separately (adopt -> finalize -> first-run), and
 # the reinstall gate runs the nvim refresh itself to mirror upstream.
 
