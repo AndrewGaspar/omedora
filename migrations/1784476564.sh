@@ -1,5 +1,9 @@
 echo "Keep non-Latin keyboard layouts out of the initramfs so the LUKS passphrase stays typeable"
 
+# Fedora uses dracut and Omedora deliberately does not own the boot/initramfs
+# configuration. The Arch body below is byte-identical to upstream.
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # Bundling vconsole.conf in the initramfs makes Plymouth apply the user's
 # layout at the LUKS prompt. For layouts that don't type Latin letters, that
 # makes the (Latin) passphrase untypeable and locks the user out (#6229).

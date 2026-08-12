@@ -70,7 +70,7 @@ There is no "upstream release" to rebase onto — Omarchy 4 ships from a moving 
 omedora-base-<YYYYMMDD>-omarchy4-<sha8>
 ```
 
-`<YYYYMMDD>` is the rebase date, `<sha8>` the 8-char abbreviation of the upstream commit. Today's pin is `omedora-base-20260703-omarchy4-1e996609` (`omarchy/quattro` @ `1e996609`, tagged 2026-07-03). Its predecessor `omedora-base-20260611-omarchy4-17f024d4` is kept — **never delete an old pin tag**; they are the audit's history and the only stable reference to a rewritten lineage.
+`<YYYYMMDD>` is the rebase date, `<sha8>` the 8-char abbreviation of the upstream commit. Today's pin is `omedora-base-20260812-omarchy4-106320ab` (`omarchy/quattro` @ `106320ab`, tagged 2026-08-12). Its predecessors, including `omedora-base-20260703-omarchy4-1e996609`, are kept — **never delete an old pin tag**; they are the audit's history and the only stable reference to a rewritten lineage.
 
 **The pin is recorded in exactly one place: the status banner at the top of [`architecture.md`](architecture.md).** [`test/byte-identity-test.sh`](../test/byte-identity-test.sh) re-derives it from there with
 
@@ -269,7 +269,7 @@ This is also a good moment to consider: would upstream accept a PR that pulls th
 
 ### Pattern F — Upstream added a new setup stage or entry point
 
-Example: upstream adds `install/config/new-thing.sh`, or a new step inside `omarchy-setup-system` / `omarchy-finalize-user` / `omarchy-first-run`.
+Example: upstream adds `install/config/new-thing.sh`, or a new step inside `omarchy-setup-system` / `omarchy-provision-user` / `omarchy-provision-first-run`.
 
 **Resolution:**
 

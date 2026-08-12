@@ -10,14 +10,14 @@
 #
 # OMEDORA_SETUP_FROM_REPO=1: same dev/test seam as system.sh.
 
-echo -e "\n\e[32mOmedora: finalizing user setup (omarchy-finalize-user)\e[0m"
+echo -e "\n\e[32mOmedora: provisioning user setup (omarchy-provision-user)\e[0m"
 
-finalize_cmd=(omarchy-finalize-user)
+finalize_cmd=(omarchy-provision-user)
 if [[ -n ${OMEDORA_SETUP_FROM_REPO:-} ]]; then
   export OMARCHY_PATH="$OMEDORA_REPO_ROOT"
   export OMARCHY_INSTALL="$OMEDORA_REPO_ROOT/install"
   export PATH="$OMEDORA_REPO_ROOT/bin:$PATH"
-  finalize_cmd=("$OMEDORA_REPO_ROOT/bin/omarchy-finalize-user")
+  finalize_cmd=("$OMEDORA_REPO_ROOT/bin/omarchy-provision-user")
 fi
 
 "${finalize_cmd[@]}" --force --first-install
