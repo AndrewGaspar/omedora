@@ -111,6 +111,7 @@ hypxrland-stack $copr3
 hypxrland-omedora $copr3
 git updates
 bash anaconda
+quickshell updates
 EOF
 # rpm -q state (must agree with the repoquery state above): the COPR set +
 # the 3.8.2-era Fedora-proper extras that v4 retires + iwd + polkit-kde,
@@ -119,7 +120,7 @@ printf '%s\n' \
   walker elephant swayosd hyprland hyprutils \
   hypxrpaper hypxrva hypxrhud hypxrvoice hypxrvoice-model-base-en \
   wivrn-hypxr monado-xreal hypxrland hypxrland-stack hypxrland-omedora \
-  waybar mako iwd polkit-kde >"$RPM_STATE"
+  waybar mako iwd polkit-kde quickshell >"$RPM_STATE"
 # whatrequires pairs: plasma-workspace (OUTSIDE the retired set) requires
 # polkit-kde; walker (INSIDE the set) requires elephant — intra-set deps must
 # not block removal.
@@ -135,7 +136,9 @@ cp -r "$ROOT/default/systemd" "$PAYLOAD/default/systemd"
 cp "$ROOT/default/hypr/toggles/flags.lua" "$PAYLOAD/default/hypr/toggles/flags.lua"
 cp "$ROOT/install/packages/fedora.toml" "$PAYLOAD/install/packages/fedora.toml"
 cp "$ROOT/bin/fedora/pkg.py" "$PAYLOAD/bin/fedora/pkg.py"
-printf 'quickshell\nfoot\n' >"$PAYLOAD/install/omarchy-base.packages"
+printf '%s\n' \
+  libvips quickshell-git omacalc ttfx herdr foot \
+  >"$PAYLOAD/install/omarchy-base.packages"
 printf 'icon\n' >"$PAYLOAD/icon.txt"
 printf 'logo\n' >"$PAYLOAD/logo.txt"
 touch "$PAYLOAD/default/agents/skills/omarchy/SKILL.md"
@@ -427,7 +430,16 @@ assert_output_lacks "retired removal never touches git" "$remove_line" " git"
 
 # New base deps resolved through the v4 map (pkg.py dry-run seam).
 assert_output_contains "v4 base set resolved through pkg.py" "$out" "[dry-run] sudo dnf install"
-assert_output_contains "missing base package quickshell resolved" "$out" "quickshell"
+base_install_line=$(grep '\[dry-run\] sudo dnf install' <<<"$out" | tail -1)
+for package in vips-tools omacalc ttfx herdr; do
+  assert_output_contains "Quattro base mapping resolved: $package" \
+    "$base_install_line" "$package"
+done
+assert_output_lacks "installed Fedora Quickshell skipped by the add-only resolver" \
+  "$base_install_line" "quickshell"
+grep -q '^sudo dnf upgrade -y --refresh quickshell$' "$MOCK_LOG" \
+  && pass "installed Fedora Quickshell forced onto the Omedora snapshot" \
+  || fail "installed Fedora Quickshell forced onto the Omedora snapshot"
 
 # Checkout retirement: backup + symlink (no live session -> no overlay).
 backup_dir=$(compgen -G "$H1/.local/share/omarchy.pre-omedora-4-*.bak" | head -1)
@@ -588,12 +600,13 @@ echo "# upgrade-to-4-test: all assertions passed"
 echo "# --- spec-set cross-check: v4_kept_packages can't silently desync ---"
 # ===========================================================================
 # Every spec in build-repo.sh's SPECS array (the canonical v4-served set) must
-# appear in the upgrader's v4_kept_packages list — a future spec retirement
-# that forgets the upgrader would otherwise let the upgrade REMOVE a package
-# the COPR still serves (or keep one it retired).
+# appear in the upgrader's v4_kept_packages list — a future spec addition that
+# forgets the upgrader would otherwise let the upgrade REMOVE a package the
+# Omedora 4 COPR still serves.
 spec_names=$(sed -n '/^SPECS=(/,/^)/p' "$ROOT/omedora/packaging/copr/build-repo.sh" \
   | sed 's/#.*//' | grep -oE '[a-zA-Z0-9._-]+\.spec' | sed 's/\.spec$//' | sort -u)
-kept_block=$(sed -n '/^v4_kept_packages=(/,/^)/p' "$ROOT/bin/omedora-upgrade-to-4")
+kept_names=$(sed -n '/^v4_kept_packages=(/,/^)/p' "$ROOT/bin/omedora-upgrade-to-4" \
+  | sed '1d;$d;s/#.*//' | tr -s '[:space:]' '\n' | sed '/^$/d')
 # On-demand specs the COPR serves but the upgrade must NOT force-install: they
 # are installed only when the user opts in (e.g. clicking Install Dictation), so
 # they are intentionally absent from v4_kept_packages. voxtype (+ its -cuda/
@@ -602,8 +615,7 @@ on_demand_specs=" voxtype "
 missing=""
 for s in $spec_names; do
   [[ $on_demand_specs == *" $s "* ]] && continue
-  # terminaltexteffects builds python3-terminaltexteffects; match either name.
-  grep -qw "$s\|python3-$s" <<<"$kept_block" || missing="$missing $s"
+  grep -qxF "$s" <<<"$kept_names" || missing="$missing $s"
 done
 if [[ -n $missing ]]; then
   echo "specs served by the v4 COPR but absent from v4_kept_packages:$missing" >&2
