@@ -1,5 +1,7 @@
 echo "Update T2 Mac suspend, Touch Bar, and fan defaults"
 
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 if ! lspci -nn | grep "106b:180[12]" >/dev/null; then
   exit 0
 fi

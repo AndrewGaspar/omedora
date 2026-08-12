@@ -1,5 +1,7 @@
 echo "Configure locate to skip Btrfs snapshots and index Btrfs subvolumes"
 
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 OMARCHY_PATH="${OMARCHY_PATH:-/usr/share/omarchy}"
 locate_config_script="$OMARCHY_PATH/install/config/locate.sh"
 UPDATEDB_CONF_PATH="${OMARCHY_UPDATEDB_CONF_PATH:-/etc/updatedb.conf}"
