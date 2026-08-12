@@ -1,3 +1,14 @@
+## v0.2.0-beta.1 — 2026-08-12 (Omarchy Quattro beta3+13)
+
+- Rebase the Omedora 4 patch stack onto `quattro` at `106320ab`.
+- Adapt Fedora provisioning and migration gates to the current beta layout.
+- Port the complete parallel HypXRland package stack to `agaspar/omedora-4`.
+- Preserve stable Hyprland as the fallback beside the private Omedora XR
+  compositor, control client, and session.
+- Upgrade surviving Omedora 3 RPMs before disabling its COPR so DNF5 installs
+  changed Omedora 4 payloads and dependencies.
+- Verify the package-backed Omedora 3 to Omedora 4 XR transition end to end.
+
 ## v0.1.3 — 2026-06-05 (Omarchy 3.8.2)
 
 - fix(bootstrap): default boot-omedora.sh ref to 3.8.2-omedora, not dev
@@ -48,10 +59,3 @@ Initial public release — **Omarchy for stable Fedora Workstation**.
 - **Verified end-to-end on a real Fedora 44 Workstation VM:** provision GNOME+GDM
   → install from the live COPR → boot the Omedora/Hyprland session on a real seat
   → full assertion suite green.
-
-## v0.2.0-beta.1 — 2026-08-12 (Omarchy Quattro beta3+13)
-
-- Rebase the Omedora 4 patch stack onto `quattro` at `106320ab`.
-- Adapt Fedora provisioning and migration gates to the current beta layout.
-- Port the complete parallel HypXRland package stack to `agaspar/omedora-4`.
-- Expand and revalidate the package-backed Omedora 3 to Omedora 4 upgrade path.
