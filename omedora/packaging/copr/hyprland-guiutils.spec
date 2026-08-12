@@ -9,7 +9,7 @@
 # Source0 is the tagged-archive (unpacks to hyprland-guiutils-VERSION/).
 
 Name:           hyprland-guiutils
-Version:        0.2.1
+Version:        0.2.2
 Release:        1%{?dist}
 Summary:        Hyprland's hyprtoolkit-based GUI utilities
 
@@ -64,6 +64,10 @@ hyprtoolkit Wayland-native toolkit. It is the successor to hyprland-qtutils.
 %{_bindir}/hyprland-update-screen
 
 %changelog
+* Mon Aug 03 2026 omedora <noreply@omedora> - 0.2.2-1
+- Update to hyprland-guiutils 0.2.2 (Hyprland 0.56.1 wave).
+- Rebuilt against hyprutils 0.14.0 (SONAME 13).
+
 * Sat May 30 2026 omedora <noreply@omedora> - 0.2.1-1
 - Initial omedora build of hyprland-guiutils 0.2.1 (authored fresh; not in
   solopasha's set). Successor to hyprland-qtutils (Obsoletes/Provides it).
