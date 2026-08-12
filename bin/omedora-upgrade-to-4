@@ -743,7 +743,11 @@ migrate_installed_v4_survivors() {
   # This transaction is intentionally fatal. The old COPR must not be disabled
   # until every installed survivor is resolvable from the new one; higher O4
   # releases also replace payloads whose package names continue unchanged.
-  sudo dnf install -y --refresh "${installed_v4_survivors[@]}"
+  # DNF5's `install` command treats an installed name as satisfied even when a
+  # newer build is available from the newly enabled repository. Use the
+  # explicitly upgrade-scoped command so bumped O4 releases and any new hard
+  # dependencies actually land before the O3 repository is disabled.
+  sudo dnf upgrade -y --refresh "${installed_v4_survivors[@]}"
 }
 
 # Fedora desktop baseline the 4.x installer adds (omedora/install/

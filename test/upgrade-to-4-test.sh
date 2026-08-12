@@ -46,7 +46,7 @@ while [[ ${1:-} == -* ]]; do shift; done   # swallow sudo flags (-n/-v probes)
 [[ $# -gt 0 ]] || exit 0
 exec "$@"'
 stub dnf  'printf "dnf %s\n" "$*" >>"$MOCK_LOG"
-[[ -n ${DNF_FAIL_REFRESH:-} && " $* " == *" install -y --refresh "* ]] && exit 42
+[[ -n ${DNF_FAIL_REFRESH:-} && " $* " == *" upgrade -y --refresh "* ]] && exit 42
 exit 0'
 # rpm stub: `-q <name>` consults $RPM_STATE (installed names, one per line);
 # `-q --whatrequires <name>` consults $WHATREQ_STATE ("<name> <dependent>"
@@ -396,14 +396,14 @@ grep -q "dnf install -y omedora omedora-settings" "$MOCK_LOG" \
   || fail "omedora + omedora-settings in ONE transaction"
 grep -q "dnf mark user omedora omedora-settings" "$MOCK_LOG" \
   && pass "packages marked user-installed" || fail "packages marked user-installed"
-survivor_line=$(grep "dnf install -y --refresh" "$MOCK_LOG" | head -1)
+survivor_line=$(grep "dnf upgrade -y --refresh" "$MOCK_LOG" | head -1)
 for package in \
   hyprland hyprutils hypxrpaper hypxrva hypxrhud hypxrvoice \
   hypxrvoice-model-base-en wivrn-hypxr monado-xreal hypxrland \
   hypxrland-stack hypxrland-omedora; do
   assert_output_contains "survivor transaction includes $package" "$survivor_line" "$package"
 done
-survivor_lineno=$(grep -n "dnf install -y --refresh" "$MOCK_LOG" | head -1 | cut -d: -f1)
+survivor_lineno=$(grep -n "dnf upgrade -y --refresh" "$MOCK_LOG" | head -1 | cut -d: -f1)
 disable_lineno=$(grep -n "dnf -y copr disable agaspar/omedora-3" "$MOCK_LOG" | head -1 | cut -d: -f1)
 (( survivor_lineno < disable_lineno )) \
   && pass "survivors migrate before old COPR disable" \
