@@ -1,5 +1,7 @@
 echo "Move zram tuning to a vendor drop-in"
 
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 zram_conf="${OMARCHY_ZRAM_CONF:-/etc/systemd/zram-generator.conf}"
 zram_dropin="${OMARCHY_ZRAM_DROPIN:-/usr/lib/systemd/zram-generator.conf.d/90-omarchy.conf}"
 
