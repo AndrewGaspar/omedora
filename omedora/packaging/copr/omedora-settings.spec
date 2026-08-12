@@ -44,7 +44,7 @@
 Name:           omedora-settings
 # Version is normally read from the repo's omedora/version file; hardcoded here
 # for now — a follow-up wires .copr/srpm.sh to substitute it at SRPM-gen time.
-Version:        0.2.0~alpha.0
+Version:        0.2.0~beta.1
 Release:        1%{?dist}
 Summary:        Omedora pre-install settings: /etc/skel seeds, system defaults, fonts, branding
 
@@ -68,7 +68,7 @@ Provides:       omarchy-settings = %{version}-%{release}
 # Supersedes the stand-alone session-entry package hyprland-omedora (which
 # shipped only /usr/share/wayland-sessions/omedora.desktop — now part of this
 # payload). NOTE: the obsoleted version is hardcoded at the last published
-# hyprland-omedora (1.0.0), NOT `< %%{version}`: our 0.2.0~alpha.0 sorts BELOW
+# hyprland-omedora (1.0.0), NOT `< %%{version}`: our 0.2.0~beta.1 sorts BELOW
 # 1.0.0, so a %%{version}-based Obsoletes would never fire against an installed
 # hyprland-omedora-1.0.0.
 Provides:       hyprland-omedora = %{version}-%{release}
@@ -369,6 +369,10 @@ desktop-file-validate %{buildroot}%{_datadir}/wayland-sessions/omedora.desktop
 %config(noreplace) %{_sysconfdir}/systemd/system/user@.service.d/10-faster-shutdown.conf
 
 %changelog
+* Wed Aug 12 2026 omedora <noreply@omedora> - 0.2.0~beta.1-1
+- Refresh the package-backed defaults for the current Quattro beta branch.
+- Continue providing the stable Omedora session beside optional Omedora XR.
+
 * Thu Jun 11 2026 omedora <noreply@omedora> - 0.2.0~alpha.0-1
 - Initial Fedora analogue of upstream's omarchy-settings Arch package,
   transliterated from docs/file-layout.md's build-time map.
