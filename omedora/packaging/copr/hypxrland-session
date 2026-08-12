@@ -1,0 +1,31 @@
+#!/bin/bash
+
+set -euo pipefail
+
+config="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland-xr.conf"
+
+if [[ ! -r $config ]]; then
+  echo "hypxrland-session: XR configuration is not readable: $config" >&2
+  echo "Create it as an OpenXR layer over your normal hyprland.conf before starting Omedora XR." >&2
+  exit 1
+fi
+
+# Export this before `uwsm start`: uwsm imports the caller's environment into
+# the systemd user manager, so XR-aware user services can distinguish this
+# session from the stable Hyprland fallback.
+export HYPXRLAND_SESSION=1
+
+# Select the packaged VA-API decode gate for XR applications. A dedicated
+# override variable keeps local shim development possible without allowing a
+# stale global LIBVA_DRIVERS_PATH to bypass the packaged default accidentally.
+export LIBVA_DRIVER_NAME=hypxr
+export LIBVA_DRIVERS_PATH="${HYPXRVA_DRIVERS_PATH:-/usr/lib64/hypxrva}"
+
+# Keep the standard Hyprland desktop identity for portals and application
+# behavior while giving uwsm a distinct compositor name. The stock 0.56.1
+# watchdog accepts --path, so it can supervise the private HypXRland binary
+# without installing a conflicting start-hyprland executable.
+exec uwsm start -g -1 -e -N HypXRland -D Hyprland -- \
+  /usr/bin/start-hyprland \
+  --path /usr/libexec/hypxrland/Hyprland \
+  -- --config "$config"

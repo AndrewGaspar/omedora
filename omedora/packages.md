@@ -211,28 +211,51 @@ Notes:
 
 ## 4. The RPM/COPR tier (`omedora/packaging/copr/`)
 
-This is how omedora installs the apps that have **no Fedora, RPM Fusion, vetted-COPR, or Flathub home** — walker, elephant, swayosd, `tte`, the Nerd Fonts. Rather than vendor a shell installer (the [retired](#1-the-package-source-tiers) approach), we build each one as a proper **RPM** and serve it from a dnf repo. In `fedora.toml` these are plain `source = "dnf"` entries pointing at the RPM `names`; everything downstream (dependency resolution, clean upgrade/remove) is ordinary dnf.
+This is how omedora installs the apps that have **no Fedora, RPM Fusion, vetted-COPR, or Flathub home** — walker, elephant, swayosd, `tte`, the Nerd Fonts, and the Hyprland/HypXRland compositor packages. Rather than vendor a shell installer (the [retired](#1-the-package-source-tiers) approach), we build each one as a proper **RPM** and serve it from a dnf repo. In `fedora.toml` these are plain `source = "dnf"` entries pointing at the RPM `names`; everything downstream (dependency resolution, clean upgrade/remove) is ordinary dnf.
 
 The specs and build scripts live in `omedora/packaging/copr/`. The directory is named for its destination: these specs are bound for a **published COPR** eventually. Until then a **local dnf repo** built from the same specs stands in (see [§5](#5-how-the-omedora-repo-is-injected-at-build-time)). Because we build with the exact same spec + toolchain a COPR uses (a `fedora:44` container), a spec that builds locally builds on COPR.
 
 ### Spec conventions
 
-Each `.spec` is a single RPM. Three flavors, by how the upstream ships:
+Each `.spec` is a single RPM. Four flavors, by how the upstream ships:
 
 | Flavor | When | Example specs | How it works |
 | --- | --- | --- | --- |
 | **Binary-repackage** | Upstream ships a prebuilt release binary | `walker.spec`, `elephant.spec`, `omedora-nerd-fonts.spec` | No `%build`; `%install` just drops the prebuilt binary/asset into place. Disable debuginfo + strip (`%global debug_package %{nil}` / `%global __os_install_post %{nil}`) since there's no source to process — important for `elephant`, whose Go plugins fail to load if stripped. The payoff over a raw installer: dnf tracking + `Requires:` pulling deps (e.g. `walker` → `gtk4-layer-shell`, `elephant` → `libqalculate`). |
+| **From-source (CMake/C++)** | Upstream is a native project | `hyprland.spec`, `hypxrland.spec` | Builds against the vendored Hyprland library wave. HypXRland additionally pins an immutable rolling commit plus every omitted submodule/source archive and makes OpenXR + the Vulkan GPU probe mandatory. |
 | **From-source (meson/cargo)** | Upstream ships no binaries; it's a compiled project | `swayosd.spec`, `satty.spec`, `bluetui.spec` | A real `%build`: e.g. SwayOSD is Rust whose `meson` build wraps `cargo build`. `BuildRequires:` names the full toolchain (cargo/rust + the C `-devel` libs the `-sys` crates link). Hermetic/offline: the build runs against a `cargo vendor` tarball (an extra `Source`) generated at SRPM-gen time from upstream's committed `Cargo.lock` (see [Hermetic vendored build](#hermetic-vendored-build) below), so the build phase never touches crates.io. |
 | **From-source (Python pyproject)** | A Python project | `terminaltexteffects.spec` | Uses Fedora's `pyproject-rpm-macros`: `%pyproject_buildrequires` derives build deps, `%pyproject_wheel`/`%pyproject_install`/`%pyproject_save_files` build and capture the wheel + console scripts (`tte`). `BuildArch: noarch`. The only network fetch is the PyPI sdist. The most hermetic of the three. |
 
 Conventions shared across specs: `Source0:` uses macros (`%{url}`, `%{version}`, `%{pypi_source}`) so URLs stay in sync with `Version:`; `spectool -g` (run by the build script) downloads every `SourceN`; the header comment explains *why* this flavor was chosen. Keep the `%changelog` and `Version:` current when bumping.
+
+HypXRland is intentionally additive. `hypxrland` installs its rolling compositor only as `/usr/libexec/hypxrland/Hyprland` plus the `hypxrland-session` launcher; it does not own the stable package's `/usr/bin/Hyprland`, `hyprctl`, watchdog, headers, shared assets, or session entries. `hypxrland-omedora` owns the separate `Omedora XR` wayland-session entry and requires `hyprland-omedora`, guaranteeing that the ordinary `Omedora` session remains available as the fallback. The rolling EVR is `<Hyprland base>^<UTC snapshot>.git<commit>`; each update changes the commit, snapshot sequence, changelog, and source-integrity pins together.
+
+#### Complete HypXRland package set
+
+The compositor is only one part of a useful XR session. The Fedora 44/Omedora 3 package topology is:
+
+| Package | Role | Install policy |
+| --- | --- | --- |
+| `hypxrland` | Parallel compositor at `/usr/libexec/hypxrland/Hyprland`; package-owned session launcher | Mandatory |
+| `wivrn-hypxr` | HypXR-patched WiVRn 26.6.2 server and OpenXR runtime | Mandatory; replaces another WiVRn server package because the standard paths overlap |
+| `hypxrvoice` + `hypxrvoice-model-base-en` | Local voice daemon/control client and checksum-pinned Whisper model | Mandatory; the packaged fallback config remains dry-run |
+| `hypxrhud` | Shared D-Bus-activated HUD and battery publisher | Mandatory |
+| `hypxrva` | Private VA-API decode-gating shim, watcher, and probe | Mandatory; selected only by the XR launcher |
+| `hypxrpaper` | Ambient OpenXR background client and bundled forest scene | Mandatory |
+| `monado-xreal` | XREAL Air driver plus real Wayland/direct compositor | Optional hardware add-on; private paths and IPC socket coexist with WiVRn |
+| `hypxrland-stack` | Dependency-only package for all mandatory rows | Installed by the branded session package |
+| `hypxrland-omedora` | `Omedora XR` desktop entry | User-facing install target; also requires stable `hyprland-omedora` |
+
+Every rolling source uses an immutable public commit and a `.spec.sources` SHA-256 list. Components without an upstream semantic version use `0^<UTC commit date>.<sequence>.git<short commit>`; WiVRn and Monado prefix the same snapshot suffix with their upstream base version. The model is versioned independently as data. `build-repo.sh` is the authoritative dependency order and `copr-submit.sh` consumes that same array.
+
+The RPMs own only system package paths. They do not replace `~/.config/hypr/hyprland-xr.conf`, WiVRn pairing/config state, voice intent rules, or machine-specific GPU/connector overrides. A source-tree setup must replace hard-coded build paths with the package paths listed by `/usr/share/doc/hypxrland-stack/README`. The current public `hypxrvoice` pin also intentionally stops before local uncommitted intent changes; those must land publicly before a later snapshot can package them.
 
 ### Build scripts
 
 | Script | What it does |
 | --- | --- |
 | `build-local.sh <name.spec>` | Builds **one** spec via `rpmbuild -ba` inside a throwaway `registry.fedoraproject.org/fedora:44` container (our dev host is Arch and has no `rpmbuild`). Installs `rpm-build`/`rpmdevtools`, runs `dnf builddep` for the spec's `BuildRequires`, `spectool -g`'s the sources, builds. Artifacts (the `.rpm` + `.src.rpm`) land in `omedora/packaging/copr/output/`. |
-| `build-repo.sh` | Builds **all** specs (its `SPECS=(...)` array — currently `walker elephant omedora-nerd-fonts swayosd terminaltexteffects`) by looping `build-local.sh`, then runs `createrepo_c` over the binary RPMs to assemble a ready-to-serve dnf repo in `omedora/packaging/copr/repo/`. This `repo/` is the local-repo COPR stand-in. |
+| `build-repo.sh` | Builds **all** specs in its canonical `SPECS=(...)` array by looping `build-local.sh`, then runs `createrepo_c` over the binary RPMs to assemble a ready-to-serve dnf repo in `omedora/packaging/copr/repo/`. This `repo/` is the local-repo COPR stand-in; `copr-submit.sh` parses the same array to preserve dependency order remotely. |
 
 `output/` and `repo/` are **gitignored** (`omedora/packaging/copr/.gitignore`) — they're build products, rebuilt on demand. Only the specs and scripts are tracked.
 

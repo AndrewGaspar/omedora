@@ -50,6 +50,17 @@ SPECS=(
   # hyprland-no-session + uwsm (both built above); no build-time deps. Ships
   # /usr/share/wayland-sessions/omedora.desktop (was a Fedora-gated sudo-cp).
   hyprland-omedora.spec
+  # HypXRland's complete rolling stack. The leaf components precede consumers:
+  # voice BuildRequires/runs against HUD + the model package, while the stack
+  # meta-package follows every mandatory runtime. monado-xreal is built and
+  # published too, but remains only a Suggests because it is hardware-specific.
+  hypxrpaper.spec hypxrva.spec hypxrhud.spec
+  hypxrvoice-model-base-en.spec hypxrvoice.spec
+  wivrn-hypxr.spec monado-xreal.spec
+  # The fork installs its compositor under /usr/libexec so both binaries remain
+  # available. The branded session pulls the complete stack and also Requires
+  # the stable Omedora session, guaranteeing a fallback in the greeter.
+  hypxrland.spec hypxrland-stack.spec hypxrland-omedora.spec
   # claude-code.spec is intentionally NOT built here — parked pending a
   # redistribution-licensing decision before any public COPR (proprietary binary).
 )
