@@ -1,5 +1,7 @@
 echo "Give SSH commands the user-level tool paths via the PAM environment"
 
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # SSH commands (ssh host cmd) run without a login or interactive shell, so the
 # PAM environment is the only place they can inherit PATH from. Same line that
 # install/config/ssh-command-path.sh writes on fresh installs; skip if PATH is

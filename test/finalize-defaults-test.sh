@@ -3,7 +3,7 @@
 # L1 unit tests for the finalize-user default-app gating.
 #
 # Verifies omedora's Fedora-gated "respect existing defaults" behavior in
-# bin/omarchy-finalize-user (the browser/mailto claims), while keeping the
+# bin/omarchy-provision-user (the browser/mailto claims), while keeping the
 # Arch path byte-identical to upstream omarchy:
 #
 #   - Arch:   always forces chromium.desktop + HEY.desktop (upstream parity).
@@ -12,7 +12,7 @@
 #   - Fedora, stale default pointing at an uninstalled app: claimed.
 #
 # PART 1 exercises install/user/default-apps-fedora.sh directly (the policy).
-# PART 2 runs the real bin/omarchy-finalize-user end-to-end against a fixture
+# PART 2 runs the real bin/omarchy-provision-user end-to-end against a fixture
 # OMARCHY_INSTALL whose user/all.sh is a stub, proving the dispatch wiring:
 # Fedora sources the sibling; Arch runs the upstream lines.
 #
@@ -154,7 +154,7 @@ assert_browser_forced "Fedora claims the browser when the existing default isn't
 assert_mailto_forced "Fedora claims mailto when the existing handler isn't installed"
 
 # ===========================================================================
-echo "# --- PART 2: bin/omarchy-finalize-user dispatch wiring ---"
+echo "# --- PART 2: bin/omarchy-provision-user dispatch wiring ---"
 # ===========================================================================
 # Fixture OMARCHY_INSTALL: stub user/all.sh (no theme/mise/keyring side
 # effects) + the REAL default-apps-fedora.sh, so the dispatch in the real
@@ -183,7 +183,7 @@ run_finalize() {  # $1 distro  $2 browser-get-out  $3 mailto-query-out
     rm -rf "$HOME"; mkdir -p "$HOME"
     export OMARCHY_DISTRO="$1" OMARCHY_PATH="$ROOT" OMARCHY_INSTALL="$FIXTURE"
     export MOCK_XDG_GET_OUT="$2" MOCK_XDG_GET_RC=0 MOCK_XDG_MAILTO="${3-}"
-    bash "$ROOT/bin/omarchy-finalize-user" --force
+    bash "$ROOT/bin/omarchy-provision-user" --force
   )
 }
 

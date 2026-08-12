@@ -1,5 +1,7 @@
 echo "Remember Bluetooth on and off through the rfkill soft block"
 
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 marker="${OMARCHY_BLUETOOTH_MIGRATION_MARKER:-/var/lib/omarchy/migrations/1786380259}"
 main_conf="${OMARCHY_BLUETOOTH_MAIN_CONF:-/etc/bluetooth/main.conf}"
 

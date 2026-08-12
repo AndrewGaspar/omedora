@@ -1,7 +1,7 @@
 # Omedora architecture
 
 > **Omarchy 4 port status (2026-07-03).** This branch (`omedora-4`) sits on the
-> upstream `omarchy-4` pin tag `omedora-base-20260703-omarchy4-1e996609` (upstream renamed
+> upstream `omarchy-4` pin tag `omedora-base-20260812-omarchy4-106320ab` (upstream renamed
 > the active v4 branch `omarchy-4` → `quattro`; the pin now tracks `omarchy/quattro`). Omarchy 4 is a
 > re-architecture into a package-backed distro (no `install.sh`/`boot.sh`; `omarchy` +
 > `omarchy-settings` packages; Quickshell `shell/` replaces waybar/mako/walker/elephant/
@@ -178,7 +178,7 @@ Two stages drop off on Fedora because they are entirely about owning the boot st
 
 - `install/preflight/all.sh` invokes `pacman.sh`, `migrations.sh`, `first-run-mode.sh`, `disable-mkinitcpio.sh`. On Fedora: insert `fedora-repos.sh` after `show-env.sh`, and gate `pacman.sh` and `disable-mkinitcpio.sh` behind `[[ $(omarchy-distro) == "arch" ]]` (or skip them via the `all.sh` dispatcher).
 - `install/preflight/first-run-mode.sh` keeps the unprivileged first-run marker on both distros, but its `sudo tee /etc/sudoers.d/first-run` NOPASSWD grant is **Arch-gated**. That grant exists only so Arch's privileged *post-login* finalizers (ufw firewall, resolv.conf symlink) can run in a TTY-less GUI session; on Fedora those finalizers are gated off (below), so first-run needs no sudo — and writing the drop-in would otherwise *crash the install* on a managed box with no `/etc/sudoers.d/` (the whole installer runs under `set -eEo pipefail`).
-- **Post-login first-run** (`bin/omarchy-first-run`, autostarted from `default/hypr/autostart.lua`) runs a chain of `install/first-run/*.sh` finalizers. On Fedora it is reduced to its *unprivileged, user-session* steps (swayosd/elephant/battery/gdk-scale/gtk-primary-paste/gnome-theme `gsettings`/welcome/wifi — all `systemctl --user`/`gsettings`, **zero sudo**). The Arch system-policy finalizers carry a top-of-file `[[ … == "arch" ]] || exit 0` guard: `dns-resolver.sh` (clobbers `/etc/resolv.conf` — redundant on Fedora, breaks corporate VPN/split-DNS), `firewall.sh` (pure `ufw`; firewalld is Fedora's default and `ufw` is `source=skip`), `cleanup-reboot-sudoers.sh` (removes an Arch-`post-install`-only grant), plus `gnome-theme.sh`'s `sudo gtk-update-icon-cache` line and the trailing `sudo rm /etc/sudoers.d/first-run` in `omarchy-first-run` itself. A handful of shared `config/*.sh` scripts likewise gate just their Arch-only privileged lines: `walker-elephant.sh` (the `/etc/pacman.d/hooks` restart hook) and `theme.sh` (the Yaru system-icon symlinks). The browser theme-follow policy dirs (`/etc/{chromium,brave}/policies/managed`) are still created on Fedora — they back a real feature — but **user-owned `755`** instead of world-writable `a+rw`.
+- **Post-login first-run** (`bin/omarchy-provision-first-run`, autostarted from `default/hypr/autostart.lua`) runs the current package-backed user first-run chain. Fedora keeps its unprivileged user-session steps and gates machine-wide policy migrations separately; the entry point itself remains byte-identical to upstream.
 - `install/packaging/all.sh` invokes `base.sh`, `fonts.sh`, `nvim.sh`, `icons.sh`, `webapps.sh`, `tuis.sh`, `npm.sh`, hardware-conditional installers, and the `omarchy-base.packages` glob-and-install. All of these route through `omarchy-pkg-add` and therefore work as-is once helpers are dispatching — the only adjustment is that some packages will be skipped via the map (e.g., `linux-firmware-marvell`).
 - `install/config/hardware/all.sh` invokes the long list of hardware fixes. Each script that touches `/etc/mkinitcpio.conf*` or builds Arch-specific drivers gets a one-line top-of-file guard: `[[ $(omarchy-distro) == "arch" ]] || return 0`. A few are partially portable (see [§7](#7-hardware-detection)).
 - `install/login/all.sh` and `install/post-install/all.sh` — gated off entirely at the orchestrator level. No internal changes needed.
@@ -467,7 +467,7 @@ Packages with no Fedora / RPM Fusion / vetted-COPR / Flathub home are built as *
 | `install/preflight/pacman.sh` | 1-line gate | Arch-only |
 | `install/preflight/disable-mkinitcpio.sh` | 1-line gate | Arch-only |
 | `install/preflight/first-run-mode.sh` | Arch-gate block | Keep the unprivileged marker on both; gate the `/etc/sudoers.d/first-run` NOPASSWD grant Arch-only (writing it crashes a managed box with no `/etc/sudoers.d`; Fedora first-run needs no sudo) |
-| `bin/omarchy-first-run` | Arch-gate line | Gate the trailing `sudo rm /etc/sudoers.d/first-run` Arch-only (nothing to remove on Fedora; bare `sudo` would hang in a TTY-less GUI session) |
+| `bin/omarchy-provision-first-run` | Unchanged | Current package-backed first-login entry point; all Fedora policy decisions live in dispatched leaves or migration gates |
 | `install/first-run/{dns-resolver,firewall,cleanup-reboot-sudoers}.sh` | 1-line gate | Arch-only privileged post-login finalizers (resolv.conf clobber / ufw / Arch reboot-grant cleanup); `… == "arch" || exit 0` at top |
 | `install/first-run/gnome-theme.sh` | Arch-gate line | Keep `gsettings` on both; gate only `sudo gtk-update-icon-cache` Arch-only |
 | `install/config/walker-elephant.sh` | Arch-gate block | Keep walker autostart + elephant menus on both; gate the `/etc/pacman.d/hooks` restart hook Arch-only |
@@ -636,7 +636,7 @@ This is the canonical document the rebase workflow ([`rebase-workflow.md`](rebas
 
 The Omarchy 4 base replaced `install.sh` with package-backed setup entry
 points (`omarchy-setup-system` → config/hardware/login/post-install scripts,
-`omarchy-finalize-user` → `install/user/**`, `omarchy-first-run` →
+`omarchy-provision-user` → `install/user/**`, `omarchy-provision-first-run` →
 `install/user/first-run/**`). This table records the explicit per-file Fedora
 decision for every script those entry points run. Patch types are the same as
 [§15](#15-patch-stack-map); every "Dispatch"/"Gate" is a top-of-file block and
@@ -668,11 +668,11 @@ dev/test seam that keeps running from the checkout).
 | `install/post-install/udev.sh` | Unchanged | `udevadm reload/trigger` is portable and already `|| true` |
 | `install/post-install/localdb.sh` | Unchanged | Guarded by `omarchy-cmd-present updatedb` |
 
-### `omarchy-finalize-user` (user)
+### `omarchy-provision-user` (user)
 
 | File | Decision | Why |
 | --- | --- | --- |
-| `bin/omarchy-finalize-user` | Fedora branch around the browser/mailto claims | Only-if-unset via `install/user/default-apps-fedora.sh` (3.8.2 mimetypes.sh pattern: `desktop_id_is_installed` + `xdg-settings get` / `xdg-mime query default`); Arch branch byte-identical |
+| `bin/omarchy-provision-user` | Fedora branch around the browser/mailto claims | Only-if-unset via `install/user/default-apps-fedora.sh` (3.8.2 mimetypes.sh pattern: `desktop_id_is_installed` + `xdg-settings get` / `xdg-mime query default`); Arch branch byte-identical |
 | `install/user/theme.sh` | Unchanged | `--first-install` selects the headless theme-set path; portable |
 | `install/user/git.sh` | Unchanged | Already guarded on OMARCHY_USER_NAME/EMAIL |
 | `install/user/xcompose.sh` | Fedora gate (backup-then-write) | Backs up an existing, differing `~/.XCompose` to `.pre-omedora-<ts>` first (3.8.2 gate ported); Arch path byte-identical |
@@ -681,11 +681,11 @@ dev/test seam that keeps running from the checkout).
 | `install/user/default-keyring.sh` | Unchanged | Only writes when absent |
 | `install/user/mise.sh` | Unchanged | `omarchy-mise-install` just writes `~/.local/bin` wrappers (no downloads at install time) |
 
-### `omarchy-first-run` (user, autostarted at first session)
+### `omarchy-provision-first-run` (user, autostarted at first session)
 
 | File | Decision | Why |
 | --- | --- | --- |
-| `bin/omarchy-first-run` | Unchanged (byte-identical to upstream) | Previously gated the Voxtype install hook off on Fedora (no Fedora build). voxtype now installs on demand from the omedora COPR (see `bin/fedora/voxtype-install-pkg`), so the hook is offered on Fedora like Arch — the gate was dropped and the file restored to upstream-identical |
+| `bin/omarchy-provision-first-run` | Unchanged (byte-identical to upstream) | Voxtype installs on demand from the omedora COPR (see `bin/fedora/voxtype-install-pkg`), so the hook is offered on Fedora exactly as on Arch |
 | `bin/omarchy-voxtype-remove` | **Reverted to upstream-byte-identical** | The Fedora `case` arm was removed: `omarchy-pkg-drop voxtype-bin` → `pkg.py drop` → `dnf remove voxtype`, which **cascades** to the installed `voxtype-cuda`/`voxtype-migraphx` subpackages (they `Requires: voxtype`). Its `byte-identity-test.sh` ALLOW entry was dropped |
 | `install/user/first-run/enable-user-units.sh` | Unchanged | The shipped user units come from the omedora-settings RPM; `systemctl --user` failures are tolerated by `run_first_run_step` (first-run retries next login) |
 | `install/user/first-run/gnome-theme.sh` | Arch-only gate | Same decision as 3.8.2: the theme system (`omarchy-theme-set-gnome`) owns GNOME appearance on Fedora; fixed dark hardcodes would clobber a coexisting GNOME setup |

@@ -1,5 +1,7 @@
 echo "Run the WPA handshake in software on Macs with Broadcom Wi-Fi"
 
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # This quirk targets Intel Macs. Apple Silicon uses brcmfmac too and reports
 # "Apple Inc." with a listed part (BCM4387 is 14e4:4433), but disabling its
 # firmware supplicant makes firmware commands time out and breaks scanning
