@@ -75,6 +75,11 @@ source = "dnf"
 names = ["moby-engine", "docker-cli"]
 reason = "Fedora ships moby-engine + docker-cli in main repos as the libre Docker stack. Docker CE from Docker's own repo is also an option but adds a third-party repo we don't need."
 
+[dotnet-runtime]
+source = "dnf"
+names = ["dotnet-runtime-10.0"]
+reason = "Arch's unversioned package tracks the current .NET runtime. Fedora 44 publishes parallel versioned runtimes; Quattro targets the current .NET 10 line."
+
 [libreoffice-fresh]
 source = "dnf"
 names = ["libreoffice"]
