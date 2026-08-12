@@ -6,7 +6,7 @@ the [root README](../README.md).**
 
 This is the **Omarchy 4** line of Omedora — the re-architected, package-backed
 generation with the new Quickshell shell. It tracks upstream Omarchy 4 (codename
-"quattro") and is currently **alpha**. The stable, field-tested line is
+"quattro") and is currently **beta**. The stable, field-tested line is
 [Omedora 3](https://github.com/AndrewGaspar/omedora/tree/omedora-3) (the `omedora-3`
 branch).
 
@@ -46,12 +46,12 @@ tiering rules and the review checklist for adding any new package source.
 
 ## Status
 
-**Alpha.** The Omarchy 4 port is on the **`omedora-4`** branch, rebased onto
+**Beta.** The Omarchy 4 port is on the **`omedora-4`** branch, rebased onto
 upstream Omarchy 4 ("quattro"). The fresh-install path (`omedora/install-4.sh`),
 the package-backed payload (`omedora`/`omedora-settings` RPMs), the dnf-backed
 update pipeline, and the Quickshell shell all build and run on the
 **`agaspar/omedora-4` COPR** (`fedora-44-x86_64`) and pass the L1 + L4-nested
-session suites. The first tagged alpha release is in progress.
+session suites. The first Omedora 4 beta package wave is in progress.
 
 ## License
 

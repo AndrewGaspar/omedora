@@ -1,4 +1,4 @@
-# Omedora 4 <sup>alpha</sup>
+# Omedora 4 <sup>beta</sup>
 
 **Omarchy 4, on stable Fedora.**
 
@@ -10,9 +10,9 @@ install, pick "Omedora" at the login screen, and get the Omarchy 4 experience �
 Hyprland, the new shell, the themes, the keybindings, and the `omarchy` command
 suite — running on Fedora's packages.
 
-> ### ⚠️ This is an alpha
-> The Omedora 4 line tracks upstream Omarchy 4 (codename "quattro"), which is still
-> under active development and not yet released. Expect rough edges and breaking
+> ### ⚠️ This is a beta
+> The Omedora 4 line tracks upstream Omarchy 4 (codename "quattro"), whose beta
+> branch remains under active development. Expect rough edges and breaking
 > changes. **If you want the stable, field-tested experience today, use
 > [Omedora 3](https://github.com/AndrewGaspar/omedora/tree/omedora-3)** (the
 > `omedora-3` branch) instead.
