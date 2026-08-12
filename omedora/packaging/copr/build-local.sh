@@ -56,6 +56,8 @@ echo "Building $spec in $IMAGE ..."
 podman run --rm \
   -v "$COPR_DIR:/copr:z" \
   -v "$CACHE_VOL:/var/cache/libdnf5" \
+  -e OMEDORA_BUILD_SPEC="$spec" \
+  -e OMEDORA_SELF_STAMP="$SELF_STAMP" \
   "$IMAGE" bash -euo pipefail -c '
     # rpm-build gives rpmbuild; rpmdevtools gives rpmdev-setuptree + spectool;
     # the builddep plugin installs a spec'\''s BuildRequires. keepcache=1 keeps
@@ -86,10 +88,11 @@ EOF
 
     # Standard ~/rpmbuild/{SPECS,SOURCES,RPMS,SRPMS,BUILD} tree.
     rpmdev-setuptree
-    cp "/copr/'"$spec"'" ~/rpmbuild/SPECS/
+    cp "/copr/$OMEDORA_BUILD_SPEC" ~/rpmbuild/SPECS/
     # Self-source Release stamping (see host-side SELF_STAMP above).
-    if [[ -n "'"$SELF_STAMP"'" ]]; then
-      sed -i -E "s/^(Release:[[:space:]]*[0-9]+)(%\{\?dist\})/\1.'"$SELF_STAMP"'\2/" ~/rpmbuild/SPECS/'"$spec"'
+    if [[ -n $OMEDORA_SELF_STAMP ]]; then
+      sed -i -E "s/^(Release:[[:space:]]*[0-9]+)(%\{\?dist\})/\1.${OMEDORA_SELF_STAMP}\2/" \
+        "$HOME/rpmbuild/SPECS/$OMEDORA_BUILD_SPEC"
     fi
 
     # Stage any LOCAL (non-URL) Source files the spec references — e.g.
@@ -97,20 +100,25 @@ EOF
     # fetches URL sources, so these plain filenames must be copied in by hand
     # (a COPR uploads them alongside the spec). We match SourceN: lines whose
     # value has no "://" and copy the matching sibling file from /copr.
-    grep -iE "^Source[0-9]*:" /copr/'"$spec"' | sed -E "s/^[^:]+:[[:space:]]*//" | while read -r src; do
+    grep -iE "^Source[0-9]*:" "/copr/$OMEDORA_BUILD_SPEC" | sed -E "s/^[^:]+:[[:space:]]*//" | while read -r src; do
       case "$src" in
         *://*) : ;;                                  # URL — spectool fetches it
         *) if [[ -f "/copr/$src" ]]; then cp "/copr/$src" ~/rpmbuild/SOURCES/; fi ;;
       esac
     done || true   # the loop must never trip set -e (a URL-only spec is normal)
 
+    # Stage local PatchN files too; rpmbuild expects them in SOURCES/.
+    grep -iE "^Patch[0-9]*:" "/copr/$OMEDORA_BUILD_SPEC" | sed -E "s/^[^:]+:[[:space:]]*//" | while read -r patch_file; do
+      [[ -f "/copr/$patch_file" ]] && cp "/copr/$patch_file" "$HOME/rpmbuild/SOURCES/"
+    done || true
+
     # Install the spec'\''s BuildRequires (e.g. systemd-rpm-macros for
     # %%{_userunitdir}, or just-built sibling -devel packages). A COPR does this
     # step for you.
-    dnf builddep -y --setopt=keepcache=1 ~/rpmbuild/SPECS/'"$spec"' >/dev/null
+    dnf builddep -y --setopt=keepcache=1 "$HOME/rpmbuild/SPECS/$OMEDORA_BUILD_SPEC" >/dev/null
 
     # Download every Source0/SourceN URL declared in the spec into SOURCES/.
-    spectool -g -R ~/rpmbuild/SPECS/'"$spec"'
+    spectool -g -R "$HOME/rpmbuild/SPECS/$OMEDORA_BUILD_SPEC"
 
     # INTEGRITY GATE: verify each just-fetched remote source against its
     # committed sha256 pin BEFORE we build, so an upstream tarball/binary that
@@ -123,7 +131,7 @@ EOF
     # per-crate checksums already anchor it to this pinned Source0'\''s Cargo.lock.
     # A spec with no .sources file is skipped (safety net; all remote-source
     # specs ship one). See OMEDORA-SOURCES.md for the format + re-pin workflow.
-    sources_pin="/copr/'"$spec"'.sources"
+    sources_pin="/copr/$OMEDORA_BUILD_SPEC.sources"
     if [[ -f "$sources_pin" ]]; then
       echo "==> Verifying fetched sources against $(basename "$sources_pin")"
       while read -r want_hash want_file; do
@@ -165,11 +173,11 @@ EOF
     #
     # Generic + guarded: act only for a *-vendor.tar.* SourceN that is NOT
     # already in SOURCES/, so non-Rust specs are untouched.
-    grep -iE "^Source[0-9]*:" /copr/'"$spec"' | sed -E "s/^[^:]+:[[:space:]]*//" | while read -r src; do
+    grep -iE "^Source[0-9]*:" "/copr/$OMEDORA_BUILD_SPEC" | sed -E "s/^[^:]+:[[:space:]]*//" | while read -r src; do
       case "$src" in
         *-vendor.tar.*)
           # Resolve %{name}/%{version} macros in the SourceN value.
-          read -r nv_name nv_version < <(rpmspec -q --srpm --qf "%{name} %{version}\n" /copr/'"$spec"')
+          read -r nv_name nv_version < <(rpmspec -q --srpm --qf "%{name} %{version}\n" "/copr/$OMEDORA_BUILD_SPEC")
           vendor_tar="$HOME/rpmbuild/SOURCES/${nv_name}-${nv_version}-vendor.tar.zst"
           [[ -f "$vendor_tar" ]] && continue   # already present — nothing to do
           echo "==> Generating vendor tarball: $(basename "$vendor_tar")"
@@ -178,25 +186,66 @@ EOF
           work=$(mktemp -d)
           # Resolve Source0 from the macro-expanded spec; SOURCES/ holds it under
           # its URL basename (what spectool -g fetched it as).
-          src0=$(rpmspec -P /copr/'"$spec"' | sed -nE "s/^Source0:[[:space:]]*//p" | head -n1)
+          src0=$(rpmspec -P "/copr/$OMEDORA_BUILD_SPEC" | sed -nE "s/^Source0:[[:space:]]*//p" | head -n1)
           src0_file="$HOME/rpmbuild/SOURCES/$(basename "$src0")"
           tar -C "$work" -xf "$src0_file"
           topdir=$(find "$work" -mindepth 1 -maxdepth 1 -type d | head -n1)
-          # `cargo vendor` reads the committed Cargo.lock. We do NOT pass
-          # --locked: swayosd'\''s lock pins its own root version (0.3.0) below its
-          # Cargo.toml (0.3.1), which --locked rejects; the lock still governs
-          # the dependency set (the self-version rewrite is a dep-set no-op).
-          ( cd "$topdir" && cargo vendor vendor >/dev/null )
+          # Keep the release lock immutable. SwayOSD is the one historical
+          # exception: its lock pins its own root version below Cargo.toml,
+          # which --locked rejects without changing the dependency set.
+          vendor_dir=vendor
+          [[ -d "$topdir/vendor/portable-pty" ]] && vendor_dir=cargo-vendor
+          if [[ $nv_name == "swayosd" ]]; then
+            ( cd "$topdir" && cargo vendor "$vendor_dir" >/dev/null )
+          else
+            ( cd "$topdir" && cargo vendor --locked "$vendor_dir" >/dev/null )
+          fi
           # Tar reproducibly (normalized metadata) so re-runs are byte-identical.
           tar --sort=name --mtime="@0" --owner=0 --group=0 --numeric-owner \
-            -C "$topdir" -caf "$vendor_tar" vendor
+            -C "$topdir" -caf "$vendor_tar" "$vendor_dir"
+          rm -rf "$work"
+          ;;
+      esac
+    done
+
+    # Herdr embeds libghostty-vt, whose Zig package manager must also be sealed
+    # before mock'\''s offline build. A *-zig-cache.tar.* Source requests a
+    # deterministic Zig global cache generated with the exact pinned Zig Source2.
+    grep -iE "^Source[0-9]*:" "/copr/$OMEDORA_BUILD_SPEC" | sed -E "s/^[^:]+:[[:space:]]*//" | while read -r src; do
+      case "$src" in
+        *-zig-cache.tar.*)
+          read -r nv_name nv_version < <(rpmspec -q --srpm --qf "%{name} %{version}\n" "/copr/$OMEDORA_BUILD_SPEC")
+          zig_cache_tar="$HOME/rpmbuild/SOURCES/${nv_name}-${nv_version}-zig-cache.tar.zst"
+          [[ -f "$zig_cache_tar" ]] && continue
+          echo "==> Generating Zig dependency cache: $(basename "$zig_cache_tar")"
+          work=$(mktemp -d)
+          src0=$(rpmspec -P "/copr/$OMEDORA_BUILD_SPEC" | sed -nE "s/^Source0:[[:space:]]*//p" | head -n1)
+          src2=$(rpmspec -P "/copr/$OMEDORA_BUILD_SPEC" | sed -nE "s/^Source2:[[:space:]]*//p" | head -n1)
+          tar -C "$work" -xf "$HOME/rpmbuild/SOURCES/$(basename "$src0")"
+          tar -C "$work" -xf "$HOME/rpmbuild/SOURCES/$(basename "$src2")"
+          topdir=$(find "$work" -mindepth 1 -maxdepth 1 -type d -name "${nv_name}-*" | head -n1)
+          zigdir=$(find "$work" -mindepth 1 -maxdepth 1 -type d -name "zig-*" | head -n1)
+          patch -d "$topdir" -p1 <"/copr/herdr-libvt-only.patch"
+          mkdir -p "$topdir/zig-cache"
+          # Execute the exact graph online, then archive only Zig package
+          # sources. Compiler state may embed temp paths and is regenerated by
+          # the offline RPM build from this immutable package store.
+          ( cd "$topdir/vendor/libghostty-vt" && \
+            ZIG_GLOBAL_CACHE_DIR="$topdir/zig-cache" "$zigdir/zig" build \
+              -Demit-lib-vt -Doptimize=ReleaseFast -Dsimd=true \
+              -Dtarget=x86_64-linux-gnu -Dversion-string=0.8.0 \
+              -Demit-xcframework=false )
+          find "$topdir/zig-cache" -mindepth 1 -maxdepth 1 ! -name p \
+            -exec rm -rf -- {} +
+          tar --sort=name --mtime="@0" --owner=0 --group=0 --numeric-owner \
+            -C "$topdir" -caf "$zig_cache_tar" zig-cache
           rm -rf "$work"
           ;;
       esac
     done
 
     # -ba = build Both the binary RPM and the source RPM.
-    rpmbuild -ba ~/rpmbuild/SPECS/'"$spec"'
+    rpmbuild -ba "$HOME/rpmbuild/SPECS/$OMEDORA_BUILD_SPEC"
 
     # Hand the artifacts back to the host via the bind mount.
     cp -v ~/rpmbuild/RPMS/*/*.rpm /copr/output/ 2>/dev/null || true
