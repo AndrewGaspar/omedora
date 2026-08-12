@@ -2,21 +2,26 @@
 #
 # P6 upgrade-to-4 verification — runs INSIDE the fedora:44 test image.
 #
-# Proves bin/omedora-upgrade-to-4 against a REAL 3.8.2-line install:
+# Proves bin/omedora-upgrade-to-4 against a REAL 3.8.2-line install, including
+# an Omedora XR stack installed from the live omedora-3 COPR:
 #   1. build the FROM state: the live agaspar/omedora-3 COPR + the 3.8.2-era
 #      RPM set (hyprland-omedora, walker/elephant, swayosd, hypridle/hyprlock/
-#      hyprshot, gazelle-tui + the Fedora-proper waybar/mako/swaybg), and the
+#      hyprshot, gazelle-tui, HypXRland + its mandatory runtimes, the optional
+#      monado-xreal runtime, and the Fedora-proper waybar/mako/swaybg), and the
 #      omedora v0.1.3 git checkout at ~/.local/share/omarchy with its config
 #      seeding replayed (omedora-seed-config — what the 3.8.2 installer ran)
-#   2. plant user customizations (hypr bindings, uwsm env, xdg-terminals.list)
+#   2. plant user customizations plus representative XR configuration, pairing
+#      state, runtime selection, and machine-specific user-service drop-ins
 #   3. run bin/omedora-upgrade-to-4 (OMEDORA_PLAN_AUTOCONFIRM=1)
-#   4. assert: omedora+omedora-settings installed; retired RPMs GONE (incl.
-#      hyprland-omedora via the settings Obsoletes); the kept Hyprland stack
-#      still present; checkout -> .pre-omedora-4 backup + symlink to
-#      /usr/share/omarchy; session entry present; the hash-match matrix
-#      (refreshed/preserved/backed-up); quickshell hot-start skipped
-#      gracefully (no session here); re-run idempotent exit 0;
-#      `omarchy --help` works; the L1 suites stay green post-upgrade
+#   4. assert: omedora+omedora-settings installed; retired RPMs GONE; the
+#      stable Hyprland stack and both Omedora sessions coexist; every mandatory
+#      XR package and the opt-in Monado runtime migrated to omedora-4; the
+#      private XR compositor/hyprctl and classic-config compatibility payload
+#      landed; XR state is byte-identical except for the intentional Quattro
+#      theme-path rewrite; all XR config sources resolve; checkout ->
+#      .pre-omedora-4 backup + symlink to /usr/share/omarchy; the hash-match
+#      matrix holds; quickshell hot-start skips gracefully (no session here);
+#      re-run is idempotent; `omarchy --help` and the L1 suites stay green
 #
 # Run (host is Arch; podman, NOT docker; TMPDIR=/var/tmp/podman-tmp):
 #   podman run --rm -v "$PWD:/repo" \
@@ -28,6 +33,21 @@ set -e
 REPO="${REPO:-/repo}"
 USER_NAME=omedora
 USER_HOME=/home/$USER_NAME
+from_repo_args=()
+if [[ -n ${OMEDORA_UPGRADE_LOCAL_REPO:-} ]]; then
+  from_repo_args+=("--disablerepo=$OMEDORA_UPGRADE_LOCAL_REPO")
+fi
+xr_v4_packages=(
+  hypxrpaper hypxrva hypxrhud
+  hypxrvoice hypxrvoice-model-base-en
+  wivrn-hypxr hypxrland-legacy-config
+  hypxrland hypxrland-stack hypxrland-omedora
+)
+xr_o3_packages=(
+  hypxrpaper hypxrva hypxrhud
+  hypxrvoice hypxrvoice-model-base-en
+  wivrn-hypxr hypxrland hypxrland-stack hypxrland-omedora
+)
 
 n=0; failed=0
 ok()  { n=$((n+1)); echo "ok $n - $1"; }
@@ -47,12 +67,16 @@ echo "# --- FROM state: a 3.8.2-line omedora v0.1.3 install ---"
 timeout 300 dnf -y copr enable agaspar/omedora-3 >/tmp/from-repos.log 2>&1 \
   || bail "could not enable the omedora-3 COPR ($(tail -2 /tmp/from-repos.log))"
 
-# The 3.8.2-era package set this scenario asserts retirement on. COPR tier
-# (hyprland-omedora pulls hyprland-no-session + uwsm + the vendored libs,
-# exactly like a real v0.1.x install) + the Fedora-proper extras.
+# The 3.8.2-era package set this scenario asserts retirement or migration on.
+# hyprland-omedora pulls hyprland-no-session + uwsm + the vendored stable
+# stack. hypxrland-omedora pulls the mandatory XR stack; monado-xreal remains
+# an explicit, hardware-specific opt-in. The remaining packages are the
+# Fedora-proper extras from a real v0.1.x install.
 timeout 1800 dnf install -y --setopt=install_weak_deps=False \
+  "${from_repo_args[@]}" \
   hyprland-omedora walker elephant swayosd hypridle hyprlock hyprshot \
-  gazelle-tui waybar mako swaybg >/tmp/from-pkgs.log 2>&1 \
+  gazelle-tui waybar mako swaybg hypxrland-omedora monado-xreal \
+  >/tmp/from-pkgs.log 2>&1 \
   || bail "could not install the 3.8.2-era package set ($(tail -3 /tmp/from-pkgs.log))"
 echo "from-state packages installed"
 
@@ -76,15 +100,64 @@ if [[ $- == *i* && -r ~/.local/share/omarchy/default/bash/rc ]]; then
 fi
 # <<< omedora <<<
 EOF
-  # User customizations the upgrade must preserve:
+  # User customizations the upgrade must preserve.
   printf "\n# my custom binds\nbind = SUPER, Z, exec, true\n" >> ~/.config/hypr/bindings.conf
   printf "export MY_CUSTOM_VAR=keep-me\n" >> ~/.config/uwsm/env
   printf "my-custom-terminal.desktop\n" > ~/.config/xdg-terminals.list
+
+  # A standalone classic-hyprlang XR entry point. Quattro intentionally
+  # rewrites only the legacy theme-state source; the package-provided classic
+  # defaults remain reachable through the ~/.local/share/omarchy symlink.
+  cat > ~/.config/hypr/hyprland-xr.conf <<"EOF"
+source = ~/.local/share/omarchy/default/hypr/envs.conf
+source = ~/.local/share/omarchy/default/hypr/autostart.conf
+source = ~/.config/omarchy/current/theme/hyprland.conf
+source = ~/.config/hypr/bindings.conf
+openxr {
+  enabled = true
+}
+EOF
+
+  # Representative XR user and machine state. RPM transitions must not edit
+  # pairing keys, runtime selection, voice/HUD setup, or service overrides.
+  mkdir -p \
+    ~/.config/hypxr ~/.config/hypxrvoice ~/.config/hypxrhud \
+    ~/.config/wivrn ~/.config/openxr/1 \
+    ~/.config/systemd/user/wivrn.service.d \
+    ~/.config/systemd/user/monado-xreal.service.d \
+    ~/.xr-pre-omedora-4
+  printf "GPU_DEVICE=/dev/dri/renderD128\n" > ~/.config/hypxr/setup.env
+  printf "[intent]\nbackend = \"rules\"\n" > ~/.config/hypxrvoice/config.toml
+  printf "anchor = \"desk\"\n" > ~/.config/hypxrhud/hypxrhud.toml
+  printf "{\"encoder\":\"vaapi\"}\n" > ~/.config/wivrn/config.json
+  printf "{\"headset\":\"paired-key\"}\n" > ~/.config/wivrn/known_keys.json
+  printf "{\"runtime\":\"wivrn\"}\n" > ~/.config/openxr/1/active_runtime.json
+  printf "[Service]\nEnvironment=LIBVA_DRIVER_NAME=radeonsi\n" \
+    > ~/.config/systemd/user/wivrn.service.d/override.conf
+  printf "[Service]\nEnvironment=VK_ICD_FILENAMES=/machine/icd.json\n" \
+    > ~/.config/systemd/user/monado-xreal.service.d/override.conf
+
+  for rel in \
+    .config/hypr/hyprland-xr.conf \
+    .config/hypxr/setup.env \
+    .config/hypxrvoice/config.toml \
+    .config/hypxrhud/hypxrhud.toml \
+    .config/wivrn/config.json \
+    .config/wivrn/known_keys.json \
+    .config/openxr/1/active_runtime.json \
+    .config/systemd/user/wivrn.service.d/override.conf \
+    .config/systemd/user/monado-xreal.service.d/override.conf; do
+    mkdir -p "$HOME/.xr-pre-omedora-4/$(dirname "$rel")"
+    cp "$HOME/$rel" "$HOME/.xr-pre-omedora-4/$rel"
+  done
 ' || bail "could not build the v0.1.3 user state"
 echo "v0.1.3 checkout + config seeding in place"
 
 check "FROM: walker installed" rpm -q walker
 check "FROM: hyprland-omedora installed" rpm -q hyprland-omedora
+for package in "${xr_o3_packages[@]}" monado-xreal; do
+  check "FROM: XR package installed: $package" rpm -q "$package"
+done
 check "FROM: checkout is a git tree" test -d "$USER_HOME/.local/share/omarchy/.git"
 check "FROM: seeded waybar config present" test -f "$USER_HOME/.config/waybar/config.jsonc"
 
@@ -105,6 +178,14 @@ echo "# --- assertions ---"
 
 check "omedora installed" rpm -q omedora
 check "omedora-settings installed" rpm -q omedora-settings
+[[ $(rpm -q --qf '%{VERSION}' omedora 2>/dev/null) == "0.2.0~beta.1" ]] \
+  && ok "Omedora core migrated to the Quattro beta package" \
+  || nok "Omedora core migrated to the Quattro beta package" \
+    "version: $(rpm -q --qf '%{VERSION}' omedora 2>/dev/null || true)"
+[[ $(rpm -q --qf '%{VERSION}' omedora-settings 2>/dev/null) == "0.2.0~beta.1" ]] \
+  && ok "Omedora settings migrated to the Quattro beta package" \
+  || nok "Omedora settings migrated to the Quattro beta package" \
+    "version: $(rpm -q --qf '%{VERSION}' omedora-settings 2>/dev/null || true)"
 
 for p in walker elephant swayosd hypridle hyprlock hyprshot gazelle-tui \
          waybar mako swaybg hyprland-omedora; do
@@ -118,6 +199,49 @@ check "kept: hyprland-no-session still installed" rpm -q hyprland-no-session
 check "kept: uwsm still installed" rpm -q uwsm
 check "new base dep installed: quickshell" rpm -q quickshell
 check "new base dep installed: foot" rpm -q foot
+
+# Every mandatory XR leaf/meta/session package must remain installed and be
+# resolvable with the old COPR disabled. Equal-NEVR leaves can legitimately
+# retain their original from_repo provenance after `dnf install`; the packages
+# with Omedora 4 payload changes are checked separately by their bumped release.
+# monado-xreal was explicitly installed in FROM and must survive by the same
+# mechanism even though it remains optional for fresh installs.
+for package in "${xr_v4_packages[@]}" monado-xreal; do
+  if ! rpm -q "$package" >/dev/null 2>&1; then
+    nok "XR package survives: $package"
+    continue
+  fi
+  ok "XR package survives: $package"
+  available_names=$(dnf repoquery --available --queryformat '%{name}\n' \
+    "$package" 2>/dev/null || true)
+  if grep -qxF "$package" <<<"$available_names"; then
+    ok "XR package resolves with omedora-3 disabled: $package"
+  else
+    nok "XR package resolves with omedora-3 disabled: $package"
+  fi
+done
+
+for package in \
+  hypxrland hypxrvoice monado-xreal hypxrland-stack hypxrland-omedora; do
+  package_release=$(rpm -q --qf '%{RELEASE}' "$package" 2>/dev/null || true)
+  package_release_number=${package_release%%[^0-9]*}
+  if [[ -n $package_release_number ]] && (( package_release_number >= 2 )); then
+    ok "$package has the Omedora 4 release ($package_release)"
+  else
+    nok "$package has the Omedora 4 release" \
+      "release: ${package_release:-not installed}"
+  fi
+done
+check "HypXRland owns the private compositor" \
+  rpm -qf /usr/libexec/hypxrland/Hyprland
+check "HypXRland owns the private XR-aware hyprctl" \
+  rpm -qf /usr/libexec/hypxrland/hyprctl
+check "stable hyprctl remains installed" test -x /usr/bin/hyprctl
+check "private XR-aware hyprctl is installed" test -x /usr/libexec/hypxrland/hyprctl
+[[ $(rpm -qf /usr/libexec/hypxrland/hyprctl 2>/dev/null) == hypxrland-* ]] \
+  && ok "private XR-aware hyprctl owner is hypxrland" \
+  || nok "private XR-aware hyprctl owner is hypxrland" \
+    "owner: $(rpm -qf /usr/libexec/hypxrland/hyprctl 2>&1 || true)"
 
 # The computed retired list came from dnf repoquery from_repo, not the fallback.
 if grep -q "probing the known 3.8.2-era" /tmp/upgrade.log; then
@@ -135,7 +259,23 @@ backup_dir=$(compgen -G "$USER_HOME/.local/share/omarchy.pre-omedora-4-*.bak" | 
   && ok "checkout backup beside it (with .git): ${backup_dir##*/}" \
   || nok "checkout backup beside it (with .git)"
 
-check "GDM session entry present" test -f /usr/share/wayland-sessions/omedora.desktop
+check "stable Omedora GDM session entry present" \
+  test -f /usr/share/wayland-sessions/omedora.desktop
+check "Omedora XR GDM session entry present" \
+  test -f /usr/share/wayland-sessions/omedora-xr.desktop
+grep -qx 'Name=Omedora' /usr/share/wayland-sessions/omedora.desktop \
+  && ok "stable session remains named Omedora" \
+  || nok "stable session remains named Omedora"
+grep -qx 'Name=Omedora XR' /usr/share/wayland-sessions/omedora-xr.desktop \
+  && ok "XR session is named Omedora XR" \
+  || nok "XR session is named Omedora XR"
+grep -qx 'Exec=/usr/bin/hypxrland-session' /usr/share/wayland-sessions/omedora-xr.desktop \
+  && ok "XR session uses the packaged launcher" \
+  || nok "XR session uses the packaged launcher"
+check "legacy classic env config present" \
+  test -f /usr/share/omarchy/default/hypr/envs.conf
+check "legacy classic autostart config present" \
+  test -f /usr/share/omarchy/default/hypr/autostart.conf
 check "omarchy payload present" test -d /usr/share/omarchy/shell
 
 # The hash-match matrix on real files.
@@ -163,6 +303,48 @@ compgen -G "$USER_HOME/.config/waybar.pre-omedora-4-*.bak" >/dev/null \
 grep -q ">>> omedora >>>" "$USER_HOME/.bashrc" \
   && ok "~/.bashrc untouched (sentinel block intact)" \
   || nok "~/.bashrc untouched (sentinel block intact)"
+
+# XR state stays byte-identical, except that hyprland-xr.conf follows Quattro's
+# intentional move of the active theme from ~/.config to ~/.local/state.
+for xr_rel in \
+  .config/hypxr/setup.env \
+  .config/hypxrvoice/config.toml \
+  .config/hypxrhud/hypxrhud.toml \
+  .config/wivrn/config.json \
+  .config/wivrn/known_keys.json \
+  .config/openxr/1/active_runtime.json \
+  .config/systemd/user/wivrn.service.d/override.conf \
+  .config/systemd/user/monado-xreal.service.d/override.conf; do
+  cmp -s "$USER_HOME/$xr_rel" "$USER_HOME/.xr-pre-omedora-4/$xr_rel" \
+    && ok "XR state preserved byte-for-byte: $xr_rel" \
+    || nok "XR state preserved byte-for-byte: $xr_rel"
+done
+
+xr_expected=$(mktemp)
+sed 's|~/.config/omarchy/current|~/.local/state/omarchy/current|g' \
+  "$USER_HOME/.xr-pre-omedora-4/.config/hypr/hyprland-xr.conf" >"$xr_expected"
+cmp -s "$USER_HOME/.config/hypr/hyprland-xr.conf" "$xr_expected" \
+  && ok "XR config changed only by the intended theme-path rewrite" \
+  || nok "XR config changed only by the intended theme-path rewrite" \
+    "$(diff -u "$xr_expected" "$USER_HOME/.config/hypr/hyprland-xr.conf" || true)"
+xr_config_backup=$(compgen -G \
+  "$USER_HOME/.config/hypr/hyprland-xr.conf.pre-omedora-4-*.bak" | head -1)
+[[ -n $xr_config_backup ]] && \
+  cmp -s "$xr_config_backup" \
+    "$USER_HOME/.xr-pre-omedora-4/.config/hypr/hyprland-xr.conf" \
+  && ok "pre-rewrite XR config was backed up byte-for-byte" \
+  || nok "pre-rewrite XR config was backed up byte-for-byte"
+
+while IFS= read -r xr_source; do
+  xr_source=${xr_source/#\~/$USER_HOME}
+  if [[ -r $xr_source ]]; then
+    ok "XR config source resolves: $xr_source"
+  else
+    nok "XR config source resolves: $xr_source"
+  fi
+done < <(sed -n \
+  's/^[[:space:]]*source[[:space:]]*=[[:space:]]*//p' \
+  "$USER_HOME/.config/hypr/hyprland-xr.conf")
 
 # No graphical session in the container: step 9 must skip gracefully.
 grep -q "No live Hyprland session" /tmp/upgrade.log \
