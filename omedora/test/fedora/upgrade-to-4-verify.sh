@@ -225,9 +225,12 @@ check "kept: uwsm still installed" rpm -q uwsm
   || nok "Quickshell matches the Quattro beta snapshot" \
     "version: $(rpm -q --qf '%{VERSION}' quickshell 2>/dev/null || true)"
 check "new base dep installed: foot" rpm -q foot
-for package in vips-tools omacalc ttfx herdr; do
+for package in dotnet-runtime-10.0 vips-tools omacalc ttfx herdr; do
   check "new Quattro base dep installed: $package" rpm -q "$package"
 done
+dotnet --list-runtimes 2>/dev/null | grep -qE '^Microsoft\.NETCore\.App 10\.' \
+  && ok ".NET 10 runtime is functional" \
+  || nok ".NET 10 runtime is functional" "$(dotnet --list-runtimes 2>&1 || true)"
 if rpm -q python3-terminaltexteffects >/dev/null 2>&1; then
   nok "ttfx retires python3-terminaltexteffects" "$(rpm -q python3-terminaltexteffects)"
 else
