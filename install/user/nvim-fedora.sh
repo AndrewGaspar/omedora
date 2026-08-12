@@ -1,7 +1,7 @@
 # Fedora-only: bootstrap omarchy's Neovim config (LazyVim starter + omarchy
 # overrides) on the user's networked machine.
 #
-# Sourced from bin/omarchy-finalize-user's Fedora branch. On Arch this is NOT
+# Sourced from bin/omarchy-provision-user's Fedora branch. On Arch this is NOT
 # run: the omarchy-nvim package seeds ~/.config/nvim via /etc/skel (its build
 # bakes the plugin cache + ships omarchy-nvim-setup), which omedora doesn't
 # touch. This is the Fedora sibling for that path.

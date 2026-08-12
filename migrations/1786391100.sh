@@ -1,5 +1,7 @@
 echo "Run the WPA handshake in software on Macs with Broadcom Wi-Fi"
 
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # The install-time quirk only reaches machines set up after it shipped, and it
 # never covered Macs without a T2 at all, so an existing install on one still
 # cannot join a WPA2/WPA3 transition-mode network. See

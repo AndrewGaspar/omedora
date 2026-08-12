@@ -139,7 +139,7 @@ install -Dpm755 omedora/bin/tensaku-edit %{buildroot}%{_datadir}/omarchy/omedora
 # /etc/skel: pre-applied user-migration markers (per the map's `version` row).
 # A NEW user starts at the shipped migration level — omarchy-migrate-user
 # treats a missing state file as "pending", and useradd -m copies these
-# markers into the fresh $HOME (same names omarchy-finalize-user touches).
+# markers into the fresh $HOME (same names omarchy-provision-user touches).
 install -d %{buildroot}/etc/skel/.local/state/omarchy/migrations/user
 for m in migrations/user/*.sh; do
   [ -f "$m" ] || continue
