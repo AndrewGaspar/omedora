@@ -184,8 +184,12 @@ install -Dpm644 default/hypr/toggles/flags.lua \
 # ---------------------------------------------------------------------------
 # systemd user units.
 install -d %{buildroot}%{_userunitdir}
-install -pm644 default/systemd/user/*.service default/systemd/user/*.path \
+install -pm644 default/systemd/user/*.service \
   %{buildroot}%{_userunitdir}/
+# Keep existing absolute wants links valid until the per-user migration
+# replaces the retired notifier name. The directory watcher itself is gone.
+ln -s omarchy-migrate-notify.service \
+  %{buildroot}%{_userunitdir}/omarchy-update-user-notify.service
 # system-sleep hook: ONLY unmount-fuse is package-installed (per the map);
 # force-igpu / keyboard-backlight are hardware-quirk files deployed by the
 # omarchy-hw-* scripts on matching machines, not packaged globally.
@@ -252,17 +256,24 @@ install -Dpm644 etc/profile.d/omarchy.sh %{buildroot}%{_sysconfdir}/profile.d/om
 # sudoers drop-ins (0440 per sudoers convention; /etc/sudoers.d owned by sudo).
 install -d %{buildroot}%{_sysconfdir}/sudoers.d
 install -pm440 etc/sudoers.d/omarchy-* %{buildroot}%{_sysconfdir}/sudoers.d/
-# sysctl / modprobe / udev drop-ins.
+# sysctl / modprobe drop-ins. Quattro beta retired the old udev rules.
 install -d %{buildroot}%{_sysconfdir}/sysctl.d
 install -pm644 etc/sysctl.d/*.conf %{buildroot}%{_sysconfdir}/sysctl.d/
 install -Dpm644 etc/modprobe.d/omarchy-usb-autosuspend.conf \
   %{buildroot}%{_sysconfdir}/modprobe.d/omarchy-usb-autosuspend.conf
-install -d %{buildroot}%{_sysconfdir}/udev/rules.d
-install -pm644 etc/udev/rules.d/*.rules %{buildroot}%{_sysconfdir}/udev/rules.d/
-# systemd system-manager/logind/resolved + unit drop-ins.
-( cd etc/systemd && find . -type f | while read -r f; do
-    install -Dpm644 "$f" "%{buildroot}%{_sysconfdir}/systemd/${f#./}"
-  done )
+# Keep the already-reviewed systemd manager/logind/resolved drop-ins. New beta
+# oomd and inhibit-delay policy is machine-wide behavior and remains reference
+# material until Omedora explicitly adopts that system policy.
+for f in \
+  logind.conf.d/10-ignore-power-button.conf \
+  resolved.conf.d/10-disable-multicast.conf \
+  resolved.conf.d/20-docker-dns.conf \
+  system.conf.d/10-faster-shutdown.conf \
+  system.conf.d/20-omarchy-nofile.conf \
+  user.conf.d/20-omarchy-nofile.conf; do
+  install -Dpm644 "etc/systemd/$f" \
+    "%{buildroot}%{_sysconfdir}/systemd/$f"
+done
 # docker daemon defaults + system gnupg dirmngr keyservers: NOT installed to
 # /etc. Both paths are unowned on Fedora 44 but are generic, user-editable
 # locations (a pre-existing /etc/docker/daemon.json — registry mirrors, cgroup
@@ -271,6 +282,16 @@ install -pm644 etc/udev/rules.d/*.rules %{buildroot}%{_sysconfdir}/udev/rules.d/
 # docker setup applies daemon.json only-if-absent (disclosed at the plan gate).
 install -Dpm644 etc/docker/daemon.json %{buildroot}%{_datadir}/omarchy/etc-overrides/docker/daemon.json
 install -Dpm644 etc/gnupg/dirmngr.conf %{buildroot}%{_datadir}/omarchy/etc-overrides/gnupg/dirmngr.conf
+# New beta machine-wide policy stays visible as inert reference material. It
+# is not installed to /etc on Fedora without a separate coexistence review.
+install -Dpm644 etc/NetworkManager/conf.d/omarchy-wifi-powersave.conf \
+  %{buildroot}%{_datadir}/omarchy/etc-overrides/NetworkManager/conf.d/omarchy-wifi-powersave.conf
+install -Dpm644 etc/tmpfiles.d/omarchy-zswap.conf \
+  %{buildroot}%{_datadir}/omarchy/etc-overrides/tmpfiles.d/omarchy-zswap.conf
+install -Dpm644 etc/systemd/logind.conf.d/20-inhibit-delay.conf \
+  %{buildroot}%{_datadir}/omarchy/etc-overrides/systemd/logind.conf.d/20-inhibit-delay.conf
+install -Dpm644 etc/systemd/oomd.conf.d/10-omarchy.conf \
+  %{buildroot}%{_datadir}/omarchy/etc-overrides/systemd/oomd.conf.d/10-omarchy.conf
 # DELIBERATELY NOT INSTALLED from etc/: mkinitcpio.conf.d/, limine-entry-tool.d/,
 # sddm.conf.d/ (Arch / sddm-only), nsswitch.conf, security/faillock.conf,
 # cups/, plymouth/ (never-touch; reference copies in etc-overrides/ above),
@@ -320,9 +341,12 @@ desktop-file-validate %{buildroot}%{_datadir}/wayland-sessions/omedora.desktop
 /etc/skel/.local/
 # systemd user units + sleep hook.
 %{_userunitdir}/bt-agent.service
+%{_userunitdir}/omarchy-fcitx5.service
+%{_userunitdir}/omarchy-migrate-notify.service
 %{_userunitdir}/omarchy-recover-internal-monitor.service
 %{_userunitdir}/omarchy-sleep-lock.service
-%{_userunitdir}/omarchy-update-user-notify.path
+%{_userunitdir}/omarchy-speaker-tuning.service
+%{_userunitdir}/omarchy-tailscale-receive.service
 %{_userunitdir}/omarchy-update-user-notify.service
 %{_prefix}/lib/systemd/system-sleep/unmount-fuse
 %{_prefix}/lib/environment.d/10-omarchy-fcitx.conf
@@ -349,8 +373,6 @@ desktop-file-validate %{buildroot}%{_datadir}/wayland-sessions/omedora.desktop
 %config(noreplace) %{_sysconfdir}/sysctl.d/90-omarchy-file-watchers.conf
 %config(noreplace) %{_sysconfdir}/sysctl.d/99-omarchy-sysctl.conf
 %config(noreplace) %{_sysconfdir}/modprobe.d/omarchy-usb-autosuspend.conf
-%config(noreplace) %{_sysconfdir}/udev/rules.d/99-omarchy-power-profile.rules
-%config(noreplace) %{_sysconfdir}/udev/rules.d/99-omarchy-wifi-powersave.rules
 %dir %{_sysconfdir}/systemd/logind.conf.d
 %config(noreplace) %{_sysconfdir}/systemd/logind.conf.d/10-ignore-power-button.conf
 %dir %{_sysconfdir}/systemd/resolved.conf.d
@@ -361,17 +383,15 @@ desktop-file-validate %{buildroot}%{_datadir}/wayland-sessions/omedora.desktop
 %config(noreplace) %{_sysconfdir}/systemd/system.conf.d/20-omarchy-nofile.conf
 %dir %{_sysconfdir}/systemd/user.conf.d
 %config(noreplace) %{_sysconfdir}/systemd/user.conf.d/20-omarchy-nofile.conf
-%dir %{_sysconfdir}/systemd/system/docker.service.d
-%config(noreplace) %{_sysconfdir}/systemd/system/docker.service.d/no-block-boot.conf
-%dir %{_sysconfdir}/systemd/system/plocate-updatedb.service.d
-%config(noreplace) %{_sysconfdir}/systemd/system/plocate-updatedb.service.d/ac-only.conf
-%dir %{_sysconfdir}/systemd/system/user@.service.d
-%config(noreplace) %{_sysconfdir}/systemd/system/user@.service.d/10-faster-shutdown.conf
 
 %changelog
 * Wed Aug 12 2026 omedora <noreply@omedora> - 0.2.0~beta.1-1
 - Refresh the package-backed defaults for the current Quattro beta branch.
 - Continue providing the stable Omedora session beside optional Omedora XR.
+- Package the beta login-only migration notifier and current user services;
+  retain the old notifier service name only as a compatibility symlink.
+- Retire removed udev and systemd unit drop-ins; keep new beta NetworkManager,
+  zswap, oomd, and inhibit policy as inert references pending Fedora review.
 
 * Thu Jun 11 2026 omedora <noreply@omedora> - 0.2.0~alpha.0-1
 - Initial Fedora analogue of upstream's omarchy-settings Arch package,
