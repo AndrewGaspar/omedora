@@ -137,7 +137,7 @@ cp "$ROOT/default/hypr/toggles/flags.lua" "$PAYLOAD/default/hypr/toggles/flags.l
 cp "$ROOT/install/packages/fedora.toml" "$PAYLOAD/install/packages/fedora.toml"
 cp "$ROOT/bin/fedora/pkg.py" "$PAYLOAD/bin/fedora/pkg.py"
 printf '%s\n' \
-  libvips quickshell-git omacalc ttfx herdr foot \
+  dotnet-runtime libvips quickshell-git omacalc ttfx herdr foot \
   >"$PAYLOAD/install/omarchy-base.packages"
 printf 'icon\n' >"$PAYLOAD/icon.txt"
 printf 'logo\n' >"$PAYLOAD/logo.txt"
@@ -431,7 +431,7 @@ assert_output_lacks "retired removal never touches git" "$remove_line" " git"
 # New base deps resolved through the v4 map (pkg.py dry-run seam).
 assert_output_contains "v4 base set resolved through pkg.py" "$out" "[dry-run] sudo dnf install"
 base_install_line=$(grep '\[dry-run\] sudo dnf install' <<<"$out" | tail -1)
-for package in vips-tools omacalc ttfx herdr; do
+for package in dotnet-runtime-10.0 vips-tools omacalc ttfx herdr; do
   assert_output_contains "Quattro base mapping resolved: $package" \
     "$base_install_line" "$package"
 done
