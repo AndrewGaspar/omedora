@@ -1,8 +1,8 @@
 # Omedora architecture
 
-> **Omarchy 4 port status (2026-07-03).** This branch (`omedora-4`) sits on the
-> upstream `omarchy-4` pin tag `omedora-base-20260812-omarchy4-106320ab` (upstream renamed
-> the active v4 branch `omarchy-4` → `quattro`; the pin now tracks `omarchy/quattro`). Omarchy 4 is a
+> **Omarchy 4 port status (2026-08-12).** This branch (`omedora-4`) sits on the
+> immutable pin `omedora-base-20260812-omarchy4-106320ab`, tracking
+> `omarchy/quattro` at `106320ab` (13 commits beyond `v4.0.0-beta3`). Omarchy 4 is a
 > re-architecture into a package-backed distro (no `install.sh`/`boot.sh`; `omarchy` +
 > `omarchy-settings` packages; Quickshell `shell/` replaces waybar/mako/walker/elephant/
 > swayosd; updates via package manager + split `migrations/{system,user}/`). Much of this
@@ -274,7 +274,7 @@ fi
 Omedora <omedora-version> (rebased on Omarchy <upstream-version>)
 ```
 
-The Omedora version lives in a new `omedora/version` file; the upstream version stays in the root `version` file. `omarchy-version` reads both and renders accordingly.
+The Omedora version lives in `omedora/version`; `omedora/base-version` records the human-readable immutable pin label while the upstream-owned root `version` stays untouched. `omarchy-version` renders the Omedora release and actual pinned base accordingly.
 
 **`boot.sh`** embeds the OMARCHY ASCII banner inline. On Fedora-bootstrapped installs, the banner should read OMEDORA. The cleanest patch: detect at the top of `boot.sh` whether the user explicitly ran the omedora bootstrap (e.g., via an `OMARCHY_BRAND=omedora` env var, or by sourcing a `boot-omedora.sh` shim that sets it), then either inline a different `ansi_art` or print from `omedora/branding/logo.txt` if available.
 
@@ -360,6 +360,10 @@ See [`branding.md`](branding.md) for the full surface-by-surface rules. Quick su
 `omedora/packaging/copr/omedora.desktop` is the source of truth for omedora's session entry — it lives next to the spec that ships it. (There is no `default/wayland-sessions/` copy: omedora **packages** the entry rather than `sudo cp`-ing it, a deliberate divergence from omarchy, which keeps `default/wayland-sessions/omarchy.desktop` for its Arch sudo-cp.) On Fedora it is **shipped by a package** — `hyprland-omedora` (`omedora/packaging/copr/hyprland-omedora.spec`, noarch) owns `/usr/share/wayland-sessions/omedora.desktop` — rather than dropped into `/usr` by a `sudo cp`. Installing `hyprland` on Fedora remaps (`install/packages/fedora.toml`) to `hyprland-omedora`, which `Requires: hyprland-no-session` + `uwsm`, so the compositor binaries and the session entry arrive together via dnf. There is no longer a session-related `/usr` write in the installer; the old `install/config/wayland-session-fedora.sh` sudo-cp is retired (now a no-op, unwired from `install/config/all.sh`).
 
 The Hyprland package set is split so the binaries and the visible session entries are separable: `hyprland-no-session` (the compositor binaries + portal config, NO `.desktop`), `hyprland` (the plain visible "Hyprland" session entry, Requires the base), `hyprland-uwsm` (the uwsm session entry), and `hyprland-omedora` (omedora's own uwsm entry). On Fedora omedora pulls only the base + `hyprland-omedora`, so the plain/uwsm visible entries are NOT installed.
+
+The optional XR path follows the same additive rule. `hypxrland` puts its compositor and matching XR-help-aware `hyprctl` under a private libexec path, sharing the stable Hyprland 0.56.1 libraries, assets, portal, and watchdog. `hypxrland-stack` pulls the mandatory runtimes (patched WiVRn, voice + model, HUD, VA gate, and paper), while the XREAL-specific Monado runtime remains suggested and opt-in. `hypxrland-omedora` adds the visible **Omedora XR** session and requires `omedora-settings`, so the stable **Omedora** session remains beside it in the greeter.
+
+The RPM boundary stops at the user's home directory. The XR launcher selects the packaged VA shim and prepends the private control client, but does not overwrite `~/.config/hypr/hyprland-xr.conf`, WiVRn pairing state, voice intent configuration, or machine-specific GPU overrides. The installed stack README records the handoff from source-tree paths to package paths.
 
 Contents:
 
