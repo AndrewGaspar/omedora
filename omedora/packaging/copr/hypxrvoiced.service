@@ -1,0 +1,14 @@
+[Unit]
+Description=HypXRland local-first voice control daemon
+After=graphical-session.target pipewire.service
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/hypxrvoiced-session
+Restart=on-failure
+RestartSec=2
+PrivateTmp=true
+
+[Install]
+WantedBy=graphical-session.target
