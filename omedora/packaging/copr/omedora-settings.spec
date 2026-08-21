@@ -341,6 +341,7 @@ desktop-file-validate %{buildroot}%{_datadir}/wayland-sessions/omedora.desktop
 /etc/skel/.local/
 # systemd user units + sleep hook.
 %{_userunitdir}/bt-agent.service
+%{_userunitdir}/omarchy-crash-watch.service
 %{_userunitdir}/omarchy-fcitx5.service
 %{_userunitdir}/omarchy-migrate-notify.service
 %{_userunitdir}/omarchy-recover-internal-monitor.service
@@ -387,6 +388,7 @@ desktop-file-validate %{buildroot}%{_datadir}/wayland-sessions/omedora.desktop
 %changelog
 * Thu Aug 20 2026 omedora <noreply@omedora> - 0.2.0~beta.2-1
 - Refresh the packaged defaults for the official Omarchy 4.0.0 release.
+- Include Quattro's crash-watch user unit in the package manifest.
 
 * Wed Aug 12 2026 omedora <noreply@omedora> - 0.2.0~beta.1-1
 - Refresh the package-backed defaults for the current Quattro beta branch.
