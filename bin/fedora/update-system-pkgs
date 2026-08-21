@@ -1,0 +1,242 @@
+#!/bin/bash
+
+set -euo pipefail
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+read -r -a resolver_cmd <<<"${OMEDORA_MANAGED_RESOLVER:-python3 $script_dir/managed_packages.py}"
+read -r -a dnf_cmd <<<"${OMEDORA_DNF_CMD:-sudo dnf}"
+
+work_dir=$(mktemp -d "${TMPDIR:-/tmp}/omedora-managed-update.XXXXXX")
+trap 'rm -rf "$work_dir"' EXIT
+resolve_count=0
+core_packages=(omedora omedora-settings)
+declare -A selected_evr=()
+declare -A selected_nevra=()
+declare -A installed_evr=()
+declare -A installed_repo=()
+
+resolve_packages() {
+  local -n result=$1
+  local output="$work_dir/resolved-$resolve_count"
+  resolve_count=$((resolve_count + 1))
+
+  if ! "${resolver_cmd[@]}" >"$output"; then
+    echo "Omedora managed-package resolution failed; no package transaction was attempted." >&2
+    return 1
+  fi
+
+  mapfile -t result <"$output"
+  local package
+  for package in "${result[@]}"; do
+    if [[ -z $package || $package =~ [[:space:]] ]]; then
+      echo "Omedora managed-package resolver returned an invalid package name: '$package'" >&2
+      return 1
+    fi
+  done
+}
+
+resolve_copr() {
+  local project_file="$work_dir/copr-project"
+  local repo_file="$work_dir/copr-repo-id"
+
+  if [[ -n ${OMEDORA_COPR_PROJECT:-} ]]; then
+    printf '%s\n' "$OMEDORA_COPR_PROJECT" >"$project_file"
+  elif ! omedora-copr >"$project_file"; then
+    echo "Could not resolve the version-scoped Omedora COPR project." >&2
+    return 1
+  fi
+
+  if [[ -n ${OMEDORA_COPR_REPO_ID:-} ]]; then
+    printf '%s\n' "$OMEDORA_COPR_REPO_ID" >"$repo_file"
+  elif ! omedora-copr --repo-id >"$repo_file"; then
+    echo "Could not resolve the version-scoped Omedora COPR repository ID." >&2
+    return 1
+  fi
+
+  copr_project=$(<"$project_file")
+  copr_repo_id=$(<"$repo_file")
+  if [[ -z $copr_project || -z $copr_repo_id ]]; then
+    echo "The version-scoped Omedora COPR identity is empty." >&2
+    return 1
+  fi
+}
+
+select_core_candidates() {
+  local output="$work_dir/core-candidates-$resolve_count"
+  local name evr nevra repo extra package count
+
+  if ! "${dnf_cmd[@]}" repoquery --available --repo "$copr_repo_id" \
+    --arch=noarch --latest-limit=1 \
+    --qf '%{name} %{evr} %{full_nevra} %{repoid}\n' \
+    "${core_packages[@]}" >"$output"; then
+    echo "Could not resolve core candidates from '$copr_repo_id'." >&2
+    return 1
+  fi
+
+  selected_evr=()
+  selected_nevra=()
+  while read -r name evr nevra repo extra; do
+    [[ -n $name ]] || continue
+    if [[ -n ${extra:-} || $repo != "$copr_repo_id" ]]; then
+      echo "Ambiguous core candidate record for '$name' from '$repo'." >&2
+      return 1
+    fi
+    if [[ -n ${selected_evr[$name]:-} ]]; then
+      echo "Multiple latest candidates returned for core package '$name'." >&2
+      return 1
+    fi
+    selected_evr["$name"]=$evr
+    selected_nevra["$name"]=$nevra
+  done <"$output"
+
+  for package in "${core_packages[@]}"; do
+    count=${selected_evr[$package]:-}
+    if [[ -z $count ]]; then
+      echo "No latest candidate for '$package' in expected repository '$copr_repo_id'." >&2
+      return 1
+    fi
+  done
+}
+
+query_installed_core() {
+  local output="$work_dir/core-installed-$resolve_count-$RANDOM"
+  local name evr repo extra
+
+  if ! "${dnf_cmd[@]}" repoquery --installed \
+    --qf '%{name} %{evr} %{from_repo}\n' "${core_packages[@]}" >"$output"; then
+    echo "Could not query installed core EVR and provenance." >&2
+    return 1
+  fi
+
+  installed_evr=()
+  installed_repo=()
+  while read -r name evr repo extra; do
+    [[ -n $name ]] || continue
+    if [[ -n ${extra:-} || -n ${installed_evr[$name]:-} ]]; then
+      echo "Ambiguous installed core record for '$name'." >&2
+      return 1
+    fi
+    installed_evr["$name"]=$evr
+    installed_repo["$name"]=$repo
+  done <"$output"
+}
+
+verify_installed_core() {
+  local package
+  query_installed_core
+  for package in "${core_packages[@]}"; do
+    if [[ ${installed_evr[$package]:-} != "${selected_evr[$package]}" ]]; then
+      echo "Installed $package EVR '${installed_evr[$package]:-missing}' does not equal selected expected-COPR EVR '${selected_evr[$package]}'." >&2
+      return 1
+    fi
+    if [[ ${installed_repo[$package]:-} != "$copr_repo_id" ]]; then
+      echo "Installed $package provenance '${installed_repo[$package]:-missing}' does not equal '$copr_repo_id'." >&2
+      return 1
+    fi
+  done
+}
+
+reconcile_core() {
+  local package needs_version_change=false
+  local -a wrong_repo=()
+
+  select_core_candidates
+  query_installed_core
+  for package in "${core_packages[@]}"; do
+    if [[ ${installed_evr[$package]:-} != "${selected_evr[$package]}" ]]; then
+      needs_version_change=true
+    fi
+  done
+
+  if $needs_version_change; then
+    echo "Reconciling core RPMs to exact candidates from $copr_repo_id"
+    "${dnf_cmd[@]}" install --refresh -y --setopt=install_weak_deps=False \
+      --allow-downgrade --from-repo="$copr_repo_id" \
+      "${selected_nevra[omedora]}" "${selected_nevra[omedora-settings]}"
+  fi
+
+  query_installed_core
+  for package in "${core_packages[@]}"; do
+    if [[ ${installed_evr[$package]:-} == "${selected_evr[$package]}" && \
+      ${installed_repo[$package]:-} != "$copr_repo_id" ]]; then
+      wrong_repo+=("${selected_nevra[$package]}")
+    fi
+  done
+
+  if (( ${#wrong_repo[@]} > 0 )); then
+    echo "Reinstalling same-EVR core RPMs from $copr_repo_id to repair provenance"
+    "${dnf_cmd[@]}" reinstall --refresh -y --setopt=install_weak_deps=False \
+      --from-repo="$copr_repo_id" "${wrong_repo[@]}"
+  fi
+
+  verify_installed_core
+}
+
+verify_managed_candidates() {
+  local output="$work_dir/managed-candidates-$resolve_count"
+  local package
+  (( $# > 0 )) || return 0
+
+  if ! "${dnf_cmd[@]}" repoquery --available --qf '%{name}\n' "$@" >"$output"; then
+    echo "Could not query candidates for Omedora-managed packages." >&2
+    return 1
+  fi
+
+  for package in "$@"; do
+    if ! grep -qxF "$package" "$output"; then
+      echo "No enabled repository provides managed package '$package'; refusing a stale no-op update." >&2
+      return 1
+    fi
+  done
+}
+
+run_update_pass() {
+  local has_omedora=false has_settings=false package
+  local -a managed=()
+
+  for package in "$@"; do
+    case "$package" in
+      omedora) has_omedora=true ;;
+      omedora-settings) has_settings=true ;;
+      *) managed+=("$package") ;;
+    esac
+  done
+  if [[ $has_omedora != "$has_settings" ]]; then
+    echo "Managed resolver must return both core packages or neither." >&2
+    return 1
+  fi
+
+  resolve_copr
+  echo "Ensuring version-scoped Omedora repository is enabled: $copr_project"
+  "${dnf_cmd[@]}" copr enable -y "$copr_project"
+
+  if $has_omedora; then
+    reconcile_core
+  fi
+
+  verify_managed_candidates "${managed[@]}"
+  if (( ${#managed[@]} > 0 )); then
+    "${dnf_cmd[@]}" install --refresh -y --setopt=install_weak_deps=False \
+      --exclude=omedora --exclude=omedora-settings "${managed[@]}"
+  fi
+
+  if $has_omedora; then
+    verify_installed_core
+  fi
+}
+
+packages=()
+resolve_packages packages
+(( ${#packages[@]} > 0 )) || exit 0
+
+echo -e "\e[32m\nUpdate Omedora-managed packages\e[0m"
+run_update_pass "${packages[@]}"
+
+# The first pass may replace the resolver and map. Resolve a second time so
+# packages introduced by that exact core build land in the same update.
+refreshed_packages=()
+resolve_packages refreshed_packages
+if [[ ${packages[*]} != "${refreshed_packages[*]}" ]]; then
+  (( ${#refreshed_packages[@]} > 0 )) || exit 0
+  run_update_pass "${refreshed_packages[@]}"
+fi

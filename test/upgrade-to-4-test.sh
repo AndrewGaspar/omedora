@@ -77,6 +77,10 @@ cat >"$FAKE_DNF_QUERY" <<'EOF'
 #!/bin/bash
 case " $* " in
   *" repoquery "*" --installed "*|*" repoquery --installed "*)
+    if [[ ${REPOQUERY_PARTIAL_FAIL:-0} == 1 ]]; then
+      head -1 "$REPOQUERY_OUT"
+      exit 42
+    fi
     cat "$REPOQUERY_OUT" 2>/dev/null
     exit 0
     ;;
@@ -136,6 +140,7 @@ cp -r "$ROOT/default/systemd" "$PAYLOAD/default/systemd"
 cp "$ROOT/default/hypr/toggles/flags.lua" "$PAYLOAD/default/hypr/toggles/flags.lua"
 cp "$ROOT/install/packages/fedora.toml" "$PAYLOAD/install/packages/fedora.toml"
 cp "$ROOT/bin/fedora/pkg.py" "$PAYLOAD/bin/fedora/pkg.py"
+cp "$ROOT/bin/fedora/package_map.py" "$PAYLOAD/bin/fedora/package_map.py"
 printf '%s\n' \
   dotnet-runtime libvips quickshell-git omacalc ttfx herdr foot \
   >"$PAYLOAD/install/omarchy-base.packages"
@@ -290,6 +295,7 @@ run_upgrade() {
     RPM_STATE="$RPM_STATE" \
     WHATREQ_STATE="$WHATREQ_STATE" \
     REPOQUERY_OUT="$REPOQUERY_OUT" \
+    REPOQUERY_PARTIAL_FAIL="${REPOQUERY_PARTIAL_FAIL:-0}" \
     DNF_FAIL_REFRESH="${DNF_FAIL_REFRESH:-}" \
     IWD_ACTIVE_RC="${IWD_ACTIVE_RC:-3}" \
     OMEDORA_OS_RELEASE="$SCRATCH/os-fedora" \
@@ -364,6 +370,17 @@ grep -qE 'dnf (install|remove|mark)|copr (enable|disable)|systemctl (enable|disa
 out=$(echo n | run_upgrade "$H1" OMEDORA_PLAN_FORCE_INTERACTIVE=1 2>&1) && rc=0 || rc=$?
 assert_equals "interactive decline aborts" "1" "$rc"
 assert_output_contains "interactive decline message" "$out" "aborted at your request"
+
+H_QUERY_FAIL="$SCRATCH/home-query-fail"; make_home "$H_QUERY_FAIL"
+out=$(REPOQUERY_PARTIAL_FAIL=1 run_upgrade "$H_QUERY_FAIL" \
+  OMEDORA_PLAN_FORCE_NONINTERACTIVE=1 2>&1) && rc=0 || rc=$?
+assert_equals "partial repoquery failure still reaches the plan gate" "1" "$rc"
+assert_output_contains "partial repoquery output is explicitly discarded" "$out" \
+  "discarding partial output"
+assert_output_contains "repoquery failure falls back to known retired package probes" "$out" \
+  "walker"
+assert_output_contains "repoquery failure fallback keeps known v4 survivors" "$out" \
+  "hyprland"
 
 H_FAIL="$SCRATCH/home-failed-survivor"; make_home "$H_FAIL"
 : >"$MOCK_LOG"

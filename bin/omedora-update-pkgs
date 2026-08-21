@@ -1,20 +1,8 @@
 #!/bin/bash
 
-# omarchy:summary=Update system + omedora packages with dnf (Fedora).
+# omarchy:summary=Update Omedora-managed packages with dnf (Fedora).
 # omarchy:requires-sudo=true
 
-# Fedora counterpart of omarchy-update-system-pkgs (pacman -Syyu). A full
-# `dnf upgrade` refreshes metadata and pulls the latest builds — including new
-# omedora RPMs from the COPR (which auto-rebuilds on push), so this is how
-# package-level omedora updates land. Matches omarchy's "update Omarchy AND
-# system packages" model.
-
-set -e
-
-# $OMEDORA_DNF_CMD is the dnf driver (default "sudo dnf"); tests inject a fake to
-# exercise the dispatch without a real multi-hundred-MB system upgrade. Same seam
-# as bin/omedora-replace-foreign.
-DNF="${OMEDORA_DNF_CMD:-sudo dnf}"
-
-echo -e "\e[32m\nUpdate system + omedora packages\e[0m"
-$DNF upgrade -y --refresh
+# Compatibility entry point for the pre-Quattro Omedora command name. Keep all
+# Fedora package-update policy in the sibling used by omarchy-update-system-pkgs.
+exec "$(dirname -- "${BASH_SOURCE[0]}")/fedora/update-system-pkgs" "$@"
