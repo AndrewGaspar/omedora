@@ -39,7 +39,7 @@ if [[ -n ${OMEDORA_UPGRADE_LOCAL_REPO:-} ]]; then
   from_repo_args+=("--disablerepo=$OMEDORA_UPGRADE_LOCAL_REPO")
 fi
 xr_v4_packages=(
-  hypxrpaper hypxrva hypxrhud
+  hypxrpaper hypxrva hypxrhud hypxrcompose
   hypxrvoice hypxrvoice-model-base-en
   wivrn-hypxr hypxrland-legacy-config
   hypxrland hypxrland-stack hypxrland-omedora
@@ -422,7 +422,7 @@ echo "# --- L1 suites post-upgrade ---"
 # NOT in this set: it belongs to the Arch-contract CI job and needs an
 # unversioned `python`, which Fedora doesn't ship by default.
 for t in test/distro-test.sh test/pkg-map-test.sh test/pkg-helper-test.sh \
-         test/quickshell-spec-test.sh test/update-flow-test.sh \
+         test/hypxr-spec-test.sh test/quickshell-spec-test.sh test/update-flow-test.sh \
          test/upgrade-to-4-test.sh; do
   if as_user "bash $REPO/$t" >/tmp/l1.log 2>&1; then
     ok "post-upgrade L1: $t"
