@@ -1,5 +1,7 @@
 echo "Rebuild the initramfs so NVIDIA-only systems shed nouveau's unused GSP firmware"
 
+[[ ${OMARCHY_DISTRO:-$(omarchy-distro)} == "fedora" ]] && { return 0 2>/dev/null || exit 0; }
+
 # omarchy_hooks.conf now filters the kms hook out of HOOKS when the proprietary
 # NVIDIA driver handles early KMS and NVIDIA owns every display controller
 # (#6790). The settings package deploys that conditional, but nothing rebuilds

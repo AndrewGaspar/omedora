@@ -1,5 +1,7 @@
 echo "Unmask wpa_supplicant so NetworkManager can bring wifi back"
 
+[[ ${OMARCHY_DISTRO:-$(omarchy-distro)} == "fedora" ]] && { return 0 2>/dev/null || exit 0; }
+
 # iwd-era installs may carry a wpa_supplicant.service mask, which breaks
 # NetworkManager's D-Bus activation of the supplicant and leaves every wifi
 # device unavailable (#6783).
