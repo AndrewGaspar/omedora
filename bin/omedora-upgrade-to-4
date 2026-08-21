@@ -226,19 +226,25 @@ installed_v4_survivors=()
 compute_retired_packages() {
   retired_packages=()
   installed_v4_survivors=()
-  local got_query=0 name repo pkg
+  local got_query=0 name repo pkg query_file
+  query_file=$(mktemp "${TMPDIR:-/tmp}/omedora-upgrade-repoquery.XXXXXX")
 
-  while read -r name repo _; do
-    [[ -n ${name:-} && -n ${repo:-} ]] || continue
-    got_query=1
-    [[ $repo == "$old_repo_id" ]] || continue
-    if is_kept_on_v4 "$name"; then
-      installed_v4_survivors+=("$name")
-      continue
-    fi
-    retired_packages+=("$name")
-  done < <("$dnf_query" repoquery --installed \
-             --queryformat '%{name} %{from_repo}\n' 2>/dev/null || true)
+  if "$dnf_query" repoquery --installed \
+    --queryformat '%{name} %{from_repo}\n' >"$query_file" 2>/dev/null; then
+    while read -r name repo _; do
+      [[ -n ${name:-} && -n ${repo:-} ]] || continue
+      got_query=1
+      [[ $repo == "$old_repo_id" ]] || continue
+      if is_kept_on_v4 "$name"; then
+        installed_v4_survivors+=("$name")
+        continue
+      fi
+      retired_packages+=("$name")
+    done <"$query_file"
+  else
+    warn "dnf repoquery failed; discarding partial output and probing the known 3.8.2-era package set."
+  fi
+  rm -f "$query_file"
 
   if (( ! got_query )); then
     warn "dnf repoquery unavailable; probing the known 3.8.2-era COPR package set instead."
@@ -1710,7 +1716,7 @@ cat <<EOF
 
 $(printf '\033[32m')Omedora 4 upgrade complete.$(printf '\033[0m')
 
-  • Updates are now package-driven: run 'omarchy update' (or plain 'sudo dnf upgrade').
+  • Updates are now package-driven: run 'omarchy update'; its dnf transaction is scoped to Omedora-managed RPMs.
   • Your old git checkout is preserved at:
       $legacy_backup
   • Every replaced config file has a sibling backup: <file>.$backup_tag(.bak)

@@ -51,8 +51,14 @@ while [[ $# -gt 0 ]]; do
 done
 
 # --- 1. detect foreign-repo conflicts (name<TAB>repo) ------------------------
-# omarchy-doctor --list exits 1 when conflicts exist; keep going regardless.
-conflicts="$(omarchy-doctor --list 2>/dev/null || true)"
+# omarchy-doctor --list exits 1 when conflicts exist. Any other non-zero status
+# means ownership/provenance resolution failed and must not become "clean".
+conflicts=$(omarchy-doctor --list 2>/dev/null)
+doctor_status=$?
+if (( doctor_status > 1 )); then
+  echo "omedora-replace-foreign: could not determine foreign-repo conflicts" >&2
+  exit "$doctor_status"
+fi
 
 if [[ -z ${conflicts//[$' \t\n']/} ]]; then
   echo -e "\033[32momedora: no foreign-repo packages to replace.\033[0m"
@@ -61,9 +67,15 @@ fi
 
 # --- 2. base -> omedora target(s) map ----------------------------------------
 declare -A TARGET=()
+work_dir=$(mktemp -d "${TMPDIR:-/tmp}/omedora-replace-foreign.XXXXXX")
+trap 'rm -rf "$work_dir"' EXIT
+if ! python3 "$script_dir/fedora/owned_packages.py" --map >"$work_dir/owned-map"; then
+  echo "omedora-replace-foreign: could not resolve replacement package names" >&2
+  exit 1
+fi
 while IFS=$'\t' read -r base names; do
   [[ -n $base ]] && TARGET["$base"]="$names"
-done < <(python3 "$script_dir/fedora/owned_packages.py" --map 2>/dev/null)
+done <"$work_dir/owned-map"
 
 # --- 3. build the transaction plan -------------------------------------------
 declare -a swaps=()             # "foreign target1 target2 ..."
@@ -92,9 +104,13 @@ done <<<"$conflicts"
 # even enabled there's nothing to disable and the sync simply moves the package
 # to whatever enabled repo provides it.
 declare -A enabled_repos=()
+if ! $DNF -q repolist --enabled >"$work_dir/enabled-repos"; then
+  echo "omedora-replace-foreign: could not query enabled repositories" >&2
+  exit 1
+fi
 while read -r rid _; do
   [[ -n $rid ]] && enabled_repos["$rid"]=1
-done < <($DNF -q repolist --enabled 2>/dev/null)
+done <"$work_dir/enabled-repos"
 
 disable_args=()
 for r in "${!disable_repos[@]}"; do
