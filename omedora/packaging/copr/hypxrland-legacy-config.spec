@@ -11,7 +11,7 @@
 
 Name:           hypxrland-legacy-config
 Version:        3.8.4^20260812.1.git%{shortcommit}
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Classic Hyprland defaults for Omedora XR
 
 License:        MIT
@@ -19,7 +19,7 @@ URL:            https://github.com/AndrewGaspar/omedora
 Source0:        %{url}/archive/%{commit}/%{name}-%{commit}.tar.gz
 
 BuildArch:      noarch
-Requires:       omedora-settings
+Requires:       omedora-settings >= 0.2.0~beta.2
 
 %description
 HypXRland's OpenXR configuration syntax is not yet available through Quattro's
@@ -95,6 +95,10 @@ grep -F 'exec-once = omarchy-provision-first-run' %{buildroot}%{_datadir}/omarch
 %{_datadir}/omarchy/default/hypr/
 
 %changelog
+* Fri Aug 21 2026 omedora <noreply@omedora> - 3.8.4^20260812.1.gitc83a2dd6c-2
+- Require the package-backed Quattro settings payload that owns the parallel
+  Lua defaults consumed beside this classic hyprlang bridge.
+
 * Wed Aug 12 2026 omedora <noreply@omedora> - 3.8.4^20260812.1.gitc83a2dd6c-1
 - Preserve the immutable Omedora 3 classic hyprlang defaults for Omedora XR.
 - Adapt its startup and removed command names to Quattro while installing only

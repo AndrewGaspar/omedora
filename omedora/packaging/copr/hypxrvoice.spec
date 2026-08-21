@@ -1,14 +1,14 @@
 # hypxrvoice.spec — local voice-control daemon for HypXRland.
 
-%global snapshot 20260802.1
-%global commit 9e899bbffbd9c7817ab8e1fc80cf512aed6f98fc
+%global snapshot 20260812.1
+%global commit 7ce7d33b20a3ddc37e9f758b57a60a2d0849fbdd
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 %global whisper_commit 080bbbe85230f624f0b52127f1ae1218247989f9
 %global llama_commit 961e4b26a7dd0e01e20599b27d709a74788ecb55
 
 Name:           hypxrvoice
 Version:        0^%{snapshot}.git%{shortcommit}
-Release:        2%{?dist}
+Release:        1%{?dist}
 Summary:        Local-first voice control daemon for HypXRland
 
 # Project code, whisper.cpp and llama.cpp are BSD-3-Clause/MIT as noted.
@@ -34,8 +34,8 @@ BuildRequires:  pkgconfig(libspa-0.2)
 BuildRequires:  pkgconfig(sndfile)
 BuildRequires:  pkgconfig(libsystemd)
 
-Requires:       hypxrhud%{?_isa}
-Requires:       hypxrvoice-model-base-en
+Requires:       hypxrhud%{?_isa} >= 0^20260817.1.gitf96d0e794-1
+Requires:       hypxrvoice-model-base-en >= 1.0.0-1
 Recommends:     espeak-ng
 
 Provides:       bundled(llama.cpp)
@@ -76,16 +76,21 @@ cp subprojects/llama.cpp/LICENSE LICENSE.llama.cpp
 install -Dpm0755 %{SOURCE3} %{buildroot}%{_bindir}/hypxrvoiced-session
 install -Dpm0644 %{SOURCE4} %{buildroot}%{_userunitdir}/hypxrvoiced.service
 install -d %{buildroot}%{_datadir}/hypxrvoice
-sed '0,/^model = ""/s|^model = "".*|model = "%{_datadir}/hypxrvoice/models/ggml-base.en.bin"|' \
+sed '0,/^model = ""/{s|^model = "".*|model = "%{_datadir}/hypxrvoice/models/ggml-base.en.bin"|}' \
   examples/config.toml > %{buildroot}%{_datadir}/hypxrvoice/config.toml
 
 %check
 bash -n %{SOURCE3}
-grep -A8 '^\[asr\]' %{buildroot}%{_datadir}/hypxrvoice/config.toml | \
-  grep -F 'model = "%{_datadir}/hypxrvoice/models/ggml-base.en.bin"'
-grep -A8 '^\[intent\]' %{buildroot}%{_datadir}/hypxrvoice/config.toml | \
-  grep -F 'model = ""'
 %ctest --exclude-regex hypxrvoice_hud_dbus_tests
+awk '
+  /^\[asr\]$/ { section = "asr"; next }
+  /^\[intent\]$/ { section = "intent"; next }
+  section == "asr" && /^model = / {
+    asr = ($0 == "model = \"%{_datadir}/hypxrvoice/models/ggml-base.en.bin\"")
+  }
+  section == "intent" && /^model = / { intent = ($0 ~ /^model = ""/) }
+  END { exit !(asr && intent) }
+' %{buildroot}%{_datadir}/hypxrvoice/config.toml
 ! ldd %{buildroot}%{_bindir}/hypxrvoiced | \
   grep -E 'lib(ggml|llama|whisper).*not found'
 
@@ -109,6 +114,12 @@ grep -A8 '^\[intent\]' %{buildroot}%{_datadir}/hypxrvoice/config.toml | \
 %{_datadir}/hypxrvoice/config.toml
 
 %changelog
+* Wed Aug 12 2026 omedora <noreply@omedora> - 0^20260812.1.git7ce7d33b2-1
+- Refresh to the current public master tip with natural monitor visibility
+  phrases in both rule and local-LLM intent paths.
+- Populate only the ASR model, leave the optional intent model empty, and
+  assert both values by section during the package check.
+
 * Wed Aug 12 2026 omedora <noreply@omedora> - 0^20260802.1.git9e899bbff-2
 - Configure only the ASR model in the packaged example; leave the optional
   intent LLM unset and assert both sections during the build.

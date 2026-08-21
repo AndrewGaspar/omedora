@@ -25,7 +25,7 @@ export LIBVA_DRIVER_NAME=hypxr
 export LIBVA_DRIVERS_PATH="${HYPXRVA_DRIVERS_PATH:-/usr/lib64/hypxrva}"
 
 # Keep the standard Hyprland desktop identity for portals and application
-# behavior while giving uwsm a distinct compositor name. The stock 0.56.1
+# behavior while giving uwsm a distinct compositor name. The stock 0.56.2
 # watchdog accepts --path, so it can supervise the private HypXRland binary
 # without installing a conflicting start-hyprland executable.
 exec uwsm start -g -1 -e -N HypXRland -D Hyprland -- \
