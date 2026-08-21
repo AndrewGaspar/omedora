@@ -10,7 +10,7 @@ If you only have time to read one section: it's [§1 Patch discipline](#1-patch-
 
 Every change you make falls into one of these categories. If you can't categorize it, **stop and think before editing**.
 
-1. **A new file in a new omedora-specific path** (e.g., `install/packages/installers/install-foo.sh`). Zero rebase risk. Go ahead.
+1. **A new file in a new omedora-specific path** (e.g., `omedora/test/fedora/check-foo.sh`). Zero rebase risk. Go ahead.
 2. **A new file in an upstream-owned path** (e.g., `bin/omarchy-pkg-add-fedora` sitting next to `bin/omarchy-pkg-add`). Low risk; conflict only if upstream adds a file with the same name.
 3. **A documented patch to an upstream file** that matches a row in [the patch-stack map](architecture.md#15-patch-stack-map). Low-to-medium risk depending on patch type.
 4. **A patch to an upstream file that isn't on the map.** **Stop.** Either:
@@ -88,7 +88,8 @@ See [`branding.md`](branding.md) for the full surface map. The core rules:
 
 - **Never rename `omarchy-*` files.**
 - **Never rename `$OMARCHY_*` env vars or filesystem paths.**
-- New user-facing strings in `bin/omarchy` use `${BRAND_NAME}`.
+- Keep `bin/omarchy`'s shared dispatcher output upstream-branded; do not add a
+  downstream-only rebranding layer there.
 - New user-facing strings in Fedora-side install scripts use literal `omedora` (those scripts only run on Fedora).
 - Don't add brand strings to migrations, themes, or configs.
 - Don't shadow upstream's root `logo.txt` / `icon.txt` / `version` — put omedora versions under `omedora/branding/` and `omedora/version`.
@@ -97,14 +98,16 @@ See [`branding.md`](branding.md) for the full surface map. The core rules:
 
 ## 5. Update-flow commands
 
-New Fedora-specific update commands follow the `bin/omarchy-update-fedora-*` naming pattern, matching the existing `bin/omarchy-update-*` cluster. Examples on the map:
+Quattro's `bin/omarchy-update` is the shared orchestrator. Fedora-specific leaf
+behavior dispatches from the existing step to a sibling under `bin/fedora/`.
+For package updates, `bin/omarchy-update-system-pkgs` executes
+`bin/fedora/update-system-pkgs`; the Arch body below the dispatch stays
+byte-for-byte upstream.
 
-- `omarchy-update-fedora-pkgs`
-- `omarchy-update-fedora-coprs`
-- `omarchy-update-fedora-version-check`
-- `omarchy-update-flatpaks` (no `-fedora-` because there's no Arch equivalent to "update Flatpaks under our management")
-
-The dispatch happens in `bin/omarchy-update-perform` (not `bin/omarchy-update` — the user-facing wrapper stays distro-agnostic).
+Fedora package updates must pass an explicit Omedora-managed package list. Never
+introduce an unscoped `dnf upgrade` or a second package-update implementation.
+Compatibility commands such as `bin/omedora-update-pkgs` must execute the same
+sibling.
 
 ---
 
@@ -129,7 +132,7 @@ The canonical test strategy lives in [`testing.md`](testing.md) — the four-lay
 
 Before any PR is merged into omedora's `dev`:
 
-1. **Automated:** `test/omarchy-cli-test.sh` passes. `omarchy commands --check` passes. As the test infra in `testing.md` lands incrementally, additional L1/L2 tests join this list and CI runs them automatically.
+1. **Automated:** every `test/*-test.sh` passes, `bash test/cli` passes, the package-map validator passes, `omarchy commands --check` passes, and the byte-identity audit runs against the exact base.
 2. **Manual (Fedora):** boot a Fedora 44 VM, install omedora, run the touched code path. For a typical helper patch: run `omedora update` end-to-end and confirm no spurious errors.
 3. **Manual (Arch):** if the patch touched a shared file (anything with both Arch and Fedora arms), spin up an Arch box (or use the existing Omarchy infrastructure) and confirm the Arch path is unchanged.
 4. **Document both** in the PR body. Include the commands run, the VM environment, and any output worth flagging.
@@ -178,11 +181,11 @@ Stopping early is cheap. Carrying a half-resolved patch through a rebase is expe
 # Detect distro
 omarchy distro
 
-# Validate the package map (planned helper)
+# Validate the package map
 omarchy dev validate-fedora-packages
 
 # Run the CLI test suite
-test/omarchy-cli-test.sh
+bash test/cli
 
 # Validate command metadata
 omarchy commands --check
