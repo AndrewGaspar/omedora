@@ -11,17 +11,34 @@ that hard-codes development binaries should be changed to the packaged paths:
   hypxrvoicectl      /usr/bin/hypxrvoicectl
   hypxrva-watcher    /usr/bin/hypxrva-watcher
   hypxrpaper         /usr/bin/hypxrpaper
+  hypxrcompose       /usr/bin/hypxrcompose
+  HUD daemon         /usr/bin/hypxrhud (D-Bus activated)
+  HUD battery        /usr/bin/hypxrhud-battery
+  HUD keystrokes     /usr/bin/hypxrhud-keys
+  HUD command ticker /usr/bin/hypxrhud-cmdlog
+  hyprctl ticker shim /usr/share/hypxrhud/shim/hyprctl
   WiVRn runtime      /usr/share/openxr/1/openxr_wivrn.json
 
 The Omedora XR launcher selects the packaged hypxrva driver automatically.
 WiVRn pairing and component configuration remain per-user state.
 The package does not alter firewalld policy; WiVRn uses TCP and UDP port 9757.
+hypxrcompose validates and renders WiVRn's recorded .hypxrtake bundles offline.
+Fedora's packaged hypxrcompose defaults to OpenH264; see
+/usr/share/doc/hypxrcompose/hypxrcompose-fedora.md for codec and stereo-metadata
+limitations.
 
-HypXRland's OpenXR directives still use classic hyprlang. The package therefore
-installs Omedora 3's immutable default *.conf tree beside Quattro's Lua files;
-the stable Omedora session continues using Lua, while Omedora XR can source the
-classic tree through ~/.local/share/omarchy/default/hypr. Keep a standalone
-~/.config/hypr/hyprland-xr.conf; the RPM never overwrites it.
+HypXRland now supports both Lua and classic hyprlang XR declarations. Omedora XR
+retains ~/.config/hypr/hyprland-xr.conf as its compatibility entry point, and
+the hypxrland-legacy-config package keeps the immutable classic default *.conf
+tree beside Quattro's Lua files. The stable Omedora session continues using
+Lua. Advanced users can use /usr/share/doc/hypxrland/contrib/hyprland-xr.lua as
+a reference when migrating an independent XR config to Lua; the RPM never
+overwrites either user entry point.
+
+The WiVRn RPM is host-only. Headset camera or raw-microphone capture requires a
+commit-matched custom HypXR APK; the stock WiVRn client supports neither path.
+See /usr/share/doc/wivrn-hypxr/wivrn-hypxr-fedora.md before requesting device
+sources. A stock client can still be used for host-only .hypxrtake recording.
 
 This WiVRn build deliberately has no x264 software fallback. Fedora's
 ffmpeg-free exposes VAAPI and NVENC encoders, but the machine still needs at
@@ -41,6 +58,14 @@ The voice and HUD battery services can be enabled for the user with:
 
 hypxrhud itself is also D-Bus activated. The XR config normally starts
 wivrn.service only for the XR session instead of enabling it globally.
+
+The keystroke and command-ticker HUD producers are static, privacy-visible
+filming aids. Start them manually with `systemctl --user start
+hypxrhud-keys.service` or `hypxrhud-cmdlog.service`. Keystrokes require the
+external /usr/bin/showmethekey-cli backend. The XR session's private hyprctl is
+/usr/libexec/hypxrland/hyprctl; preserve it as HYPXR_CMD_HUD_REAL when opting
+into the ticker shim. Full Fedora guidance is installed at
+/usr/share/doc/hypxrhud/hypxrhud-fedora.md.
 
 XREAL Air users can additionally install monado-xreal. Its runtime manifest is
 /usr/share/openxr/1/openxr_monado-xreal.json and its private user unit is
