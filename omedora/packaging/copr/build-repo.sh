@@ -2,12 +2,10 @@
 #
 # Build all omedora RPMs and assemble them into a local dnf repository.
 #
-# This local repo is the stand-in for a published COPR: a directory of RPMs
-# with `createrepo_c` metadata that dnf can install from. The L4 session build
-# (build-session.sh) drops it into the container and points dnf at it, so
-# install.sh resolves walker/elephant/fonts + their dependencies exactly as it
-# would from a real COPR. When you publish the COPR, the only change is swapping
-# the repo URL (or flipping fedora.toml entries to source = "copr").
+# This local repo is a pre-publication test fixture: a directory of RPMs with
+# `createrepo_c` metadata that dnf can install from. The L4 session build
+# (build-session.sh) drops it into the container and points dnf at it. Production
+# installs and updates use the live version-scoped Omedora COPR.
 #
 # Output: packaging/copr/repo/ (a ready-to-serve dnf repo; gitignored).
 #
@@ -15,8 +13,8 @@
 # NOT committed with their cargo-vendor tarball. build-local.sh generates each
 # deterministically at SRPM-gen time from the upstream release tarball's
 # committed Cargo.lock (the rpmbuild build phase still runs fully offline against
-# it). A future COPR .copr/Makefile (#60) must do the same `cargo vendor` in its
-# SRPM step so COPR's offline build phase has the vendor dir.
+# it). The COPR SRPM tooling performs the same `cargo vendor` step so its offline
+# build phase has the vendor dir.
 
 set -euo pipefail
 

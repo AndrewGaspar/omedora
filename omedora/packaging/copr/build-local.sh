@@ -167,9 +167,9 @@ EOF
     # lock pins every transitive dep, and crates.io (name,version) content is
     # immutable, so `cargo vendor` produces a bit-identical crate set every time.
     # The rpmbuild (build) phase stays fully offline against this dir; only this
-    # source-prep step needs network (this container has it). A future COPR
-    # .copr/Makefile (#60) must run the same `cargo vendor` in its SRPM step so
-    # COPR'\''s offline build phase has the vendor dir.
+    # source-prep step needs network (this container has it). The COPR SRPM
+    # tooling runs the same `cargo vendor` step so its offline build phase has
+    # the vendor dir.
     #
     # Generic + guarded: act only for a *-vendor.tar.* SourceN that is NOT
     # already in SOURCES/, so non-Rust specs are untouched.

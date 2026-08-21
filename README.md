@@ -10,10 +10,10 @@ install, pick "Omedora" at the login screen, and get the Omarchy 4 experience �
 Hyprland, the new shell, the themes, the keybindings, and the `omarchy` command
 suite — running on Fedora's packages.
 
-> ### ⚠️ This is a beta
-> The Omedora 4 line tracks upstream Omarchy 4 (codename "quattro"), whose beta
-> branch remains under active development. Expect rough edges and breaking
-> changes. **If you want the stable, field-tested experience today, use
+> ### Omedora 4 is beta software
+> This line is rebased on the official Omarchy 4.0.0 release, but the Fedora
+> port itself remains under beta validation. Expect rough edges. **If you want
+> the established Omedora release today, use
 > [Omedora 3](https://github.com/AndrewGaspar/omedora/tree/omedora-3)** (the
 > `omedora-3` branch) instead.
 
@@ -101,7 +101,7 @@ Like Omedora 3, the Fedora install is deliberately **non-destructive** and
 Omarchy 4 updates through the package manager:
 
 ```bash
-omedora update              # refresh the Omedora COPR + system packages, run migrations
+omedora update              # refresh Omedora-managed packages, run migrations
 omedora update-available    # is a newer Omedora release out?
 omedora version             # the installed Omedora + Omarchy version
 ```
@@ -109,6 +109,25 @@ omedora version             # the installed Omedora + Omarchy version
 Because the payload is package-owned, updates come as new COPR builds — `omedora
 update` refreshes them and runs any pending user/system migrations. Your
 `~/.config` edits are yours; migrations handle required changes.
+
+### One-time beta.1 to beta.2 step
+
+Omedora `0.2.0-beta.1` shipped an older updater that runs an unscoped Fedora
+transaction before it can receive the beta.2 fix. **Do not run the beta.1
+`omedora update` first.** Upgrade the two core RPMs from the Omedora 4 COPR,
+then run the newly installed updater:
+
+```bash
+repo_id=$(omedora-copr --repo-id)
+sudo dnf copr enable -y "$(omedora-copr)"
+sudo dnf upgrade --refresh -y --setopt=install_weak_deps=False --from-repo="$repo_id" omedora omedora-settings
+test "$(rpm -q --qf '%{VERSION}\n' omedora omedora-settings | sort -u)" = "0.2.0~beta.2" && omedora update
+```
+
+The first transaction is intentionally limited to `omedora` and
+`omedora-settings`; it does not upgrade unrelated Fedora packages. The final
+guard refuses to invoke the updater unless both RPMs are beta.2. This step is
+needed once when moving from beta.1 to beta.2 and not for later updates.
 
 ---
 
