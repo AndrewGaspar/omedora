@@ -47,7 +47,7 @@ Requires:       omedora-settings
 # desktop set: the full set is installed by the omedora install transaction,
 # per install/omarchy-base.packages + install/packages/fedora.toml).
 #   bash/jq/gum/fzf — the bin/omarchy-* command family's interpreters + menus
-#   python3         — bin/fedora/{pkg,owned_packages}.py dnf backends
+#   python3         — bin/fedora package-map and managed-update backends
 #   quickshell      — the shell/ Quickshell desktop (lock/OSD/launcher/bar)
 #   foot            — default terminal omarchy-launch-* falls back to
 #   uwsm            — the session manager the omedora session launches through
@@ -127,6 +127,10 @@ cp -a shell %{buildroot}%{_datadir}/omarchy/shell
 install -pm644 version %{buildroot}%{_datadir}/omarchy/version
 install -Dpm644 omedora/version %{buildroot}%{_datadir}/omarchy/omedora/version
 install -Dpm644 omedora/base-version %{buildroot}%{_datadir}/omarchy/omedora/base-version
+# Fedora-only packages that complement upstream's base list. The managed update
+# resolver reads this from the installed payload as well as from source trees.
+install -Dpm644 omedora/install/fedora-baseline.packages \
+  %{buildroot}%{_datadir}/omarchy/omedora/install/fedora-baseline.packages
 
 # omedora helper binaries that live under the payload (not /usr/bin) because
 # they're sourced/copied by install steps via $OMARCHY_PATH, not run as
@@ -189,6 +193,8 @@ fi
 %dir %{_datadir}/omarchy/omedora
 %{_datadir}/omarchy/omedora/version
 %{_datadir}/omarchy/omedora/base-version
+%dir %{_datadir}/omarchy/omedora/install
+%{_datadir}/omarchy/omedora/install/fedora-baseline.packages
 %dir %{_datadir}/omarchy/omedora/bin
 %{_datadir}/omarchy/omedora/bin/powerprofilesctl-shim
 %{_datadir}/omarchy/omedora/bin/tensaku-edit

@@ -19,20 +19,22 @@
 # omedora COPR repo via `dnf check-upgrade --repo <id>`. The repo id is the
 # single source of truth from `omedora-copr --repo-id` (e.g.
 # copr:copr.fedorainfracloud.org:agaspar:omedora-4). Override with
-# OMEDORA_COPR_REPO_ID for tests; if the id can't be resolved we fall back to an
-# unscoped check so a misconfigured box still surfaces *some* signal.
+# OMEDORA_COPR_REPO_ID for tests. If the id cannot be resolved, fail closed
+# rather than turning the Omedora indicator into an unscoped Fedora update check.
 
 set -euo pipefail
 
 CHECK_TIMEOUT="${OMARCHY_UPDATE_CHECK_TIMEOUT:-60}"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/updates"
-DNF="${OMEDORA_DNF_CMD:-dnf}"
+read -r -a dnf_cmd <<<"${OMEDORA_DNF_CMD:-dnf}"
 
 # Restrict the upgrade check to the omedora COPR repo so the bar's update light
 # fires only for omedora/omarchy/COPR packages (#108).
-REPO_ID="${OMEDORA_COPR_REPO_ID:-$(omedora-copr --repo-id 2>/dev/null || true)}"
-repo_args=()
-[[ -n $REPO_ID ]] && repo_args=(--repo "$REPO_ID")
+if [[ ${OMEDORA_COPR_REPO_ID+x} == x ]]; then
+  REPO_ID=$OMEDORA_COPR_REPO_ID
+elif ! REPO_ID=$(omedora-copr --repo-id 2>/dev/null); then
+  REPO_ID=""
+fi
 
 mkdir -p "$STATE_DIR"
 
@@ -48,8 +50,15 @@ status=0
 # --refresh so a stale metadata cache can't hide (or invent) updates; the
 # output is "name arch version repo" lines plus headers we strip to package
 # lines only. dnf5's check-upgrade prints nothing when current.
-timeout "$CHECK_TIMEOUT" $DNF -q check-upgrade --refresh "${repo_args[@]}" \
-  >"$tmp_dir/raw" 2>"$tmp_dir/err" || status=$?
+if [[ -z $REPO_ID ]]; then
+  echo "Could not resolve the version-scoped Omedora repository" >"$errors_tmp"
+  : >"$tmp_dir/raw"
+  : >"$tmp_dir/err"
+  status=1
+else
+  timeout "$CHECK_TIMEOUT" "${dnf_cmd[@]}" -q check-upgrade --refresh --repo "$REPO_ID" \
+    >"$tmp_dir/raw" 2>"$tmp_dir/err" || status=$?
+fi
 
 case "$status" in
   0 | 100)
@@ -60,7 +69,7 @@ case "$status" in
     echo "System package update check timed out" >>"$errors_tmp"
     ;;
   *)
-    echo "System package update check failed" >>"$errors_tmp"
+    [[ -s $errors_tmp ]] || echo "System package update check failed" >>"$errors_tmp"
     sed '/^[[:space:]]*$/d' "$tmp_dir/err" >>"$errors_tmp" || true
     ;;
 esac
