@@ -54,6 +54,12 @@ grep -qE '^Requires:[[:space:]]+/usr/bin/ffmpeg$' "$COPR/hypxrcompose.spec" \
   && pass "compose uses ffmpeg capability" || fail "compose uses ffmpeg capability"
 grep -qE '^Requires:[[:space:]]+/usr/bin/ffprobe$' "$COPR/hypxrcompose.spec" \
   && pass "compose uses ffprobe capability" || fail "compose uses ffprobe capability"
+grep -qF 'Patch0:         hypxrcompose-fedora-codec.patch' "$COPR/hypxrcompose.spec" \
+  && grep -qF 'videoCodec  = "libsvtav1"' "$COPR/hypxrcompose-fedora-codec.patch" \
+  && grep -qF '"-svtav1-params", "lossless=1", "-g", "1"' "$COPR/hypxrcompose-fedora-codec.patch" \
+  && grep -qF 'EXPECT_EQ(matroskaTag(SBS_MKV), "left_right")' "$COPR/hypxrcompose-fedora-codec.patch" \
+  && pass "compose uses Fedora-available SVT-AV1 default" \
+  || fail "compose uses Fedora-available SVT-AV1 default"
 grep -qE '^Requires:[[:space:]]+/usr/bin/ffmpeg$' "$WIVRN" \
   && pass "WiVRn uses ffmpeg capability" || fail "WiVRn uses ffmpeg capability"
 ! grep -qE '^Requires:[[:space:]]+ffmpeg(-free)?([[:space:]]|$)' \
