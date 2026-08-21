@@ -17,11 +17,6 @@ TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
 MOCK_LOG="$TMPDIR/mock.log"
-INSTALLERS_DIR="$TMPDIR/installers"
-mkdir -p "$INSTALLERS_DIR"
-echo '#!/bin/bash' >"$INSTALLERS_DIR/install-walker.sh"
-chmod +x "$INSTALLERS_DIR/install-walker.sh"
-
 # Fixture map exercising each tier
 FIXTURE_MAP="$TMPDIR/fedora.toml"
 cat >"$FIXTURE_MAP" <<'EOF'
@@ -38,13 +33,19 @@ names = ["ghostty"]
 source = "flathub"
 app_id = "md.obsidian.Obsidian"
 
-[walker]
-source = "source"
-installer = "install-walker.sh"
-
 [ufw]
 source = "skip"
 reason = "Fedora ships firewalld"
+
+[future-name]
+source = "dnf"
+names = ["future-name-fedora"]
+since = "45"
+
+[former-name]
+source = "dnf"
+names = ["former-name-fedora"]
+until = "45"
 EOF
 
 # Prepend our mocks to PATH so the dispatch lands in them, not the real binaries.
@@ -52,7 +53,7 @@ EOF
 export PATH="$ROOT/test/mocks:$ROOT/bin:$PATH"
 export OMARCHY_DISTRO=fedora
 export OMARCHY_FEDORA_MAP="$FIXTURE_MAP"
-export OMARCHY_FEDORA_INSTALLERS="$INSTALLERS_DIR"
+export OMEDORA_FEDORA_VERSION=44
 export MOCK_LOG
 # pkg.py skips Flatpak installs when there's no DBus session bus (correct on a
 # bare container/TTY). These tests verify the flatpak *routing* via the mock, so
@@ -116,19 +117,6 @@ else
   fail "pkg-add obsidian → expected flatpak install call"
 fi
 
-# --- omarchy-pkg-add: source installer ---
-
-reset_log
-walker_installer_marker="$TMPDIR/walker-was-run"
-cat >"$INSTALLERS_DIR/install-walker.sh" <<EOF
-#!/bin/bash
-touch "$walker_installer_marker"
-EOF
-chmod +x "$INSTALLERS_DIR/install-walker.sh"
-
-"$ROOT/bin/omarchy-pkg-add" walker >/dev/null 2>&1 || true
-assert_file_exists "pkg-add walker → runs install-walker.sh installer" "$walker_installer_marker"
-
 # --- omarchy-pkg-add: skip is a no-op (and not a dnf install) ---
 
 reset_log
@@ -182,6 +170,43 @@ set +e
 exit_code=$?
 set -e
 assert_equals "pkg-present not-installed → exit 1 (missing)" "$exit_code" "1"
+
+# --- since/until: inactive entries are treated as intentional no-ops ---
+
+reset_log
+output=$("$ROOT/bin/omarchy-pkg-add" future-name former-name 2>&1 || true)
+if log_contains "sudo dnf install -y --setopt=install_weak_deps=False former-name-fedora" &&
+  log_lacks "future-name"; then
+  pass "Fedora 44 installs active mappings and skips future mappings"
+else
+  cat "$MOCK_LOG" >&2
+  fail "Fedora 44 applies since/until package-map bounds"
+fi
+assert_output_contains "inactive future mapping reports why it was skipped" \
+  "$output" "mapping does not apply"
+
+set +e
+OMEDORA_FEDORA_VERSION=44 "$ROOT/bin/omarchy-pkg-present" future-name >/dev/null 2>&1
+present_rc=$?
+OMEDORA_FEDORA_VERSION=44 "$ROOT/bin/omarchy-pkg-missing" future-name >/dev/null 2>&1
+missing_rc=$?
+set -e
+assert_equals "inactive mapping is present for guard semantics" "$present_rc" "0"
+assert_equals "inactive mapping is not missing for guard semantics" "$missing_rc" "1"
+reset_log
+OMEDORA_FEDORA_VERSION=44 "$ROOT/bin/omarchy-pkg-drop" future-name >/dev/null 2>&1
+log_lacks "dnf remove" && pass "inactive mapping removal is a no-op" \
+  || fail "inactive mapping removal is a no-op"
+
+reset_log
+OMEDORA_FEDORA_VERSION=45 "$ROOT/bin/omarchy-pkg-add" future-name former-name >/dev/null 2>&1 || true
+if log_contains "sudo dnf install -y --setopt=install_weak_deps=False future-name-fedora" &&
+  log_lacks "former-name"; then
+  pass "Fedora 45 installs active mappings and skips expired mappings"
+else
+  cat "$MOCK_LOG" >&2
+  fail "Fedora 45 applies since/until package-map bounds"
+fi
 
 # --- omarchy-pkg-drop: dnf remove for installed dnf package ---
 
