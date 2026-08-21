@@ -201,11 +201,11 @@ echo "# --- assertions ---"
 
 check "omedora installed" rpm -q omedora
 check "omedora-settings installed" rpm -q omedora-settings
-[[ $(rpm -q --qf '%{VERSION}' omedora 2>/dev/null) == "0.2.0~beta.1" ]] \
+[[ $(rpm -q --qf '%{VERSION}' omedora 2>/dev/null) == "0.2.0~beta.2" ]] \
   && ok "Omedora core migrated to the Quattro beta package" \
   || nok "Omedora core migrated to the Quattro beta package" \
     "version: $(rpm -q --qf '%{VERSION}' omedora 2>/dev/null || true)"
-[[ $(rpm -q --qf '%{VERSION}' omedora-settings 2>/dev/null) == "0.2.0~beta.1" ]] \
+[[ $(rpm -q --qf '%{VERSION}' omedora-settings 2>/dev/null) == "0.2.0~beta.2" ]] \
   && ok "Omedora settings migrated to the Quattro beta package" \
   || nok "Omedora settings migrated to the Quattro beta package" \
     "version: $(rpm -q --qf '%{VERSION}' omedora-settings 2>/dev/null || true)"
