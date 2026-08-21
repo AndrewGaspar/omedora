@@ -175,4 +175,12 @@ assert_exit_code "doctor still flags a foreign COPR alongside opaque-id pkgs (ex
     "tmux 3.6a 19278be6a81040f5b6cbc7bacea5148e" \
     "hyprland 0.56.0 copr:copr.fedorainfracloud.org:solopasha:hyprland"
 
+assert_exit_code "doctor fails closed when owned-package resolution fails" 2 \
+  env OMARCHY_DISTRO=fedora OMARCHY_FEDORA_MAP="$SCRATCH/missing-map.toml" \
+    OMEDORA_REPOQUERY_CMD="printf ''" "$ROOT/bin/omarchy-doctor"
+
+assert_exit_code "doctor fails closed when provenance query fails" 2 \
+  env OMARCHY_DISTRO=fedora OMEDORA_REPOQUERY_CMD="exit 42" \
+    "$ROOT/bin/omarchy-doctor"
+
 echo "# all coexistence tests passed"
