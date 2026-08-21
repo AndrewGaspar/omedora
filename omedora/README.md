@@ -5,8 +5,8 @@ This folder is Omedora's design and contributor documentation — the "why" and
 the [root README](../README.md).**
 
 This is the **Omarchy 4** line of Omedora — the re-architected, package-backed
-generation with the new Quickshell shell. It tracks upstream Omarchy 4 (codename
-"quattro") and is currently **beta**. The stable, field-tested line is
+generation with the new Quickshell shell. It is rebased on official Omarchy
+4.0.0 (codename "quattro"); the Fedora port is currently **beta**. The established line is
 [Omedora 3](https://github.com/AndrewGaspar/omedora/tree/omedora-3) (the `omedora-3`
 branch).
 
@@ -24,10 +24,10 @@ Read these in roughly this order:
 
 | Doc | What it covers |
 |---|---|
-| [`architecture.md`](architecture.md) | The technical design: the package-backed Omarchy 4 model, dual-distro patch model, package-helper dispatch, install-pipeline gating, CLI rebrand mechanism, update flow, branding. Includes the patch-stack map — the canonical list of files Omedora touches. |
+| [`architecture.md`](architecture.md) | The technical design: the package-backed Omarchy 4 model, dual-distro patch model, package-helper dispatch, install-pipeline gating, CLI alias/version branding, and update flow. Includes the patch-stack map — the canonical list of files Omedora touches. |
 | [`packages.md`](packages.md) | The tiered package-mapping strategy (Fedora main → RPM Fusion → COPR → Flathub → Omedora RPMs → skip), the on-demand package flow, and the TOML schema for `install/packages/fedora.toml`. |
 | [`testing.md`](testing.md) | The test pyramid (shell unit → Fedora container integration → smoke → L4-nested full session). Includes the L4-headless automated suite. |
-| [`versioning.md`](versioning.md) | Omedora's SemVer + release-tag scheme, the version-scoped COPR, and the two-channel (git + dnf) update flow. |
+| [`versioning.md`](versioning.md) | Omedora's SemVer + release-tag scheme, version-scoped COPR, and package-backed update flow. |
 | [`update-and-upgrade.md`](update-and-upgrade.md) | The `omedora update` flow on the package-backed Omarchy 4 base and what happens at Fedora major-version upgrades. |
 | [`rebase-workflow.md`](rebase-workflow.md) | How to resync onto a newer upstream `quattro`: the pin-tag rebase + force-push recipe (correct on this package-backed line, forbidden on omedora-3), conflict triage, byte-identity ALLOW maintenance, verification matrix. |
 | [`branding.md`](branding.md) | Where "Omedora" surfaces vs where "Omarchy" remains, and the ASCII logo. |
@@ -47,11 +47,12 @@ tiering rules and the review checklist for adding any new package source.
 ## Status
 
 **Beta.** The Omarchy 4 port is on the **`omedora-4`** branch, rebased onto
-upstream Omarchy 4 ("quattro"). The fresh-install path (`omedora/install-4.sh`),
+official Omarchy `v4.0.0`. The fresh-install path (`omedora/install-4.sh`),
 the package-backed payload (`omedora`/`omedora-settings` RPMs), the dnf-backed
-update pipeline, and the Quickshell shell all build and run on the
-**`agaspar/omedora-4` COPR** (`fedora-44-x86_64`) and pass the L1 + L4-nested
-session suites. The first Omedora 4 beta package wave is in progress.
+update pipeline, and the Quickshell shell target the
+**`agaspar/omedora-4` COPR** (`fedora-44-x86_64`). Release candidate
+`0.2.0-beta.2` has passed L1 and L2 verification; fresh-install, beta.1 upgrade,
+L4 nested/VM, and human visual sign-off remain required before publication.
 
 ## License
 
