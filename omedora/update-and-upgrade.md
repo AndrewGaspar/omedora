@@ -1,281 +1,164 @@
-# Update and upgrade flow
+# Update and upgrade policy
 
-This doc covers two distinct concerns:
+Omedora is layered onto a Fedora installation the user already owns. Its update
+command therefore updates Omedora's package universe, not the whole operating
+system.
 
-1. **`omedora update`** — the everyday update flow that mirrors `omarchy update`'s UX but targets only the omedora-managed package set on Fedora.
-2. **Fedora major-version upgrades** (44 → 45 → 46 …) — how omedora detects and reacts to the user upgrading their underlying Fedora install via `dnf system-upgrade`.
+## Fedora update flow
 
-For the architectural sketch and patch-stack entries, see [`architecture.md` §11](architecture.md#11-update-story--omedora-update).
+Upstream Quattro's `bin/omarchy-update` remains the orchestrator:
 
----
-
-## 1. Design principles
-
-- **Same UX as Arch.** Users running `omedora update` should see the same confirmation prompt, the same banners, the same progress, and (where possible) the same restart prompts as Arch users running `omarchy update`. The dispatch is invisible.
-- **Don't own the user's Fedora system.** `omedora update` does *not* run `dnf upgrade` of everything. It updates only the packages omedora installed. Users still update their Fedora system via their own preferred path (`dnf upgrade`, GNOME Software, etc.).
-- **Idempotent.** Re-running `omedora update` immediately after a successful run should be a no-op (or very close to it).
-- **Loud failures, soft skips.** Failures from package operations exit non-zero and surface the error. The only "soft skip" path is for map entries explicitly marked `source = "skip"`.
-- **Survive Fedora major upgrades.** A user can `dnf system-upgrade` to a new Fedora release, then run `omedora update`, and omedora detects the change and self-repairs (re-enables COPRs, re-resolves the package map, etc.) without manual intervention.
-
----
-
-## 2. The `omedora update` flow on Fedora
-
-End-to-end, when a user runs `omedora update` (or `omarchy update`, same dispatcher):
-
-```
-omedora update
-└─ bin/omarchy-update                       # user-facing wrapper (unchanged from Arch)
-    ├─ PTY-logged via `script` to /tmp/omarchy-update.log
-    ├─ omarchy-update-confirm               # confirmation prompt (unchanged)
-    ├─ omarchy-snapshot create              # exits 127 on Fedora → tolerated
-    ├─ omarchy-update-git                   # git pull in $OMARCHY_PATH (unchanged)
-    └─ omarchy-update-perform               # body, distro-dispatched
-        └─ case $(omarchy-distro) in fedora) exec omarchy-update-perform-fedora ;; esac
-           │
-           └─ omarchy-update-perform-fedora     # NEW
-              ├─ omarchy-update-fedora-version-check  # NEW
-              │   └─ if /etc/os-release VERSION_ID != last-fedora-version:
-              │       prompt, then bash install/packages/fedora-upgrade.sh
-              │       then write new marker
-              ├─ omarchy-update-fedora-coprs          # NEW
-              │   └─ dnf copr enable -y <each copr referenced in the package map>
-              ├─ omarchy-update-fedora-pkgs           # NEW
-              │   └─ sudo dnf upgrade -y --refresh \
-              │        $(resolve omarchy-base.packages + all entries with source=dnf via map)
-              ├─ omarchy-update-flatpaks              # NEW
-              │   └─ flatpak update -y <each app_id with source=flathub in the map>
-              ├─ omarchy-migrate                       # (unchanged; distro-aware via §9 of architecture)
-              ├─ omarchy-hook post-update              # (unchanged)
-              └─ omarchy-update-restart                # (unchanged)
+```text
+omarchy update
+  -> prune Omedora/Omarchy package cache
+  -> optional snapshot (absence is tolerated)
+  -> update a developer checkout, only when OMARCHY_PATH is not /usr/share/omarchy
+  -> Fedora keyring step: no-op
+  -> omarchy-update-system-pkgs
+       -> bin/fedora/update-system-pkgs
+  -> omarchy-migrate
+  -> post-update hook
+  -> Fedora AUR step: no-op
+  -> mise update
+  -> Fedora orphan step: no-op
+  -> status/log analysis and restart prompt
 ```
 
-### What each new step does in detail
+Normal package-backed Fedora installs use `/usr/share/omarchy`, so
+`omarchy-update-dev` exits without touching git.
 
-#### `omarchy-update-fedora-version-check`
+### One-time beta.1 bootstrap
 
-```
-last_seen=$(cat ~/.local/state/omedora/last-fedora-version 2>/dev/null || echo "")
-. /etc/os-release
-current=$VERSION_ID
+`0.2.0-beta.1` predates the managed-only updater. Its installed update command
+would start the old unscoped transaction before beta.2 code arrives, so beta.1
+users must **not** run `omedora update` first. The supported transition is:
 
-if [[ -n $last_seen && $last_seen != $current ]]; then
-  echo "Fedora upgraded: $last_seen → $current"
-  gum confirm "Run omedora's Fedora-upgrade migration now?" || exit 0
-  bash $OMARCHY_INSTALL/packages/fedora-upgrade.sh
-fi
-
-mkdir -p ~/.local/state/omedora
-echo "$current" > ~/.local/state/omedora/last-fedora-version
+```bash
+repo_id=$(omedora-copr --repo-id)
+sudo dnf copr enable -y "$(omedora-copr)"
+sudo dnf upgrade --refresh -y --setopt=install_weak_deps=False --from-repo="$repo_id" omedora omedora-settings
+test "$(rpm -q --qf '%{VERSION}\n' omedora omedora-settings | sort -u)" = "0.2.0~beta.2" && omedora update
 ```
 
-On first run after install, `last-fedora-version` doesn't exist — the script records the current version and moves on without prompting (the install itself is the "initial setup"). The check fires only after a `dnf system-upgrade` happens between omedora updates.
+The first command idempotently enables the version-scoped `agaspar/omedora-4`
+COPR selected by `omedora-copr`. The second command is a one-time transaction
+scoped to the two core RPMs; dnf5's `--from-repo` constrains those requested
+RPMs to that COPR while leaving normal repositories available for dependencies.
+Only after those packages report beta.2 should the
+normal updater run. `omedora/test/fedora/upgrade-from-beta1-verify.sh` enforces
+this ordering against real RPM and dnf state as an L3 release gate. The shell
+guard above makes that ordering executable: stale beta.1 RPMs prevent the final
+update command from running.
 
-#### `omarchy-update-fedora-coprs`
+## Managed RPM resolution
 
-```
-mapfile -t coprs < <(omarchy-pkg-map-coprs)   # parses fedora.toml, emits unique copr identifiers
+`bin/fedora/managed_packages.py` constructs the transaction in four parts:
 
-for copr in "${coprs[@]}"; do
-  if ! dnf copr list 2>/dev/null | grep -qF "$copr"; then
-    sudo dnf copr enable -y "$copr"
-  fi
-done
-```
+1. `omedora` and `omedora-settings`.
+2. Every dnf/COPR target resolved from the current
+   `install/omarchy-base.packages`.
+3. Every target in `omedora/install/fedora-baseline.packages`.
+4. Every non-base dnf/COPR map target whose mapped RPM is already installed.
 
-Why this step exists: Fedora's `dnf system-upgrade` disables third-party repos (RPM Fusion, COPRs) during the upgrade. They must be re-enabled afterward or `dnf upgrade` won't see updated builds for packages from those sources. Running this on every `omedora update` is idempotent and ensures the set is correct.
+Base and baseline targets are unconditional. This is intentional: when a new
+Omarchy release adds a base package, the next Omedora update must install it,
+not merely update packages that were present before the release.
 
-#### `omarchy-update-fedora-pkgs`
+Non-base map entries are optional. They are included only if already installed,
+so updating Omedora does not opt the user into every menu application or hardware
+variant described by the map.
 
-```
-# Resolve the omedora-managed package list:
-#   - All packages in omarchy-base.packages, translated via fedora.toml.
-#   - All other map entries with source = "dnf" or source = "copr" (the COPR ones already enabled above).
-#   - Skip entries with source = "flathub" (handled by omarchy-update-flatpaks).
-#   - Skip entries with source = "source" (handled by their own installers; updated separately if needed).
-#   - Skip entries with source = "skip".
-mapfile -t pkgs < <(omarchy-pkg-map-resolve --source=dnf,copr)
+Before each pass, the sibling resolves and enables the version-scoped COPR
+through `omedora-copr`. For `omedora` and `omedora-settings`, it queries the
+latest noarch candidate from that repository and records each exact NEVRA and
+EVR. Missing, duplicate, malformed, or wrong-repository results abort.
 
-if (( ${#pkgs[@]} > 0 )); then
-  echo "Updating Fedora packages managed by omedora..."
-  sudo dnf upgrade -y --refresh "${pkgs[@]}"
-fi
-```
+Core reconciliation is separate from the broad managed transaction. When an
+installed core EVR differs, including a locally newer build, the sibling runs an
+exact-NEVRA `dnf install --allow-downgrade --from-repo=<expected-id>`. When the
+EVR matches but `%{from_repo}` is foreign, it runs an exact-NEVRA `dnf reinstall`
+with the same source constraint. dnf5 applies `--from-repo` to the requested
+items while leaving all enabled repositories available for dependencies.
 
-The crucial difference from `omarchy-update-system-pkgs` (the Arch counterpart, which is `sudo pacman -Syyu --noconfirm`): we pass an explicit package list to `dnf upgrade`. The user's other Fedora packages are not touched. If the user has 200 packages installed beyond omedora, none of them are updated by this step.
+The remaining managed names are then installed with:
 
-#### `omarchy-update-flatpaks`
-
-```
-mapfile -t apps < <(omarchy-pkg-map-resolve --source=flathub)
-
-if (( ${#apps[@]} > 0 )); then
-  echo "Updating omedora Flatpaks..."
-  flatpak update -y "${apps[@]}"
-fi
-```
-
-Again, scoped: only Flatpaks omedora installed. The user's other Flatpaks are untouched.
-
-#### Source-installed packages
-
-Source installers (under `install/packages/installers/install-<name>.sh`) write their installed version to `~/.local/state/omedora/installed-versions/<name>`. When omedora wants to update them, it re-runs the installer — the installer checks its own version stamp and either no-ops or refreshes. This means we don't need a separate `omarchy-update-source-pkgs` step at the orchestrator level; it's handled implicitly when the package map's source-installed packages get re-resolved.
-
-In practice, source installers are infrequent (Walker and a small handful at most). The cleanest flow is to bump `VERSION_TAG` inside the installer script when we want users to get a new build, and let `omedora update` → `omarchy-migrate` → migration-that-re-runs-installer handle the delivery. That keeps the update-flow surface narrow.
-
----
-
-## 3. Fedora major-version upgrade handling
-
-When a user runs `dnf system-upgrade` to go from Fedora 44 to Fedora 45, three things can break omedora:
-
-1. **Third-party `.repo` files get disabled.** Fedora's `dnf system-upgrade` plugin auto-disables RPM Fusion and any COPRs to prevent cross-version dependency conflicts during the upgrade. They need re-enabling on the new release.
-2. **COPRs may lack a build for the new Fedora version.** If the omedora COPR (or the on-demand `scottames/ghostty` COPR) doesn't have an F45 build yet on the morning the user upgrades, `dnf` will refuse to install/update packages from that source. omedora needs to handle this gracefully.
-3. **Packages may have moved into or out of main repos.** Hyprland might be in F45 main repos when it wasn't in F44; conversely a package we relied on may have been removed. The package map should reflect the new reality.
-
-### `install/packages/fedora-upgrade.sh`
-
-This script runs once after a detected major upgrade. Its job:
-
-```
-echo "Reconfiguring omedora for $(. /etc/os-release; echo $VERSION_ID)"
-
-# 1. Re-run the preflight repo enablement (idempotent).
-bash $OMARCHY_INSTALL/preflight/fedora-repos.sh
-
-# 2. Probe each COPR for current-Fedora build availability.
-mapfile -t coprs < <(omarchy-pkg-map-coprs)
-for copr in "${coprs[@]}"; do
-  if ! dnf --enablerepo="copr:copr.fedorainfracloud.org:${copr/\//:}" list available &>/dev/null; then
-    echo "WARNING: COPR $copr has no builds for this Fedora version yet."
-    echo "         Packages using this COPR may fail to install/update until the COPR catches up."
-  fi
-done
-
-# 3. Re-resolve the package map and look for entries that should now use main repos.
-omarchy-pkg-map-check-promotions
-
-# 4. (Optional, gated by user confirm) re-run the install pipeline to pick up any new packages
-#    upstream Omarchy added since the last omedora update.
-gum confirm "Re-run omedora install to apply latest configuration?" && {
-  bash $OMARCHY_INSTALL/packaging/all.sh
-  bash $OMARCHY_INSTALL/config/all.sh
-}
+```bash
+sudo dnf install --refresh -y --setopt=install_weak_deps=False \
+  --exclude=omedora --exclude=omedora-settings "${managed_without_core[@]}"
 ```
 
-The "check-promotions" step is just a diagnostic: it scans the map for entries with `source = "copr"` whose package now exists in main repos, and tells the maintainer (via the log) that the map can probably be updated. It doesn't automatically rewrite the map — that's a human/agent decision.
+The exclusions prevent another enabled repository from replacing the reconciled
+core RPMs during this broader pass. For other named installed packages, `dnf
+install` selects the latest available build; newly added base names are
+installed. Because every top-level target is explicit, unrelated installed
+Fedora RPMs do not join the transaction. Dependency changes required by managed
+targets may still be resolved normally by dnf.
 
-After the script finishes, control returns to `omarchy-update-fedora-version-check`, which writes the new version marker.
+After core reconciliation and again after the broad pass, the sibling requires
+each installed core EVR to equal the selected expected-COPR EVR and each
+installed `%{from_repo}` to equal the version-scoped COPR ID. Query failure,
+ambiguity, transaction mismatch, or foreign provenance aborts the update.
 
-### What the user sees during a major upgrade
+After the first transaction, the sibling resolves the list again from the
+potentially replaced `omedora` payload. If the new release changed the base list
+or map, it runs one more scoped transaction. This is what installs a base package
+introduced by the release being applied, without requiring a second user update.
 
-1. User runs `dnf system-upgrade reboot` and goes through Fedora's normal upgrade flow.
-2. After the reboot completes, the user logs back in. Their Omedora session may or may not start cleanly — if a Hyprland-stack package broke (e.g., portal mismatch), the user may need to fall back to GNOME / their previous session to run the next step.
-3. From a working terminal, the user runs `omedora update`.
-4. `omarchy-update-fedora-version-check` detects the mismatch and prompts: "Fedora upgraded: 44 → 45. Run omedora's Fedora-upgrade migration now?"
-5. User confirms; the migration runs, re-enables COPRs, warns about any COPR that lacks a build for F45.
-6. The normal `omedora update` flow continues — dnf upgrade picks up the latest builds, Flatpaks update, migrations run.
-7. The user logs into the Omedora session again, which should now work on F45.
+An unscoped `dnf upgrade` is prohibited. `bin/omedora-update-pkgs`, retained as
+a compatibility command, executes the same scoped sibling and cannot bypass the
+policy.
 
----
+## Other update sources
 
-## 4. Comparison: `omarchy update` on Arch vs `omedora update` on Fedora
+- Arch keyring, AUR, and pacman orphan logic are Fedora no-ops.
+- Omedora does not run `dnf autoremove`.
+- Flatpak entries remain user-managed unless a specific Omedora migration or
+  install action updates them; the RPM transaction never broadens into a global
+  `flatpak update`.
+- Mise-managed development tools continue through upstream's
+  `omarchy-update-mise` behavior.
 
-| Step | Arch | Fedora | Notes |
-| --- | --- | --- | --- |
-| Confirm prompt | `omarchy-update-confirm` | same | Unchanged; distro-agnostic UX. |
-| Snapshot | `omarchy-snapshot create` (snapper) | exit 127 (tolerated) | omedora doesn't own snapshots. |
-| Git pull omedora repo | `omarchy-update-git` | same | Unchanged. |
-| Major-version check | — | `omarchy-update-fedora-version-check` | New on Fedora; no equivalent on Arch (rolling release). |
-| Re-enable third-party repos | — | `omarchy-update-fedora-coprs` | New on Fedora; pacman doesn't disable repos on its own. |
-| Update keyring | `omarchy-update-keyring` | — | Arch-specific (omarchy + archlinux keyring). Fedora's RPM keys are managed by dnf itself. |
-| Reset available-update marker | `omarchy-update-available-reset` | same | Unchanged. |
-| Update system packages | `omarchy-update-system-pkgs` (`pacman -Syyu`) | `omarchy-update-fedora-pkgs` (`dnf upgrade <omedora list>`) | **Key difference:** Arch updates *the whole system*; Fedora updates *only omedora-managed packages*. |
-| Run migrations | `omarchy-migrate` | same | Distro-aware via env var; migrations self-gate. |
-| Update AUR packages | `omarchy-update-aur-pkgs` | — | Arch-specific; Fedora has no AUR. |
-| Update Flatpaks | — | `omarchy-update-flatpaks` | Fedora-only step. |
-| Remove orphans | `omarchy-update-orphan-pkgs` | — | Arch-specific. dnf autoremove is a separate user concern; out of scope. |
-| Post-update hook | `omarchy-hook post-update` | same | Unchanged. |
-| Analyze logs | `omarchy-update-analyze-logs` | same | Unchanged. |
-| Prompt restart | `omarchy-update-restart` | same | Detects deleted Hyprland binary + kernel updates. The kernel-update detection attributes `/usr/lib/modules/*/vmlinuz` to a package: `pacman -Qo` on Arch, `rpm -qf` on Fedora (distro-dispatched — fixed, see below). |
+## Update availability
 
-**Resolved:** `omarchy-update-restart` now dispatches the kernel-file→package probe by distro (`rpm -qf` on Fedora, `pacman -Qo` on Arch), so it no longer falsely prompts a reboot on every Fedora update.
+`bin/omarchy-update-available` dispatches to
+`bin/fedora/update-available`. It runs `dnf check-upgrade` scoped to the Omedora
+COPR repo ID from `bin/omedora-copr` and writes the state files consumed by the
+Quickshell update indicator. Pending kernel or unrelated Fedora updates do not
+light the Omedora indicator.
 
----
+## Fedora major upgrades
 
-## 4a. Fedora-update breakages fixed (the `omarchy update` / `omedora update` flow)
+Omedora does not initiate `dnf system-upgrade`. The user upgrades Fedora through
+Fedora's supported tooling. Before supporting a new Fedora release, maintainers
+must:
 
-Three Arch-only assumptions in the shared update chain aborted (or degraded) the Fedora flow. All are now guarded/distro-gated, keeping the Arch paths byte-identical:
+1. Build all required Omedora RPMs for that release.
+2. Validate every base-map target against its repositories.
+3. Run the Fedora integration, fresh-install, upgrade, and session gates.
+4. Review package moves, replacements, and SELinux behavior.
 
-1. **`script` PTY wrapper (the headline bug).** `bin/omarchy-update` re-execs itself under `script` to log the session to `/tmp/omarchy-update.log`. On Fedora 44 `script` lives in the `util-linux-script` package (split out of `util-linux-core`) and is absent on a minimal base, so the unconditional `exec env … script …` died immediately with `env: 'script': No such file or directory` — before *any* Fedora logic ran. Now guarded on `command -v script`: present → logged path (Arch always; Fedora once `util-linux-script` is installed); absent → run unlogged instead of aborting. omedora's Fedora baseline (`install/packaging/fedora-baseline.sh`) now installs `util-linux-script` so fresh installs get the logged path.
+If the Omedora COPR does not have builds for the new Fedora release, users should
+remain on the supported Fedora version. The update command must fail loudly
+rather than replacing managed packages from an unreviewed source.
 
-2. **`omarchy-update-time` restarted `systemd-timesyncd`.** Fedora rides `chronyd` and does not ship `systemd-timesyncd`, so the restart failed — and because `omarchy-update-git` calls it under `set -e`, it aborted the **whole update right after the git pull**. Now restarts `chronyd` on Fedora (tolerating it being absent/inactive).
+## Failure behavior
 
-3. **`omarchy-update-restart` kernel probe used `pacman -Qo`** (see §4 row above) — now `rpm -qf` on Fedora.
+- A dnf transaction failure aborts the update and is safe to retry after the
+  repository or dependency issue is corrected.
+- Missing managed candidates, an unavailable Omedora COPR, or ambiguous core
+  candidate data aborts before package installation. Core EVR/provenance
+  mismatch after reconciliation or after the broad pass aborts immediately.
+- A failed migration does not receive a completion marker and retries later.
+- A missing snapshot implementation is tolerated; other snapshot failures are
+  reported before continuing.
+- Restart/reboot remains an explicit user decision.
 
-### Recovery for users already on v0.1.0 / v0.1.1 (important)
+## Tests
 
-The guard (#1) and the timesyncd fix (#2) are **going-forward** fixes: they live in the *new* code. A user already on v0.1.0/v0.1.1 is running the *old* `omarchy-update`, which dies at the `script` wrapper (and, on a real Fedora box, at the `systemd-timesyncd` restart) **before** it can `git pull` the fix. So `omarchy update` cannot self-heal those installs — it's chicken-and-egg.
+`test/update-flow-test.sh` uses fixture base/map files and mocked rpm/dnf tools to
+prove the transaction includes core, mapped base, newly added base, Fedora
+baseline, and installed optional RPMs while excluding an installed unrelated
+RPM. It also verifies the Arch update arms emit no dnf calls.
 
-**The one-time recovery is a manual pull (no sudo):**
-
-```
-git -C ~/.local/share/omarchy pull
-```
-
-After that single pull, the on-disk `omarchy-update` is the fixed one, and `omarchy update` works normally from then on. (Re-running omedora's bootstrap installer achieves the same thing.) This is verified end-to-end by `omedora/test/fedora/upgrade-from-release-test.sh`, which checks out each prior release in a fedora:44 container, confirms `omarchy update` stays stuck, then confirms the manual pull + a subsequent `omarchy update` reaches the real `dnf upgrade` dispatch.
-
----
-
-## 5. Failure modes and recovery
-
-### `dnf upgrade` fails partway
-
-Same behavior as Arch's `pacman -Syyu` failing partway: surface the error, exit non-zero. `omarchy-update` is wrapped in a `trap ERR` that points the user to the discord/community link. User re-runs after fixing the underlying issue.
-
-### A COPR is unreachable
-
-`omarchy-update-fedora-coprs` will fail loudly if `dnf copr enable` errors out. The user can:
-
-1. Re-run `omedora update` later when the COPR is back.
-2. If a COPR is permanently dead, edit the package map to move affected entries to a different tier (source installer, Flathub, or skip).
-
-`omarchy-update-fedora-pkgs` is the next step; it will fail if the COPR's packages aren't available. The error message includes which packages failed, which makes diagnosis straightforward.
-
-### A Flatpak refuses to update
-
-`flatpak update -y` may report failures for individual apps without aborting the run. The exit code reflects the worst case. Users can inspect with `flatpak update -y --verbose` separately if needed.
-
-### A migration fails
-
-Existing upstream behavior: gum prompts the user to skip or abort. Skipping writes a marker into `~/.local/state/omarchy/migrations/skipped/`, so the migration won't re-prompt. This is the same on Fedora.
-
-### A source installer fails
-
-The installer's exit code propagates. Source installers should be coded defensively (network resilience, idempotency); when they fail, the user gets a clear error and can either re-run `omedora update` or invoke the installer manually.
-
-### The user's Omedora session won't start after `dnf system-upgrade`
-
-Documented user-facing recovery path:
-
-1. Log in to a fallback session (GNOME / their previous DE).
-2. Open a terminal.
-3. Run `omedora update`. The Fedora-upgrade migration will run.
-4. Log out, log back in to Omedora.
-
-If that doesn't help, file an issue with the omedora repo including the output of `omedora debug` (which captures Fedora version, GPU, Hyprland version, and recent journal lines).
-
----
-
-## 6. What omedora update does NOT do
-
-To avoid surprising users coming from Arch:
-
-- **Does not run `dnf upgrade` of the whole system.** The user's other packages are not touched.
-- **Does not run `flatpak update -y`** for *all* their Flatpaks. Only the ones omedora installed.
-- **Does not run `dnf autoremove`.** Removing orphans on Fedora is a user-policy choice; we don't make it.
-- **Does not change `dnf` configuration or repo priorities.** RPM Fusion and the Hyprland COPR are added via standard `dnf install rpmfusion-*-release` / `dnf copr enable`, nothing more.
-- **Does not reboot.** It may prompt for one via `omarchy-update-restart` (e.g., when Hyprland was updated and the running binary is now "(deleted)"), but the user decides.
-- **Does not silently fall back tiers.** If a `source = "dnf"` entry's package can't be installed because the repo is down, it fails — not silently switch to Flathub.
-
-These boundaries are what make `omedora update` safe to run frequently on top of an enterprise-managed Fedora install.
+Real package-manager behavior belongs in Fedora L2/L3 and the pre-release upgrade
+gate described in [`testing.md`](testing.md).
