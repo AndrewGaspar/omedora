@@ -196,7 +196,7 @@ v4_kept_packages=(
   hyprland-guiutils hyprpicker hyprsunset
   xdg-desktop-portal-hyprland
   uwsm
-  hypxrpaper hypxrva hypxrhud
+  hypxrpaper hypxrva hypxrhud hypxrcompose
   hypxrvoice hypxrvoice-model-base-en
   wivrn-hypxr monado-xreal
   hypxrland-legacy-config hypxrland hypxrland-stack hypxrland-omedora
