@@ -1,8 +1,7 @@
 name: Test
 
-# P0 scope: only the ported L1 foundation tests + the upstream CLI suite run
-# here. The rest of the pyramid returns phase by phase as the omarchy-4 port
-# lands (pkg helpers/L2 in P3, install smoke/L3 in P4, update flow in P5).
+# CI runs the deterministic L1 suite and upstream's Arch CLI contract. Fedora
+# L2 and the package/session-backed L3/L4 runners remain explicit local gates.
 
 on:
   push:
@@ -126,7 +125,7 @@ jobs:
             -v "${GITHUB_WORKSPACE}:/repo" \
             -w /repo \
             archlinux:latest bash -c '
-              pacman -Sy --noconfirm --needed jq python git gum >/dev/null
+              pacman -Syu --noconfirm --needed jq python git gum ripgrep fontconfig >/dev/null
               # Upstream CLI behavior must hold byte-for-byte on Arch even
               # with the omedora bins present on the tree.
               bash test/cli
