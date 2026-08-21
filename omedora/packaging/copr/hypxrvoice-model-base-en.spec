@@ -8,7 +8,7 @@ Summary:        Whisper base.en speech model for HypXRVoice
 
 License:        MIT
 URL:            https://github.com/openai/whisper
-Source0:        https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+Source0:        https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.en.bin
 
 BuildArch:      noarch
 

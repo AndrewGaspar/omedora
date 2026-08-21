@@ -85,10 +85,10 @@ RPM Fusion, or an approved source are built under `omedora/packaging/copr/` and
 served from `agaspar/omedora-4`.
 
 Hyprland is split so `hyprland-no-session` provides the compositor without a
-login entry. Omedora currently packages Hyprland 0.56.1 with Aquamarine 0.14.0.
-The separate HypXR package stack consumes that stable ABI and is maintained by
-its own packaging workflow; a Quattro source rebase does not imply an HypXR
-rebuild.
+login entry. Omedora packages Hyprland 0.56.2 with Aquamarine 0.14.0. The
+separate HypXR package stack consumes that stable dependency wave and is
+maintained by its own packaging workflow; a Quattro source rebase does not by
+itself imply an HypXR rebuild.
 
 ## 6. System boundary
 

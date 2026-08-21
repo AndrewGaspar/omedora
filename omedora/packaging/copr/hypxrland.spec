@@ -1,6 +1,6 @@
 # hypxrland.spec — the HypXRland OpenXR compositor (omedora).
 #
-# HypXRland is a rolling fork layered directly on Hyprland 0.56.1. It is
+# HypXRland is a rolling fork layered directly on Hyprland 0.56.2. It is
 # intentionally packaged in parallel with, rather than as a replacement for,
 # Omedora's stable Hyprland:
 #
@@ -21,16 +21,19 @@
 # matching hyprland.spec, because Fedora 44 provides Lua 5.4 while Hyprland
 # 0.56.x requires 5.5.
 
-%global base_version 0.56.1
-%global snapshot 20260811.1
-%global commit 25c9b36859b81f412254e6446eae716f242215a6
+%global base_version 0.56.2
+%global snapshot 20260821.2
+%global commit 67200a838356a206c4819595a2f733299ab4da63
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 %global udis86_commit 5336633af70f3917760a6d441ff02d93477b0c86
 %global lua_version 5.5.0
+# Large C++26 translation units plus the precompiled header exhaust memory on
+# constrained COPR builders even at four-way parallelism.
+%global _smp_ncpus_max 1
 
 Name:           hypxrland
 Version:        %{base_version}^%{snapshot}.git%{shortcommit}
-Release:        2%{?dist}
+Release:        1%{?dist}
 Summary:        Hyprland-based spatial OpenXR compositor
 
 # HypXRland/Hyprland: BSD-3-Clause
@@ -124,14 +127,14 @@ Provides:       hypxrland-bin = %{version}-%{release}
 # importantly—the fallback compositor binary. HypXRland's hyprctl is installed
 # privately because its only fork delta is XR-specific command help. Reassess
 # this range and the shared-library policy when HypXRland rebases onto 0.57.
-Requires:       hyprland-no-session%{?_isa} >= %{base_version}
+Requires:       hyprland-no-session%{?_isa} >= 0.56.2-1
 Requires:       hyprland-no-session%{?_isa} < 0.57
-Requires:       hypxrland-legacy-config
-Requires:       uwsm
+Requires:       hypxrland-legacy-config >= 3.8.4^20260812.1.gitc83a2dd6c-1
+Requires:       uwsm >= 0.26.5
 Requires:       vulkan-loader%{?_isa}
 
 %description
-HypXRland extends Hyprland 0.56.1 with spatial OpenXR monitors, headset input,
+HypXRland extends Hyprland 0.56.2 with spatial OpenXR monitors, headset input,
 anchoring and XR session control. This package installs the compositor under a
 private libexec path so Omedora's stable Hyprland remains installed and usable
 as a fallback.
@@ -176,10 +179,10 @@ export PKG_CONFIG_PATH="%{_builddir}/hypxrland-lua-prefix/lib/pkgconfig${PKG_CON
 export GIT_COMMIT_HASH=%{commit}
 export GIT_BRANCH=hypxrland
 export GIT_COMMIT_MESSAGE="packaged HypXRland snapshot %{shortcommit}"
-export GIT_COMMIT_DATE=2026-08-11
+export GIT_COMMIT_DATE=2026-08-21
 export GIT_DIRTY=clean
-export GIT_TAG=v%{base_version}-285-g%{shortcommit}
-export GIT_COMMITS=7928
+export GIT_TAG=v%{base_version}-373-g%{shortcommit}
+export GIT_COMMITS=8034
 
 %cmake \
   -GNinja \
@@ -218,11 +221,22 @@ XDG_RUNTIME_DIR="$runtime_dir" %{__cmake_builddir}/Hyprland --version |
 
 %files
 %license LICENSE
-%doc example/openxr.conf docs/openxr/00-overview.md docs/openxr/05-configuration.md
+%doc example/openxr.conf contrib/hyprland-xr.lua docs/openxr/00-overview.md docs/openxr/05-configuration.md
 %{_libexecdir}/hypxrland/
 %{_bindir}/hypxrland-session
 
 %changelog
+* Fri Aug 21 2026 omedora <noreply@omedora> - 0.56.2^20260821.2.git67200a838-1
+- Refresh to the current public hypxrland tip, including cached GPU probing for
+  hyprctl systeminfo so repeated queries do not wake a suspended discrete GPU.
+
+* Fri Aug 21 2026 omedora <noreply@omedora> - 0.56.2^20260821.1.git552222a48-1
+- Rebase to the current public hypxrland tip on Hyprland 0.56.2.
+- Preserve Omedora's private XR-aware hyprctl, classic-config bridge, and
+  session-only PATH injection while also shipping upstream's Lua XR example.
+- Require the matching stable Hyprland 0.56.2 fallback and minimum Quattro
+  compatibility package versions.
+
 * Wed Aug 12 2026 omedora <noreply@omedora> - 0.56.1^20260811.1.git25c9b3685-2
 - Install the matching XR-aware hyprctl privately for Omedora 4 sessions.
 - Require the classic hyprlang compatibility defaults used by HypXRland.
