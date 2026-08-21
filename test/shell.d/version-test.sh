@@ -55,8 +55,8 @@ pass "version fails when no Omarchy package is installed"
 cat >"$stub_bin/cat" <<'STUB'
 #!/bin/bash
 case "$1" in
-  /usr/share/omarchy/omedora/version) printf '0.2.0-beta.1\n' ;;
-  /usr/share/omarchy/omedora/base-version) printf '4.0.0-beta3+13\n' ;;
+  /usr/share/omarchy/omedora/version) printf '0.2.0-beta.2\n' ;;
+  /usr/share/omarchy/omedora/base-version) printf '4.0.0\n' ;;
   *) exec /usr/bin/cat "$@" ;;
 esac
 STUB
@@ -64,9 +64,9 @@ chmod +x "$stub_bin/cat"
 fedora_version=$(OMARCHY_DISTRO=fedora OMARCHY_PATH=/usr/share/omarchy \
   PATH="$stub_bin:$PATH" \
   "$ROOT/bin/omarchy-version")
-[[ $fedora_version == "Omedora 0.2.0-beta.1 (rebased on Omarchy 4.0.0-beta3+13)" ]] \
-  || fail "Fedora version reports the immutable beta base" "actual: $fedora_version"
-pass "Fedora version reports the immutable beta base"
+[[ $fedora_version == "Omedora 0.2.0-beta.2 (rebased on Omarchy 4.0.0)" ]] \
+  || fail "Fedora version reports the official immutable base" "actual: $fedora_version"
+pass "Fedora version reports the official immutable base"
 
 # The snapshot description is only a label, so a failed lookup must not abort
 # the update under set -e.
