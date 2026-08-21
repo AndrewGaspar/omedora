@@ -5,8 +5,8 @@
 # "Omedora" session installed beside "Omedora XR" as the fallback.
 
 Name:           hypxrland-omedora
-Version:        1.0.0
-Release:        2%{?dist}
+Version:        1.1.0
+Release:        1%{?dist}
 Summary:        Omedora XR wayland-session entry
 
 License:        MIT
@@ -18,8 +18,8 @@ BuildRequires:  desktop-file-utils
 
 # Requiring the branded stable session is deliberate: installing Omedora XR
 # must add a choice to the greeter, never replace the known-good fallback.
-Requires:       hypxrland-stack
-Requires:       omedora-settings
+Requires:       hypxrland-stack >= 1.1.0-1
+Requires:       omedora-settings >= 0.2.0~beta.2
 
 %description
 The Omedora XR display-manager session entry. It installs the complete Fedora
@@ -45,6 +45,10 @@ desktop-file-validate \
 %{_datadir}/wayland-sessions/omedora-xr.desktop
 
 %changelog
+* Fri Aug 21 2026 omedora <noreply@omedora> - 1.1.0-1
+- Require the fully versioned refreshed XR stack and current Quattro settings
+  while preserving the stable Omedora fallback session.
+
 * Wed Aug 12 2026 omedora <noreply@omedora> - 1.0.0-2
 - Require the package-backed Quattro settings payload while retaining the
   stable Omedora session beside Omedora XR.

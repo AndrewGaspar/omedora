@@ -239,8 +239,31 @@ Each `.spec` is a single RPM. Three flavors, by how the upstream ships:
 | **From-source (qmake/Qt6)** | A plain C++/Qt6 project | `omacut.spec`, `omawrite.spec`, `omacalc.spec` | Quattro's omarchy-family Qt6/QML apps. `%build` runs upstream's qmake build; no vendoring is needed because every dependency comes from `BuildRequires:`. Omacalc also runs its Qt unit suite offscreen and ships Omarchy's desktop entry and icon. |
 | **From-source (Cargo + pinned Zig)** | A Rust project with a Zig-built embedded library | `herdr.spec` | Cargo dependencies are vendored separately from Herdr's own `vendor/portable-pty` and `vendor/libghostty-vt` path dependencies. The networked SRPM phase runs the exact upstream-required Zig 0.15.2 lib-vt build graph and archives only its immutable package store. Mock then rebuilds entirely offline from the Cargo and Zig caches; the Zig binary is build-only and is not shipped. |
 | **From-source (Meson/C++)** | A plain C/C++ Meson project | `gpu-screen-recorder.spec` | The GPU-accelerated screen recorder omarchy's `omarchy screenrecord` flow (`bin/omarchy-capture-screenrecording`) and the Quickshell bar indicator (`ScreenRecording.qml`) are **hardcoded** to — they exec / `pgrep -f "^gpu-screen-recorder"`, so skip-mapping it made recording a silent no-op. From-source (`%meson`/`%meson_build`/`%meson_install`), all deps via `BuildRequires:` so `%build` is offline. **ffmpeg:** builds against Fedora main's stripped **`ffmpeg-free-devel`** — gsr encodes via VAAPI/NVENC/Vulkan, not libx264 — so it needs **no RPM Fusion** at build or runtime (all deps resolve from Fedora main; verified with `dnf install --downloadonly`). NVENC/CUDA are `dlopen`'d at runtime (headers bundled in `external/`) — no CUDA build dep. Ships `/usr/bin/gpu-screen-recorder` + the `gsr-kms-server` KMS-capture helper, granted `CAP_SYS_ADMIN` as a **file capability** (not setuid) via `%post: setcap cap_sys_admin+ep`; built with `-Dcapabilities=false` so meson's own install-time `setcap` doesn't choke rpmbuild's fakeroot. Debuginfo stays enabled (a real `-g` C/C++ build). |
+| **From-source (CMake/C++)** | A native C/C++ project | `hyprland.spec`, `hypxrland.spec`, `hypxrcompose.spec` | Hyprland and HypXRland build against the ordered packaged dependency wave; HypXRland additionally pins every omitted source archive and requires OpenXR plus its Vulkan GPU probe. Hypxrcompose runs its headless media/reprojection suite and uses executable runtime capabilities for ffmpeg compatibility. |
 
 Conventions shared across specs: `Source0:` uses macros (`%{url}`, `%{version}`, `%{pypi_source}`) so URLs stay in sync with `Version:`; `spectool -g` (run by the build script) downloads every `SourceN`; the header comment explains *why* this flavor was chosen. Keep the `%changelog` and `Version:` current when bumping.
+
+### HypXR stack
+
+The Quattro XR session is an additive package stream. `hypxrland` installs its
+0.56.2 compositor and matching XR-aware `hyprctl` under
+`/usr/libexec/hypxrland`; `hypxrland-session` prepends that directory only for
+the XR session. The stable `hyprland-no-session` compositor remains installed as
+the fallback. `hypxrland-legacy-config` keeps the classic hyprlang bridge beside
+Quattro's Lua defaults, while the current fork also ships a Lua XR example.
+
+`hypxrland-stack` version-locks the compositor, HUD, voice/model, VA gate,
+background client, WiVRn host runtime, and offline `.hypxrtake` compositor to
+their minimum compatible EVRs. `monado-xreal` remains an optional,
+hardware-specific suggestion. Runtime media requirements are `/usr/bin/ffmpeg`
+and `/usr/bin/ffprobe`, not the `ffmpeg-free` package name, so RPM Fusion's full
+ffmpeg remains a valid provider; build roots use Fedora's ffmpeg-free packages.
+
+The WiVRn RPM does not include a headset APK. Device camera and raw-microphone
+capture require the commit-matched custom `hypxr` client documented in the
+package; a stock client supports only the host half of `.hypxrtake` recording.
+Package-specific codec, HUD privacy, GPU, classic-config, and XREAL guidance is
+installed with the relevant RPM and summarized by `hypxrland-stack`'s README.
 
 ### Build scripts
 
