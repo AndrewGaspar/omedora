@@ -1,0 +1,95 @@
+diff --git a/src/Ffmpeg.cpp b/src/Ffmpeg.cpp
+index c9099684..ebd1496b 100644
+--- a/src/Ffmpeg.cpp
++++ b/src/Ffmpeg.cpp
+@@ -520,6 +520,11 @@ namespace hxc {
+             argv.push_back(std::to_string(spec.crf));
+             argv.push_back("-preset");
+             argv.push_back(spec.preset);
++        } else if (spec.videoCodec == "libsvtav1") {
++            argv.push_back("-crf");
++            argv.push_back(std::to_string(spec.crf));
++            argv.push_back("-preset");
++            argv.push_back("10");
+         } else if (spec.videoCodec.ends_with("_nvenc")) {
+             // NVENC does not take -crf, and left alone it targets a default
+             // bitrate that has nothing to do with the quality the user asked
+diff --git a/src/Ffmpeg.hpp b/src/Ffmpeg.hpp
+index 1e7e8e69..3bcf76f9 100644
+--- a/src/Ffmpeg.hpp
++++ b/src/Ffmpeg.hpp
+@@ -214,7 +214,7 @@ namespace hxc {
+         int                         width  = 0;
+         int                         height = 0;
+         double                      fps    = 60.0;
+-        std::string                 videoCodec  = "libx264";
++        std::string                 videoCodec  = "libsvtav1";
+         std::string                 pixelFormat = "yuv420p";
+         int                         crf         = 18;
+         std::string                 preset      = "medium";
+diff --git a/src/Render.hpp b/src/Render.hpp
+index e100e575..f0bf99d2 100644
+--- a/src/Render.hpp
++++ b/src/Render.hpp
+@@ -166,7 +166,7 @@ namespace hxc {
+         double                micGain  = 1.0;
+         bool                  noLimiter = false;
+ 
+-        std::string           videoCodec = "libx264";
++        std::string           videoCodec = "libsvtav1";
+         int                   crf        = 18;
+         std::string           preset     = "medium";
+ 
+diff --git a/src/Synth.cpp b/src/Synth.cpp
+index a28853d9..a2f7f8a1 100644
+--- a/src/Synth.cpp
++++ b/src/Synth.cpp
+@@ -657,7 +657,8 @@ namespace hxc {
+                 });
+ 
+                 auto encoder = CSimpleEncoder::open((options.out / "cameras" / std::format("{}-cam{}.mp4", TAKE_ID, CAMERA.key)).string(), WIDTH, HEIGHT, CAMERA.hz,
+-                                                    {"-c:v", "libx264", "-qp", "0", "-pix_fmt", "yuv444p"}, static_cast<double>(CAMERA.deviceNs.front()) * 1e-9, error);
++                                                    {"-c:v", "libsvtav1", "-preset", "10", "-svtav1-params", "lossless=1", "-g", "1", "-pix_fmt", "yuv420p"},
++                                                    static_cast<double>(CAMERA.deviceNs.front()) * 1e-9, error);
+                 if (!encoder) {
+                     HXC_ERR("{}", error);
+                     return 1;
+diff --git a/src/main.cpp b/src/main.cpp
+index a216401b..a3ed469f 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -113,8 +113,8 @@ render:
+       --no-audio           video only
+       --mic-gain G         linear gain applied to the mic track (default 1.0)
+       --no-limiter         sum audio without the clip limiter
+-      --codec NAME         libx264 (default), libx265, ffv1, ...
+-      --crf N              quality for x264/x265 (default 18)
++      --codec NAME         libsvtav1 (default), libx264, libx265, ffv1, ...
++      --crf N              quality for SVT-AV1/x264/x265 (default 18)
+       --preset NAME        x264/x265 preset (default medium)
+       --gpu SUBSTR         pin the EGL device by renderer/vendor/DRM node; `list` enumerates
+       --frames-dir DIR     also write every output frame as a PNG
+diff --git a/tests/test_endtoend.cpp b/tests/test_endtoend.cpp
+index ed4dd43c..3ceae6c2 100644
+--- a/tests/test_endtoend.cpp
++++ b/tests/test_endtoend.cpp
+@@ -1197,8 +1197,8 @@ TEST(EndToEnd, StereoSideBySideOutputCarriesStereoSignalling) {
+     const std::string MONO_MP4 = renderTo("mono-signal.mp4", eEyeSelection::LEFT);
+ 
+     EXPECT_EQ(matroskaTag(SBS_MKV), "left_right") << "a stereo .mkv must carry StereoMode left_right";
+-    EXPECT_TRUE(hasStereoSideData(SBS_MKV)) << "and the frame-packing SEI too, since libx264 can write it";
+-    EXPECT_TRUE(hasStereoSideData(SBS_MP4)) << "a stereo .mp4 must carry frame-packing SEI, arrangement type 3";
++    EXPECT_TRUE(hasStereoSideData(SBS_MKV)) << "Matroska StereoMode must surface as stereo side data";
++    EXPECT_FALSE(hasStereoSideData(SBS_MP4)) << "SVT-AV1 does not write H.264 frame-packing SEI";
+ 
+     // A wrong stereo flag is worse than none: a mono take tagged side-by-side
+     // shows as two half-width pictures in anything that honours the signal.
+@@ -1206,7 +1206,7 @@ TEST(EndToEnd, StereoSideBySideOutputCarriesStereoSignalling) {
+     EXPECT_FALSE(hasStereoSideData(MONO_MKV));
+     EXPECT_FALSE(hasStereoSideData(MONO_MP4));
+ 
+-    std::cout << "[measured] stereo .mkv: StereoMode=" << matroskaTag(SBS_MKV) << " + frame-packing SEI; stereo .mp4: frame-packing SEI; mono: neither\n";
++    std::cout << "[measured] stereo .mkv: StereoMode=" << matroskaTag(SBS_MKV) << " + container-derived side data; SVT-AV1 stereo .mp4 and mono: no H.264 frame-packing SEI\n";
+ }
+ 
+ // ---------------------------------------------------------------------------
