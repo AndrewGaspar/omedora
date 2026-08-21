@@ -13,6 +13,7 @@ License:        BSD-3-Clause
 URL:            https://github.com/AndrewGaspar/hypxrcompose
 Source0:        %{url}/archive/%{commit}/%{name}-%{commit}.tar.gz
 Source1:        hypxrcompose-fedora.md
+Patch0:         hypxrcompose-fedora-codec.patch
 
 ExclusiveArch:  x86_64
 
@@ -37,15 +38,6 @@ media decoding, encoding, and audio mixing to ffmpeg and ffprobe subprocesses.
 %prep
 %autosetup -n hypxrcompose-%{commit} -p1
 cp %{SOURCE1} hypxrcompose-fedora.md
-# Fedora's ffmpeg-free omits libx264. Use its OpenH264 encoder in constant-QP,
-# all-intra mode for synthetic camera media and as the default output encoder.
-sed -i \
-  -e 's/{"-c:v", "libx264", "-qp", "0", "-pix_fmt", "yuv444p"}/{"-c:v", "libopenh264", "-rc_mode", "off", "-qp", "0", "-g", "1", "-pix_fmt", "yuv420p"}/' \
-  src/Synth.cpp
-sed -i 's/videoCodec = "libx264"/videoCodec = "libopenh264"/' \
-  src/Render.hpp src/Ffmpeg.hpp
-sed -i 's/libx264 (default), libx265, ffv1/libopenh264 (default), ffv1, libsvtav1/' \
-  src/main.cpp
 
 %build
 %cmake -GNinja -DCMAKE_BUILD_TYPE=Release
@@ -55,10 +47,9 @@ sed -i 's/libx264 (default), libx265, ffv1/libopenh264 (default), ffv1, libsvtav
 %cmake_install
 
 %check
-# Fedora cannot exercise x264's frame-packing SEI. All other tests cover
-# rendering, media I/O, Matroska stereo metadata, and validation.
-%{__cmake_builddir}/hypxrcompose_tests \
-  --gtest_filter=-EndToEnd.StereoSideBySideOutputCarriesStereoSignalling
+# The Fedora patch keeps the Matroska stereo metadata checks while adapting
+# x264-specific frame-packing assertions to the packaged SVT-AV1 default.
+%{__cmake_builddir}/hypxrcompose_tests
 
 %files
 %license LICENSE
@@ -70,5 +61,5 @@ sed -i 's/libx264 (default), libx265, ffv1/libopenh264 (default), ffv1, libsvtav
 - Package the immutable current public master tip and complete headless suite.
 - Require ffmpeg and ffprobe executable capabilities so Fedora ffmpeg-free and
   RPM Fusion full ffmpeg are both compatible runtime providers.
-- Use constant-QP, all-intra OpenH264 fixtures and defaults because Fedora's
-  ffmpeg-free does not ship libx264.
+- Use Fedora's SVT-AV1 encoder for fixtures and packaged defaults because COPR's
+  ffmpeg-free environment substitutes the non-functional noopenh264 shim.
