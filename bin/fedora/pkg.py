@@ -4,8 +4,7 @@ Fedora-side package helper for omedora.
 
 Invoked by the bin/omarchy-pkg-* shell wrappers when omarchy-distro is fedora.
 Handles map resolution (install/packages/fedora.toml) and dispatches to dnf,
-rpm, or flatpak. Source-installed packages run their installer script from
-install/packages/installers/.
+rpm, or flatpak.
 
 Subcommands:
   add <pkg> [<pkg>...]      Install if missing
@@ -16,7 +15,6 @@ Subcommands:
 
 Env vars:
   OMARCHY_FEDORA_MAP         Path to fedora.toml (default: derived from script)
-  OMARCHY_FEDORA_INSTALLERS  Path to installer scripts (default: derived)
   OMARCHY_PKG_DRY_RUN        If set, log commands instead of executing
 """
 
@@ -31,6 +29,8 @@ import tomllib
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
+
+from package_map import resolve_mapping
 
 def _resolve_tree_root() -> Path:
     """Root of the omarchy tree this helper belongs to.
@@ -56,9 +56,6 @@ def _resolve_tree_root() -> Path:
 
 REPO_ROOT = _resolve_tree_root()
 DEFAULT_MAP = REPO_ROOT / "install" / "packages" / "fedora.toml"
-DEFAULT_INSTALLERS = REPO_ROOT / "install" / "packages" / "installers"
-
-
 @dataclass
 class Entry:
     package: str
@@ -66,7 +63,6 @@ class Entry:
     names: list[str] = field(default_factory=list)
     copr: str = ""
     app_id: str = ""
-    installer: str = ""
     reason: str = ""
 
     @classmethod
@@ -79,7 +75,6 @@ class Entry:
             names=[str(n) for n in raw.get("names", [package])],
             copr=str(raw.get("copr", "")),
             app_id=str(raw.get("app_id", "")),
-            installer=str(raw.get("installer", "")),
             reason=str(raw.get("reason", "")),
         )
 
@@ -106,7 +101,18 @@ def info(msg: str) -> None:
 
 
 def resolve(packages: Iterable[str], pkg_map: dict[str, dict]) -> list[Entry]:
-    return [Entry.from_map(p, pkg_map.get(p)) for p in packages]
+    entries = []
+    for package in packages:
+        raw, active = resolve_mapping(package, pkg_map)
+        if active:
+            entries.append(Entry.from_map(package, raw))
+        else:
+            entries.append(Entry(
+                package=package,
+                source="skip",
+                reason="mapping does not apply to this Fedora release",
+            ))
+    return entries
 
 
 def run(cmd: list[str], dry_run: bool, check: bool = True) -> int:
@@ -143,15 +149,6 @@ def is_installed_flatpak(app_id: str) -> bool:
     return result.returncode == 0
 
 
-def is_installed_source(package: str) -> bool:
-    """Source installers write a version marker; check it exists."""
-    marker = (
-        Path.home() / ".local" / "state" / "omedora"
-        / "installed-versions" / package
-    )
-    return marker.is_file()
-
-
 def is_entry_installed(entry: Entry) -> bool:
     if entry.source == "skip":
         # Skip entries are treated as "always installed" so they don't trip
@@ -161,8 +158,6 @@ def is_entry_installed(entry: Entry) -> bool:
         return all(is_installed_rpm(n) for n in entry.names) if entry.names else False
     if entry.source == "flathub":
         return is_installed_flatpak(entry.app_id)
-    if entry.source == "source":
-        return is_installed_source(entry.package)
     return False
 
 
@@ -191,7 +186,6 @@ def cmd_add(entries: list[Entry], args: argparse.Namespace) -> int:
     dnf_names: list[str] = []
     coprs_to_enable: set[str] = set()
     flathub_ids: list[str] = []
-    source_installers: list[Entry] = []
     skipped: list[Entry] = []
 
     for entry in entries:
@@ -207,8 +201,6 @@ def cmd_add(entries: list[Entry], args: argparse.Namespace) -> int:
             dnf_names.extend(entry.names)
         elif entry.source == "flathub":
             flathub_ids.append(entry.app_id)
-        elif entry.source == "source":
-            source_installers.append(entry)
         else:
             die(f"unknown source '{entry.source}' for package '{entry.package}'")
 
@@ -257,16 +249,6 @@ def cmd_add(entries: list[Entry], args: argparse.Namespace) -> int:
             run(["flatpak", "install", "--user", "-y", "flathub", app_id],
                 args.dry_run, check=False)
 
-    # Run source installers (each is a separate script).
-    installers_dir = Path(os.environ.get("OMARCHY_FEDORA_INSTALLERS", DEFAULT_INSTALLERS))
-    for entry in source_installers:
-        installer_path = installers_dir / entry.installer
-        if not installer_path.is_file():
-            die(f"installer '{entry.installer}' for '{entry.package}' "
-                f"not found at {installer_path}")
-        info(f"Running source installer: {entry.installer}")
-        run(["bash", str(installer_path)], args.dry_run)
-
     # Post-install verification for dnf/copr packages.
     if dnf_names and not args.dry_run:
         for name in dnf_names:
@@ -294,11 +276,6 @@ def cmd_drop(entries: list[Entry], args: argparse.Namespace) -> int:
             dnf_names.extend(entry.names)
         elif entry.source == "flathub":
             flathub_ids.append(entry.app_id)
-        elif entry.source == "source":
-            warn(
-                f"package '{entry.package}' was source-installed; "
-                "dropping is not automated. Remove manually if desired."
-            )
 
     if dnf_names:
         info(f"Removing via dnf: {' '.join(dnf_names)}")
