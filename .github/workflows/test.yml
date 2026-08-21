@@ -109,6 +109,9 @@ jobs:
       - name: Run gpu-screen-recorder-spec static guard
         run: bash test/gpu-screen-recorder-spec-test.sh
 
+      - name: Run HypXR spec static guard
+        run: bash test/hypxr-spec-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 
