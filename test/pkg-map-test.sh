@@ -15,11 +15,6 @@ VALIDATOR="$ROOT/bin/omarchy-dev-validate-fedora-packages"
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
-# Set up a stable installers dir (most fixtures don't use source=, but a couple do)
-INSTALLERS_DIR="$TMPDIR/installers"
-mkdir -p "$INSTALLERS_DIR"
-echo '# placeholder' >"$INSTALLERS_DIR/install-walker.sh"
-
 write_map() {
   local name="$1"
   local content="$2"
@@ -30,7 +25,7 @@ write_map() {
 
 run_validator() {
   local map="$1"
-  OMARCHY_FEDORA_MAP="$map" OMARCHY_FEDORA_INSTALLERS="$INSTALLERS_DIR" \
+  OMARCHY_FEDORA_MAP="$map" \
     "$VALIDATOR" 2>&1
 }
 
@@ -64,6 +59,20 @@ for package, names in expected.items():
 PY
 pass "Quattro base additions have explicit Fedora dnf mappings"
 
+python3 - "$ROOT/install/packages/fedora.toml" <<'PY'
+import sys
+import tomllib
+
+with open(sys.argv[1], "rb") as file:
+  package_map = tomllib.load(file)
+
+entry = package_map.get("grok-bot")
+assert entry is not None, "Quattro menu package grok-bot must be classified"
+assert entry.get("source") == "skip", "grok-bot must not fall through to dnf"
+assert "no grok-bot RPM" in entry.get("reason", ""), "grok-bot skip needs a durable rationale"
+PY
+pass "Quattro's optional grok-bot menu package is explicitly skip-mapped"
+
 # --- Valid fixtures: one of each tier --------------------------------------
 
 valid=$(write_map valid '
@@ -80,17 +89,13 @@ names = ["copr-pkg"]
 source = "flathub"
 app_id = "com.example.App"
 
-[source-pkg]
-source = "source"
-installer = "install-walker.sh"
-
 [skip-pkg]
 source = "skip"
 reason = "not applicable on fedora"
 ')
 
-assert_exit_code "valid map of all 5 tiers exits 0" 0 \
-  env OMARCHY_FEDORA_MAP="$valid" OMARCHY_FEDORA_INSTALLERS="$INSTALLERS_DIR" "$VALIDATOR"
+assert_exit_code "valid map of all 4 supported sources exits 0" 0 \
+  env OMARCHY_FEDORA_MAP="$valid" "$VALIDATOR"
 
 # --- Missing source key fails ----------------------------------------------
 
@@ -100,7 +105,7 @@ names = ["bad"]
 ')
 
 assert_exit_code "missing source key exits 1" 1 \
-  env OMARCHY_FEDORA_MAP="$missing_source" OMARCHY_FEDORA_INSTALLERS="$INSTALLERS_DIR" "$VALIDATOR"
+  env OMARCHY_FEDORA_MAP="$missing_source" "$VALIDATOR"
 output=$(run_validator "$missing_source" || true)
 assert_output_contains "missing source surfaces error" "$output" "missing required key: source"
 
@@ -181,7 +186,7 @@ app_id = "myapp"
 output=$(run_validator "$flathub_bad_id" || true)
 assert_output_contains "source=flathub requires reverse-DNS app_id" "$output" "reverse-DNS"
 
-# --- source=source with missing installer file fails -----------------------
+# --- retired source installers are rejected --------------------------------
 
 missing_installer=$(write_map missing-installer '
 [bad]
@@ -190,7 +195,7 @@ installer = "install-does-not-exist.sh"
 ')
 
 output=$(run_validator "$missing_installer" || true)
-assert_output_contains "missing installer file fails" "$output" "not found at"
+assert_output_contains "retired source installer entries fail" "$output" "invalid source 'source'"
 
 # --- source=skip without reason fails --------------------------------------
 
@@ -215,6 +220,16 @@ until = "44"
 output=$(run_validator "$bad_range" || true)
 assert_output_contains "since >= until fails" "$output" "must be <"
 
+non_numeric_bound=$(write_map non-numeric-bound '
+[pkg]
+source = "dnf"
+names = ["pkg"]
+since = "future"
+')
+
+output=$(run_validator "$non_numeric_bound" || true)
+assert_output_contains "a lone non-numeric since bound fails" "$output" "must be a numeric string"
+
 # --- unknown key warns but does not fail -----------------------------------
 
 unknown_key=$(write_map unknown-key '
@@ -225,26 +240,26 @@ typo = "value"
 ')
 
 assert_exit_code "unknown key does not fail" 0 \
-  env OMARCHY_FEDORA_MAP="$unknown_key" OMARCHY_FEDORA_INSTALLERS="$INSTALLERS_DIR" "$VALIDATOR"
+  env OMARCHY_FEDORA_MAP="$unknown_key" "$VALIDATOR"
 output=$(run_validator "$unknown_key")
 assert_output_contains "unknown key produces warning" "$output" "unknown key 'typo'"
 
 # --- --json output is valid JSON with ok flag -------------------------------
 
-json_output=$(OMARCHY_FEDORA_MAP="$valid" OMARCHY_FEDORA_INSTALLERS="$INSTALLERS_DIR" \
+json_output=$(OMARCHY_FEDORA_MAP="$valid" \
   "$VALIDATOR" --json)
 echo "$json_output" | python3 -c '
 import json, sys
 data = json.load(sys.stdin)
 assert data["ok"] is True, f"ok should be true, got {data}"
-assert data["package_count"] == 5, f"package_count should be 5, got {data}"
+assert data["package_count"] == 4, f"package_count should be 4, got {data}"
 assert data["errors"] == [], f"errors should be empty, got {data}"
 '
 pass "--json output is structured and reports ok=true for valid map"
 
 # --- --json on bad map reports ok=false ------------------------------------
 
-json_bad=$(OMARCHY_FEDORA_MAP="$missing_source" OMARCHY_FEDORA_INSTALLERS="$INSTALLERS_DIR" \
+json_bad=$(OMARCHY_FEDORA_MAP="$missing_source" \
   "$VALIDATOR" --json 2>/dev/null || true)
 echo "$json_bad" | python3 -c '
 import json, sys
