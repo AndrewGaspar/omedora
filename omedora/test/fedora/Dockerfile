@@ -34,6 +34,8 @@ RUN --mount=type=cache,target=/var/cache/libdnf5,sharing=locked \
         which \
         procps-ng \
         diffutils \
+        rpm-build \
+        createrepo_c \
         sudo
 
 # Warm the dnf metadata cache so the first `dnf install` inside a test isn't

@@ -5,7 +5,7 @@
 #
 # All assertions emit TAP-style output (`ok - …` / `not ok - …`). Failures
 # call `fail`, which exits non-zero, so a single failed assertion aborts
-# the test file. This matches the style of test/omarchy-cli-test.sh.
+# the test file. This matches the TAP-style output used by upstream test/cli.
 
 pass() {
   printf 'ok - %s\n' "$1"
