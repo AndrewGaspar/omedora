@@ -21,7 +21,7 @@
 %global lua_version 5.5.0
 
 Name:           hyprland
-Version:        0.56.1
+Version:        0.56.2
 Release:        1%{?dist}
 Summary:        Dynamic tiling Wayland compositor that doesn't sacrifice on its looks
 
@@ -270,6 +270,11 @@ install -Dpm644 %{SOURCE1} -t %{buildroot}%{macrosdir}
 %{macrosdir}/macros.hyprland
 
 %changelog
+* Fri Aug 21 2026 omedora <noreply@omedora> - 0.56.2-1
+- Update the stable fallback compositor to Hyprland 0.56.2 so it provides the
+  exact shared dependency wave consumed by the rebased HypXRland package.
+- Keep the no-session/full/uwsm/devel package split unchanged.
+
 * Mon Aug 03 2026 omedora <noreply@omedora> - 0.56.1-1
 - Update to Hyprland 0.56.1.
 - Requires hyprutils >= 0.14.0 (hard upstream minimum, HYPRUTILS_MINIMUM_VERSION)
