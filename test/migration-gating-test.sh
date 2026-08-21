@@ -84,7 +84,7 @@ for c in pacman snapper limine-mkinitcpio mkinitcpio omarchy-pkg-add omarchy-pkg
 done
 chmod +x "$BIN"/*
 
-for base in 1781984677.sh 1781286586.sh 1781587663.sh; do
+for base in 1781984677.sh 1781286586.sh 1781587663.sh 1786567036.sh 1786605598.sh; do
   f="$MIGRATIONS_DIR/$base"
   [[ -e $f ]] || { pass "# SKIP $base absent (pin rotated past it)"; continue; }
   : >"$MOCK_LOG"
@@ -100,6 +100,25 @@ for base in 1781984677.sh 1781286586.sh 1781587663.sh; do
     fail "$base: Fedora gate must run BEFORE any pacman/snapper/pkg-add/install call"
   else
     pass "$base: Fedora path invokes no Arch tooling"
+  fi
+
+  if [[ $base == "1786567036.sh" || $base == "1786605598.sh" ]]; then
+    : >"$MOCK_LOG"
+    continuation="$TMP/$base.sourced"
+    set +e
+    ( export PATH="$BIN:$PATH" OMARCHY_DISTRO=fedora HOME="$TMP/home"
+      source "$f"
+      touch "$continuation" ) >"$TMP/out" 2>&1
+    rc=$?
+    set -e
+    assert_equals "$base: can be sourced on Fedora without exiting its caller" "$rc" "0"
+    assert_file_exists "$base: sourced Fedora gate returns to its caller" "$continuation"
+    if [[ -s $MOCK_LOG ]]; then
+      cat "$MOCK_LOG" >&2
+      fail "$base: sourced Fedora gate must invoke no Arch tooling"
+    else
+      pass "$base: sourced Fedora path invokes no Arch tooling"
+    fi
   fi
 done
 
