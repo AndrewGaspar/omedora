@@ -30,6 +30,7 @@
 # Exit status (default/--list):
 #   0  no foreign-repo conflicts found
 #   1  one or more owned packages are installed from a foreign repo
+#   2  package ownership or repository provenance could not be queried
 #
 # Mocking (for tests): set OMEDORA_REPOQUERY_CMD to a command that prints lines
 # of "name evr from_repo" (the same shape as
@@ -76,7 +77,7 @@ owned_pkgs() {
 # the mocked unit tests supplied their own newlines and masked it.)
 repoquery_installed() {
   if [[ -n ${OMEDORA_REPOQUERY_CMD:-} ]]; then
-    eval "$OMEDORA_REPOQUERY_CMD"
+    ( eval "$OMEDORA_REPOQUERY_CMD" )
   else
     dnf repoquery --installed --qf '%{name} %{evr} %{from_repo}\n' 2>/dev/null
   fi
@@ -114,12 +115,28 @@ is_friendly_repo() {
 
 # Run the scan. Prints warnings to stderr; returns 1 if any conflict found.
 run_scan() {
+  local scan_dir owned_file installed_file
+  scan_dir=$(mktemp -d "${TMPDIR:-/tmp}/omedora-doctor.XXXXXX")
+  owned_file="$scan_dir/owned"
+  installed_file="$scan_dir/installed"
+
+  if ! owned_pkgs >"$owned_file"; then
+    echo "omarchy-doctor: could not resolve Omedora-owned packages" >&2
+    rm -rf "$scan_dir"
+    return 2
+  fi
+  if ! repoquery_installed >"$installed_file"; then
+    echo "omarchy-doctor: could not query installed package provenance" >&2
+    rm -rf "$scan_dir"
+    return 2
+  fi
+
   # Build the owned-set lookup.
   local -A owned=()
   local p
   while IFS= read -r p; do
     [[ -n $p ]] && owned["$p"]=1
-  done < <(owned_pkgs)
+  done <"$owned_file"
 
   local conflicts=0
   local name evr repo
@@ -142,7 +159,9 @@ run_scan() {
     printf '  omedora installs and pins its own %s and expects to own the Hyprland desktop stack.\n' "$name" >&2
     printf '  Installing over a foreign-repo build may leave a mismatched compositor/session.\n' >&2
     printf '  Fix it with: omedora doctor --fix\n' >&2
-  done < <(repoquery_installed)
+  done <"$installed_file"
+
+  rm -rf "$scan_dir"
 
   if [[ $conflicts -gt 0 ]]; then
     [[ $DOCTOR_MODE == "list" ]] && return 1
