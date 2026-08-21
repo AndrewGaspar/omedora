@@ -1,3 +1,16 @@
+## v0.2.0-beta.2 — 2026-08-20 (Omarchy 4.0.0)
+
+- Rebase the full Omedora 4 patch stack onto official Omarchy `v4.0.0` at
+  `f0020448ca87329199de7cb12f2015ebc4a3e5e7`.
+- Keep Fedora updates scoped to Omedora-managed RPMs and add coverage proving
+  unrelated installed packages are excluded.
+- Require beta.1 users to bootstrap beta.2 with a scoped
+  `dnf upgrade omedora omedora-settings` before invoking `omedora update`.
+- Enable and verify the version-scoped Omedora COPR, fail closed when managed
+  candidates or core provenance are unavailable, and honor map version bounds.
+- Gate the Quattro wpa_supplicant and mkinitcpio migrations on Fedora.
+- Classify the optional `grok-bot` menu package as unavailable on Fedora.
+
 ## v0.2.0-beta.1 — 2026-08-12 (Omarchy Quattro beta3+13)
 
 - Rebase the Omedora 4 patch stack onto `quattro` at `106320ab`.

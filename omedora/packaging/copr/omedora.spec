@@ -20,7 +20,7 @@
 Name:           omedora
 # Version is normally read from the repo's omedora/version file; hardcoded here
 # for now — a follow-up wires .copr/srpm.sh to substitute it at SRPM-gen time.
-Version:        0.2.0~beta.1
+Version:        0.2.0~beta.2
 Release:        1%{?dist}
 Summary:        Omedora runtime: omarchy commands, installer, migrations, themes, Quickshell desktop
 
@@ -202,6 +202,10 @@ fi
 /etc/skel/.local/
 
 %changelog
+* Thu Aug 20 2026 omedora <noreply@omedora> - 0.2.0~beta.2-1
+- Rebase the runtime payload onto the official Omarchy 4.0.0 release.
+- Scope Fedora updates to the Omedora-managed RPM set.
+
 * Wed Aug 12 2026 omedora <noreply@omedora> - 0.2.0~beta.1-1
 - Rebase onto the current Quattro beta branch and adapt its provisioning flow.
 - Add the Omedora 3 to Omedora 4 package-backed upgrade path.
