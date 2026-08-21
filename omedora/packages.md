@@ -19,14 +19,19 @@ When omedora installs a package on Fedora, it picks an install source in this or
 | # | Tier | `source` | Notes |
 | --- | --- | --- | --- |
 | 1 | **Fedora main repos / RPM Fusion** (`dnf install <name>`) | `dnf` | Default. If the package name is unchanged from Arch, no map entry needed. If the name differs, the map provides the Fedora name. RPM Fusion (enabled in preflight) is the same `dnf` codepath — for multimedia codecs and the handful of nonfree libs. |
-| 2 | **The omedora repo** (`dnf install <name>` from RPMs we build) | `dnf` | Packages that aren't anywhere in Fedora's ecosystem but that we build ourselves as RPMs under [`omedora/packaging/copr/`](#4-the-rpmcopr-tier-omedorapackagingcopr). Same `source = "dnf"` install path — the RPMs are served from a repo dnf already trusts (a local repo today, a published COPR later). The `names` point at the RPM's package name(s). |
+| 2 | **The Omedora COPR** (`dnf install <name>` from RPMs we build) | `dnf` | Packages that aren't anywhere in Fedora's ecosystem but that we build ourselves as RPMs under [`omedora/packaging/copr/`](#4-the-rpmcopr-tier-omedorapackagingcopr). The live version-scoped Omedora COPR is enabled during install/update. Local repos built from the same specs are test fixtures only. The `names` point at the RPM's package name(s). |
 | 3 | **Vetted third-party COPR** (`dnf copr enable <copr>` then `dnf install <name>`) | `copr` | Third-party COPRs we don't maintain. Allowed COPRs are an explicit allowlist (see [§7](#7-review-checklist)). One deliberate exception: **`scottames/ghostty`** for `[ghostty]` — the ghostty-docs-endorsed canonical Fedora COPR, adopted because an in-house Zig build is blocked by ghostty's zig 0.15.x pin vs Fedora 44's zig 0.16 (TODO: revisit vendoring). It is enabled **lazily** — `pkg.py` runs `dnf copr enable` only when a package with a `copr` source is actually installed, and ghostty is on-demand (not a base package), so a machine gains the COPR only if the user picks Install > Terminal > Ghostty. This is the *only* allowed third-party COPR — the base system enables none, since the whole hyprwm stack is vendored under tier 2 and built from omedora's own COPR. New COPRs require review. |
 | 4 | **Flathub** (`flatpak install -y flathub <app_id>`) | `flathub` | For proprietary or otherwise unpackaged GUI apps. Flathub remote is enabled in preflight. |
 | 5 | **Skip** (`source = "skip"`, logged) | `skip` | Not installed on Fedora at all — hardware/Arch-specific packages, bootloader components, or things still awaiting a packaging decision. Always carries a `reason`. |
 
 Tiers 1 and 2 are **both** `source = "dnf"`: the difference is only *which repo* satisfies the name. A reader of `fedora.toml` tells them apart by the `reason` field and by whether the `names` resolve to a Fedora-shipped package or to one of our [`omedora/packaging/copr/`](#4-the-rpmcopr-tier-omedorapackagingcopr) RPMs. This unification is deliberate — `dnf` resolution, dependency handling, and clean install/remove/upgrade work identically whether a name comes from Fedora main or from our repo.
 
-> **Retired tier — source installers.** Earlier drafts had a sixth tier: per-package shell "source installers" (`source = "source"`, `bash install/packages/installers/<name>.sh`). That approach is **retired.** Anything that previously would have been a source installer is now either built as an RPM in [`omedora/packaging/copr/`](#4-the-rpmcopr-tier-omedorapackagingcopr) (tier 2) or left as `source = "skip"` with a TODO until it is. `install/packages/installers/` retains only a `README.md` pointer; the directory is otherwise dead. Do not add new source installers.
+> **Retired tier — source installers.** Omedora 4 beta.1 supported per-package
+> shell source installers (`source = "source"`). That tier had no package-map
+> entries or persisted installer state and is now removed. Build missing
+> software as an RPM in
+> [`omedora/packaging/copr/`](#4-the-rpmcopr-tier-omedorapackagingcopr) (tier 2)
+> or use `source = "skip"` with a TODO. Do not add new source installers.
 
 **Why preference for earlier tiers:**
 
@@ -49,7 +54,7 @@ If you break the order, document it in the entry's `reason` field.
 The map is one TOML table per Arch package. **Absence from the map ⇒ Fedora-main-repos install under the same name.** Only add an entry when:
 
 1. The Fedora package name differs from the Arch name, or
-2. The package isn't in Fedora main repos at all (needs RPM Fusion / COPR / Flathub / source), or
+2. The package isn't in Fedora main repos at all (needs RPM Fusion, COPR, or Flathub), or
 3. The package should be deliberately skipped on Fedora (with a reason).
 
 ### Keys
@@ -61,8 +66,8 @@ The map is one TOML table per Arch package. **Absence from the map ⇒ Fedora-ma
 | `copr` | string | `source = "copr"` | The third-party COPR identifier (`owner/repo`) to enable before install. Must be on the allowlist (see [§7](#7-review-checklist)). |
 | `app_id` | string | `source = "flathub"` | The Flathub app ID, e.g., `md.obsidian.Obsidian`. |
 | `reason` | string | `source = "skip"`; recommended elsewhere when the choice isn't obvious | One-line explanation. Lives in the file so reviewers and agents understand intent. For omedora-repo packages, the `reason` is where we note that the name resolves to one of our RPMs rather than a Fedora-shipped one. |
-| `since` | string | optional | Fedora version where this entry first applies (e.g., `"44"`). Lets the map carry historical entries when behavior changed between Fedora releases. |
-| `until` | string | optional | Fedora version where this entry stops applying (exclusive). Used together with `since` to express "in main repos from F46 onward, COPR before that." |
+| `since` | string | optional | Fedora version where this entry first applies (inclusive, e.g. `"44"`). Outside the range the table is an intentional no-op, not an absent mapping. |
+| `until` | string | optional | Fedora version where this entry stops applying (exclusive). Outside the range the table is an intentional no-op, not an unchanged-name fallback. |
 
 ### Layout
 
@@ -73,7 +78,7 @@ The map is one TOML table per Arch package. **Absence from the map ⇒ Fedora-ma
 # Absence from this file means: "Same name, in Fedora main repos."
 #
 # Schema is documented in omedora/packages.md. Validate with:
-#   omarchy dev validate-fedora-packages    (planned helper)
+#   omarchy dev validate-fedora-packages
 
 # --- renamed packages (different name, in Fedora main) -------------------
 
@@ -84,14 +89,14 @@ names = ["neovim"]
 [ttf-jetbrains-mono-nerd]
 source = "dnf"
 names = ["omedora-nerd-fonts"]
-reason = "Fedora's plain jetbrains-mono-fonts-all lacks the Nerd Font icon glyphs. The omedora-nerd-fonts RPM (omedora/packaging/copr/) bundles the patched families; served from the omedora repo (local now, COPR later)."
+reason = "Fedora's plain jetbrains-mono-fonts-all lacks the Nerd Font icon glyphs. The omedora-nerd-fonts RPM (omedora/packaging/copr/) bundles the patched families and is served from Omedora's COPR."
 
 # --- omedora-repo packages (RPMs we build; still source = "dnf") ----------
 
 [omarchy-walker]
 source = "dnf"
 names = ["walker", "elephant"]
-reason = "Neither in Fedora repos. Both packaged as RPMs in omedora/packaging/copr/ (walker pulls gtk4-layer-shell; elephant ships its providers + user service) and served from the omedora repo (local now, COPR later)."
+reason = "Neither in Fedora repos. Both packaged as RPMs in omedora/packaging/copr/ (walker pulls gtk4-layer-shell; elephant ships its providers + user service) and served from Omedora's COPR."
 
 [swayosd]
 source = "dnf"
@@ -180,10 +185,9 @@ for each package_name in args:
     dnf_install [package_name]
     continue
 
-  if entry.since and current_fedora_version < entry.since:
-    continue using next applicable entry or default
-  if entry.until and current_fedora_version >= entry.until:
-    continue using next applicable entry or default
+  if current_fedora_version is outside [entry.since, entry.until):
+    treat the entry as an intentional no-op
+    continue
 
   case entry.source:
     dnf:
@@ -203,9 +207,17 @@ for each package_name in args:
 Notes:
 
 - Failures from `dnf install` are surfaced; the helper exits non-zero like upstream.
-- Failures from `flatpak install` are also surfaced; we don't silently swallow them. The skip-with-log behavior is **only** for `source = "skip"` entries.
+- `flatpak install` output is surfaced, but an individual Flatpak failure is
+  best-effort and does not abort the remaining package install. A missing user
+  session bus also skips Flatpaks with a warning; rerun from a desktop session.
+  This differs from dnf failures, which abort immediately.
 - There is no `source` case: per-package source installers are [retired](#1-the-package-source-tiers). Packages that aren't in Fedora/RPM Fusion/a vetted COPR/Flathub are either built as omedora-repo RPMs (`source = "dnf"`) or `source = "skip"`.
-- Resolution is identical whether a `dnf` name lives in Fedora main or the omedora repo. The omedora repo only has to be *enabled* for the second case to work — see [§4](#4-the-rpmcopr-tier-omedorapackagingcopr) and [§5](#5-how-the-omedora-repo-is-injected-at-build-time).
+- An inactive `since`/`until` table never falls through to the unchanged Arch
+  name. `add` and `drop` skip it, `present` succeeds, `missing` returns false,
+  and managed-update and ownership resolution omit it. The current schema uses
+  version bounds only for conditional omission; it cannot express a different
+  fallback mapping outside the range.
+- Resolution is identical whether a `dnf` name lives in Fedora main or the Omedora COPR. The Omedora COPR only has to be *enabled* for the second case to work — see [§4](#4-the-rpmcopr-tier-omedorapackagingcopr) and [§5](#5-local-repositories-in-tests).
 
 ---
 
@@ -213,7 +225,7 @@ Notes:
 
 This is how omedora installs the apps that have **no Fedora, RPM Fusion, vetted-COPR, or Flathub home** — walker, elephant, swayosd, the Nerd Fonts, and Quattro additions such as omacalc, ttfx, and herdr. Rather than vendor a shell installer (the [retired](#1-the-package-source-tiers) approach), we build each one as a proper **RPM** and serve it from a dnf repo. In `fedora.toml` these are plain `source = "dnf"` entries pointing at the RPM `names`; everything downstream (dependency resolution, clean upgrade/remove) is ordinary dnf.
 
-The specs and build scripts live in `omedora/packaging/copr/`. The directory is named for its destination: these specs are bound for a **published COPR** eventually. Until then a **local dnf repo** built from the same specs stands in (see [§5](#5-how-the-omedora-repo-is-injected-at-build-time)). Because we build with the exact same spec + toolchain a COPR uses (a `fedora:44` container), a spec that builds locally builds on COPR.
+The specs and build scripts live in `omedora/packaging/copr/`. Production installs and updates consume their RPMs from the live, version-scoped Omedora COPR selected by `omedora-copr`. A local dnf repo built from the same specs is used only by package-build and nested-session tests (see [§5](#5-local-repositories-in-tests)).
 
 ### Spec conventions
 
@@ -245,13 +257,13 @@ The from-source Rust specs (`swayosd.spec`, `satty.spec`, `tensaku.spec`, `bluet
 
 **The vendor tarball is not committed.** It's generated deterministically at SRPM-gen time, not stored in the repo (it used to live in Git LFS at ~64 MB total). `build-local.sh`, after `spectool -g` fetches `Source0`, regenerates any `*-vendor.tar.*` `SourceN` that isn't already present: it extracts the upstream release tarball, runs `cargo vendor` against its committed `Cargo.lock`, and re-tars with normalized metadata (`--sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner`) so re-runs are byte-identical. This is deterministic because `Source0` is a version-pinned GitHub tag tarball, the lock pins every transitive dep, and crates.io `(name,version)` content is immutable. (swayosd's lock pins its own root version below its `Cargo.toml`, so it uses plain `cargo vendor`, not `--locked`.)
 
-When the real COPR lands, its `.copr/Makefile` (#60) must run the same `cargo vendor` in its SRPM step so COPR's offline build phase has the vendor dir. The Python and binary-repackage specs don't need any of this (their only fetch is the declared `SourceN`).
+The COPR SRPM step runs the same vendoring path so COPR's offline build phase has the vendor directory. The Python and binary-repackage specs don't need any of this (their only fetch is the declared `SourceN`).
 
 ---
 
-## 5. How the omedora repo is injected at build time
+## 5. Local repositories in tests
 
-The local repo from [`build-repo.sh`](#build-scripts) is the **stand-in for a published COPR**: a directory of RPMs plus `createrepo_c` metadata that dnf can install from. The L4-nested session build wires it into the install container so `install.sh`'s `dnf install` resolves the omedora-repo packages (with their deps) exactly as a real COPR would.
+The local repo from [`build-repo.sh`](#build-scripts) is a test fixture: a directory of RPMs plus `createrepo_c` metadata that dnf can install from. The L4 nested-session build wires it into the install container so candidate specs can be tested before publication. Production installation, update, L3, and VM release gates use the live Omedora COPR.
 
 `omedora/test/fedora/build-session.sh` does this in two steps:
 
@@ -264,7 +276,7 @@ The local repo from [`build-repo.sh`](#build-scripts) is the **stand-in for a pu
    ```
    That drops the RPMs in `/opt/omedora-repo` and a `.repo` pointing dnf at them. From that point packages including `walker`, `elephant`, `swayosd`, `ttfx`, `omacalc`, `herdr`, and `omedora-nerd-fonts` install through ordinary dnf dependency resolution.
 
-**Swapping to a published COPR** later is a small, contained change: delete the inject block in `build-session.sh` and flip the affected `fedora.toml` entries from `source = "dnf"` (omedora repo) to `source = "copr"` with the COPR identifier. The specs themselves move to the COPR unchanged.
+This injection does not change `fedora.toml`: Omedora-owned RPMs remain `source = "dnf"` because the Omedora COPR is a first-party repository enabled by the install/update flow. `source = "copr"` is reserved for lazily enabled third-party COPRs.
 
 ---
 
@@ -286,7 +298,7 @@ Every map entry change goes in a PR with the rationale in the commit body. Agent
 To take a package from `source = "skip"` (or a missing entry) to an installed omedora-repo RPM:
 
 1. **Write the spec.** Add `omedora/packaging/copr/<name>.spec`, picking the right [flavor](#spec-conventions) (binary-repackage / from-source meson-cargo / Python pyproject). Lead with a comment explaining the choice. Iterate with `omedora/packaging/copr/build-local.sh <name>.spec` until it builds clean in the `fedora:44` container.
-2. **Add it to `build-repo.sh`.** Append the spec filename to the `SPECS=(...)` array so the local repo (and the future COPR) builds it.
+2. **Add it to `build-repo.sh`.** Append the spec filename to the `SPECS=(...)` array so local test repositories include it; add the same spec to the live COPR build set.
 3. **Flip the `fedora.toml` entry.** Set `source = "dnf"` and `names = [...]` to the RPM `Name:` field(s). Note in `reason` that the name resolves to an omedora-repo RPM, not a Fedora-shipped one.
 4. **Rebuild + test.** `omedora/test/fedora/build-session.sh --rebuild` rebuilds the repo, injects it, and runs `install.sh` — the most faithful end-to-end check that dnf resolves the new package and its deps.
 
@@ -313,11 +325,11 @@ Before merging a new map entry — agents and humans both run through this:
 
 | COPR | Used for | Rationale |
 | --- | --- | --- |
-| _(none)_ | — | No third-party COPRs are currently in use. |
+| `scottames/ghostty` | Optional Ghostty terminal | Ghostty's documented Fedora COPR; enabled only when the user selects Ghostty. An in-house build remains blocked by Ghostty's Zig 0.15.x requirement versus Fedora 44's Zig 0.16. |
 
 **Retired third-party Hyprland COPR:** the Hyprland stack (Hyprland + hypridle/hyprlock/hyprpaper/hyprpicker/hyprsunset/xdg-desktop-portal-hyprland) used to come from a third-party COPR. Retired in task #66: the entire hyprwm stack is now vendored as omedora RPMs under [`omedora/packaging/copr/`](#4-the-rpmcopr-tier-omedorapackagingcopr) (specs adapted from the maintained `solopasha/hyprlandRPM` spec set), built from omedora's own COPR and resolved via `source = "dnf"` from the omedora repo. `hyprpaper` was dropped entirely (omedora uses swaybg).
 
-This allowlist is for **third-party** COPRs only. The omedora repo (our own RPMs in [`omedora/packaging/copr/`](#4-the-rpmcopr-tier-omedorapackagingcopr), eventually a published omedora COPR) is not a third-party trust decision — those specs are reviewed as ordinary source in this repo — so it doesn't appear here.
+This allowlist is for **third-party** COPRs only. The live Omedora COPR contains our own RPMs from [`omedora/packaging/copr/`](#4-the-rpmcopr-tier-omedorapackagingcopr) and is not a third-party trust decision, so it does not appear here.
 
 To add a new third-party COPR: open a PR that (a) updates this allowlist with rationale, (b) adds the map entries that use it. Both reviewed together.
 
@@ -325,7 +337,8 @@ To add a new third-party COPR: open a PR that (a) updates this allowlist with ra
 
 ## 8. Validating the map
 
-A planned helper command, `omarchy dev validate-fedora-packages`, parses `install/packages/fedora.toml` and reports:
+The shipped `omarchy dev validate-fedora-packages` command parses
+`install/packages/fedora.toml` and reports:
 
 - Entries with `source = "copr"` whose COPR isn't on the allowlist.
 - Entries with an unknown `source` (only `dnf`/`copr`/`flathub`/`skip` are valid — `source` is retired).
@@ -334,7 +347,8 @@ A planned helper command, `omarchy dev validate-fedora-packages`, parses `instal
 - Entries with `source = "skip"` missing `reason`.
 - Entries with `since`/`until` that don't form a valid range.
 
-This validator runs as part of the rebase verification step (see [`rebase-workflow.md`](rebase-workflow.md)) and ideally as a CI check. The base commit doesn't ship the validator — it's a follow-up implementation task — but the contract above is what it must enforce.
+The validator runs in L1 and CI as part of the rebase verification step (see
+[`rebase-workflow.md`](rebase-workflow.md)).
 
 ---
 
@@ -354,7 +368,7 @@ Verified live before committing to the port (spike container: `omedora-test:fedo
 
 | Dependency | Verdict | Evidence / disposition |
 | --- | --- | --- |
-| `quickshell` | **VENDORED 0.3.0.r20.g28771c7 — see §11** | Quattro beta explicitly requires post-0.3.0 synchronous `quickshell kill` semantics so shell restarts wait for the old instance to exit. Fedora's stalled February snapshot and upstream 0.3.0 both predate that fix. The RPM follows Omarchy beta's exact `28771c7` pin. |
+| `quickshell` | **VENDORED 0.3.0.r20.g28771c7 — see §11** | Omarchy 4 requires post-0.3.0 synchronous `quickshell kill` semantics so shell restarts wait for the old instance to exit. Fedora's stalled February snapshot and upstream 0.3.0 both predate that fix. The RPM follows Omarchy 4.0.0's exact `28771c7` pin. |
 | hyprland 0.55.2 (our RPM) + Lua config | **GO, with a re-check note** | `Hyprland --config .../hyprland.lua` (full omarchy-4 lua tree, `OMARCHY_PATH` set) boots on our existing 0.55.2 spec — 189 binds registered from Lua. One `configerrors` entry: a config-load shell-out in `config/hypr/bindings.lua` hit Hyprland's Lua execution timeout in the slow container; re-verify on a real install (not a Lua-capability gap). |
 | `dua-cli` | **dnf tier** | In Fedora proper (source package `rust-dua-cli`). |
 | `aether`, `cliamp`, `tobi-try` | **skip (existing entries stand)** | 37signals/AUR-world tools; the 3.8.2-era skip reasons hold for 4.x. `cliamp` is bound to SUPER+SHIFT+ALT+M — degrades gracefully. |
@@ -376,4 +390,4 @@ version resolves over Fedora's automatically).
 
 | Package | omedora version | Fedora 44 version | Decision |
 | --- | --- | --- | --- |
-| `quickshell` | **0.3.0.r20.g28771c7** (vendored as RPM `0.3.0^20.git28771c7`, `quickshell.spec`) | 0.2.1^git20260209.dacfa9d (stalled Feb-2026 snapshot, identical across stable/updates/testing/rawhide) | **Follow Omarchy 4 beta's exact snapshot.** Quattro's `omarchy-restart-shell` depends on synchronous `quickshell kill`, added after 0.3.0, to avoid launching a replacement before the old shell exits. The final beta pin also carries IpcHandler lifetime fixes relevant to the shell's extensive IPC use. Recipe adapted from Fedora's own `quickshell.spec`; built `-DCRASH_HANDLER=OFF` (`cpptrace` is unavailable in Fedora 44 and vendoring it would require build-time fetching). See `install/packages/fedora.toml` `[quickshell]`. |
+| `quickshell` | **0.3.0.r20.g28771c7** (vendored as RPM `0.3.0^20.git28771c7`, `quickshell.spec`) | 0.2.1^git20260209.dacfa9d (stalled Feb-2026 snapshot, identical across stable/updates/testing/rawhide) | **Follow Omarchy 4.0.0's exact snapshot.** Quattro's `omarchy-restart-shell` depends on synchronous `quickshell kill`, added after 0.3.0, to avoid launching a replacement before the old shell exits. The pin also carries IpcHandler lifetime fixes relevant to the shell's extensive IPC use. Recipe adapted from Fedora's own `quickshell.spec`; built `-DCRASH_HANDLER=OFF` (`cpptrace` is unavailable in Fedora 44 and vendoring it would require build-time fetching). See `install/packages/fedora.toml` `[quickshell]`. |

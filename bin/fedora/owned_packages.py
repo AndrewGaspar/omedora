@@ -6,7 +6,7 @@ desktop/compositor components it installs and pins.
 Reads install/omarchy-base.packages (the Arch package list) and resolves each
 through install/packages/fedora.toml. Emits, one per line, the Fedora package
 names for entries whose source is dnf or copr (these become real RPMs on the
-system). flathub / source / skip entries are not "owned RPMs" and are omitted.
+system). flathub and skip entries are not "owned RPMs" and are omitted.
 
 For each such entry the emitted set includes BOTH the upstream/base name (the
 map key, e.g. `hyprland`) AND omedora's mapped name(s) (e.g. `hyprland-omedora`).
@@ -31,6 +31,8 @@ import os
 import sys
 import tomllib
 from pathlib import Path
+
+from package_map import resolve_mapping
 
 def _resolve_tree_root() -> Path:
     """Root of the omarchy tree this helper belongs to.
@@ -97,7 +99,9 @@ def resolve_owned(
     owned: list[str] = []
     seen: set[str] = set()
     for pkg in base:
-        raw = pkg_map.get(pkg)
+        raw, active = resolve_mapping(pkg, pkg_map)
+        if not active:
+            continue
         if raw is None:
             # Absent from the map -> resolves to the same name via dnf.
             source = "dnf"
@@ -136,7 +140,9 @@ def resolve_map(base: list[str], pkg_map: dict[str, dict]) -> list[tuple[str, li
     out: list[tuple[str, list[str]]] = []
     seen: set[str] = set()
     for pkg in base:
-        raw = pkg_map.get(pkg)
+        raw, active = resolve_mapping(pkg, pkg_map)
+        if not active:
+            continue
         if raw is None:
             source, names = "dnf", [pkg]
         else:
