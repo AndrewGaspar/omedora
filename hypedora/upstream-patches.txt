@@ -4,3 +4,4 @@
 omedora/test/fedora/vm/run-vm-test.sh
 omedora/test/fedora/vm/in-vm/assert-install.sh
 omedora/test/fedora/vm/in-vm/run-suite-in-session.sh
+omedora/test/fedora/headless/run-tests.sh
