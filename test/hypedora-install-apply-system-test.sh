@@ -19,3 +19,11 @@ assert_output_lacks   "system.sh nu mai apelează omarchy-setup-system" "$src" '
 
 grep -qxF 'omedora/install/system.sh' "$ROOT/hypedora/upstream-patches.txt" \
   && pass "system.sh e în upstream-patches.txt" || fail "system.sh e în upstream-patches.txt"
+
+# snapper e mapat source="skip" pe Fedora (fedora.toml) dar scriptul nu era gated →
+# `snapper: command not found` (127) omora tot apply-ul pe un Workstation stock.
+snap=$(cat "$ROOT/install/config/snapper.sh")
+assert_output_contains "snapper.sh are gate-ul de Fedora" "$snap" 'omarchy-distro'
+bash -n "$ROOT/install/config/snapper.sh" && pass "bash -n snapper.sh" || fail "bash -n snapper.sh"
+grep -qxF 'install/config/snapper.sh' "$ROOT/hypedora/upstream-patches.txt" \
+  && pass "snapper.sh e în upstream-patches.txt" || fail "snapper.sh e în upstream-patches.txt"

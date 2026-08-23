@@ -1,3 +1,13 @@
+# omedora: Fedora skips snapper retention config — snapper and
+# limine-snapper-sync are mapped source="skip" in install/packages/fedora.toml
+# (snapshot integration relies on Limine on Arch), so the binary is absent and
+# running it here would fail the whole apply with 127. The Arch body below is
+# byte-identical to upstream. See omedora/architecture.md
+# §"Omarchy 4 setup-system gating map".
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
+
 SNAPPER_CONFIG_PATH="${OMARCHY_SNAPPER_CONFIG_PATH:-/etc/snapper/configs/root}"
 SNAPPER_CONF_PATH="${OMARCHY_SNAPPER_CONF_PATH:-/etc/conf.d/snapper}"
 template="${OMARCHY_SNAPPER_TEMPLATE:-${OMARCHY_PATH:-/usr/share/omarchy}/default/snapper/root}"
