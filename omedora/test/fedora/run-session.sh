@@ -112,6 +112,12 @@ $headless || chmod 0777 "$host_sock"
 podman rm -f "$RUN_CTR" >/dev/null 2>&1 || true
 run_args=(
   -d --name "$RUN_CTR" --systemd=always
+  # SELinux-enforcing hosts: the confined container can neither read the
+  # bind-mounted session-launch scripts (no :z label) nor let systemd's
+  # sandboxed services (logind, polkit, upower) mount over /proc and cgroupfs,
+  # so user@1000 never starts. Test scaffolding — run unconfined; no-op where
+  # SELinux is off. Same rationale as headless/run-tests.sh.
+  --security-opt label=disable
   # GPU: the render node is world-rw, so no group juggling. /dev/rfkill keeps
   # rfkill consumers (the shell's network widget) quiet. Whole /dev/dri so
   # Mesa can pick a device.
