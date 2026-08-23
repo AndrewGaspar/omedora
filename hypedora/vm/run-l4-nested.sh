@@ -10,6 +10,17 @@ stamp=$(date +%Y%m%d-%H%M%S)
 
 bash "$ROOT/hypedora/vm/preflight-host.sh"
 
+# Upstream bind-montează scripturile de sesiune fără etichetă SELinux (:z), deci pe
+# un host Fedora cu SELinux Enforcing containerul primește „Permission denied".
+# Etichetăm fișierele montate aici, în stratul nostru (candidat de PR upstream: `,z`).
+if command -v getenforce >/dev/null 2>&1 && [[ $(getenforce) == "Enforcing" ]]; then
+  chcon -t container_file_t \
+    "$ROOT/omedora/test/fedora/omedora-session/staged-install-4.sh" \
+    "$ROOT/omedora/test/fedora/omedora-session/session-launch.sh" \
+    "$ROOT/omedora/test/fedora/omedora-session/session-launch-headless.sh" \
+    "$ROOT/omedora/test/fedora/omedora-session/session-launch-common.sh"
+fi
+
 export TMPDIR="${TMPDIR:-/var/tmp/podman-tmp}"; mkdir -p "$TMPDIR"
 set +e
 bash "$ROOT/omedora/test/fedora/headless/run-tests.sh" "$@" 2>&1 | tee "$RESULTS/nested-$stamp.log"
