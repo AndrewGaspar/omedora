@@ -18,6 +18,7 @@ assert_output_contains "install stage folosește vmssh simplu" "$src" 'vmssh "se
 assert_output_contains "grafica e parametrizabilă (OMEDORA_VM_GRAPHICS)" "$src" 'OMEDORA_VM_GRAPHICS'
 assert_output_contains "video e parametrizabil (OMEDORA_VM_VIDEO)" "$src" 'OMEDORA_VM_VIDEO'
 assert_output_contains "geometry-skip e transmis în VM" "$src" 'OMEDORA_VM_GEOMETRY_SKIP'
+assert_output_contains "seam-ul SETUP_FROM_REPO e transmis în VM" "$src" 'OMEDORA_SETUP_FROM_REPO'
 
 asrt=$(cat "$VM/in-vm/assert-install.sh")
 assert_output_lacks   "assert-install nu mai cere hyprland-omedora ca keystone" "$asrt" 'rpm -q hyprland-omedora'

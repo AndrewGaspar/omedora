@@ -47,8 +47,12 @@ else
 fi
 
 # --- installer-ul omedora-4, nemodificat (rulat din checkout → install-4.sh) --
+# OMEDORA_SETUP_FROM_REPO=1: setup-ul de sistem rulează din checkout-ul clonat
+# (fork-ul nostru poartă fix-uri pe care build-ul COPR încă nu le are:
+# apply-system redenumit, gate-ul snapper). Se scoate la un COPR rebuild.
 if [[ "${HYPEDORA_SKIP_INSTALL:-0}" != "1" ]]; then
-  OMEDORA_REPO="$HYPEDORA_REPO" OMEDORA_REF="$HYPEDORA_REF" bash "$CO/omedora/boot.sh"
+  OMEDORA_REPO="$HYPEDORA_REPO" OMEDORA_REF="$HYPEDORA_REF" \
+    OMEDORA_SETUP_FROM_REPO="${OMEDORA_SETUP_FROM_REPO:-1}" bash "$CO/omedora/boot.sh"
 fi
 
 # --- stratul nostru -----------------------------------------------------------

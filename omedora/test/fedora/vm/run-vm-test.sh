@@ -332,7 +332,8 @@ do_install() {
   # the install's, not ssh's.
   set +e
   vmssh "set -o pipefail; \
-    export OMARCHY_NONINTERACTIVE=1 OMEDORA_PLAN_AUTOCONFIRM=1 OMEDORA_REF='$ref' $fastenv; \
+    export OMARCHY_NONINTERACTIVE=1 OMEDORA_PLAN_AUTOCONFIRM=1 OMEDORA_REF='$ref' \
+      OMEDORA_SETUP_FROM_REPO='${OMEDORA_SETUP_FROM_REPO:-}' $fastenv; \
     bash ~/.local/share/omarchy/omedora/install-4.sh 2>&1 | tee /tmp/omedora-install.out; \
     echo \"INSTALL_RC=\${PIPESTATUS[0]}\" | tee /tmp/omedora-install.rc"
   local rc=$?

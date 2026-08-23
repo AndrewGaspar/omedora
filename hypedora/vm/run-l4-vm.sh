@@ -23,6 +23,10 @@ export OMEDORA_VM_RES=""
 export OMEDORA_VM_GEOMETRY_SKIP="${OMEDORA_VM_GEOMETRY_SKIP:-0}"
 export OMEDORA_VM_RAM_MB="${OMEDORA_VM_RAM_MB:-6144}"
 export OMEDORA_VM_VCPUS="${OMEDORA_VM_VCPUS:-4}"
+# Setup-ul de sistem rulează din checkout (seam-ul documentat în install-4.sh):
+# payload-ul RPM din COPR e în urma branch-ului (apply-system redenumit, gate-ul
+# snapper) — se scoate când COPR-ul publică un build cu fix-urile.
+export OMEDORA_SETUP_FROM_REPO="${OMEDORA_SETUP_FROM_REPO:-1}"
 
 echo "hypedora L4-VM env:"
 echo "  HYPEDORA_VM_RES=$RES"
