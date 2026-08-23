@@ -1,3 +1,6 @@
 # Fișiere upstream pe care hypedora le poartă modificate = PR-uri către
 # AndrewGaspar/omedora (omedora-4). O cale pe linie. Se scot când PR-ul e merge-uit
 # și am făcut rebase. Testul: test/hypedora-additive-test.sh
+omedora/test/fedora/vm/run-vm-test.sh
+omedora/test/fedora/vm/in-vm/assert-install.sh
+omedora/test/fedora/vm/in-vm/run-suite-in-session.sh

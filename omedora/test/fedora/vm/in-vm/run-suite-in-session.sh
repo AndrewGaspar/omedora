@@ -35,7 +35,8 @@ export XDG_CURRENT_DESKTOP="Hyprland"
 # real regression. Downgrade those to TAP SKIPs in the VM tier — the session's
 # actual rendering is proven by the host-side `virsh screenshot` + the
 # layer/process assertions in 00/10/20. (Off in the podman tier; see lib.sh.)
-export SCREENSHOT_GEOMETRY_SKIP=1
+export SCREENSHOT_GEOMETRY_SKIP="${SCREENSHOT_GEOMETRY_SKIP:-1}"
+[[ "$SCREENSHOT_GEOMETRY_SKIP" == "0" ]] && unset SCREENSHOT_GEOMETRY_SKIP   # lib.sh testează doar „setat/nesetat"
 
 rm -rf "$ART"; mkdir -p "$ART"
 

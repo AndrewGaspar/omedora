@@ -70,6 +70,9 @@ VM_RAM_MB="${OMEDORA_VM_RAM_MB:-4096}"
 VM_VCPUS="${OMEDORA_VM_VCPUS:-4}"
 VM_DISK_GB="${OMEDORA_VM_DISK_GB:-24}"
 SSH_PORT="${OMEDORA_VM_SSH_PORT:-2222}"        # host-forwarded port (passt) -> VM:22
+VM_GRAPHICS="${OMEDORA_VM_GRAPHICS:-vnc,listen=127.0.0.1}"   # ex.: egl-headless,rendernode=/dev/dri/renderD128
+VM_VIDEO="${OMEDORA_VM_VIDEO:-virtio}"                        # ex.: model.type=virtio,model.acceleration.accel3d=yes
+VM_GEOMETRY_SKIP="${OMEDORA_VM_GEOMETRY_SKIP:-1}"             # 0 când OMEDORA_VM_RES=1920x1080 (goldens reale)
 SSH_KEY="$RUN/id_omedora_vmtest"
 OVERLAY="$IMAGES/${VM}-overlay.qcow2"
 SEED_ISO="$IMAGES/${VM}-seed.iso"
@@ -254,8 +257,8 @@ provision() {
     --disk "path=$SEED_ISO,device=cdrom" \
     --os-variant fedora-unknown \
     --network "$netopt" \
-    --graphics vnc,listen=127.0.0.1 \
-    --video virtio \
+    --graphics "$VM_GRAPHICS" \
+    --video "$VM_VIDEO" \
     "${qemu_cmdline_args[@]}" \
     --noautoconsole \
     || die "virt-install failed"
@@ -299,12 +302,13 @@ provision() {
 }
 
 # ---------------------------------------------------------------------------
-# stage: install — run the Omedora bootstrap the user way (boot.sh -> install.sh)
+# stage: install — run the Omedora bootstrap the user way (boot.sh -> omedora/install-4.sh)
 # ---------------------------------------------------------------------------
 do_install() {
   log "syncing this omedora checkout into the VM (so the in-VM install uses THIS code, not just a remote clone)"
-  # Pack the working tree (tracked files) and unpack at the path install.sh
-  # hardcodes (~/.local/share/omarchy). This makes the VM test THIS branch.
+  # Pack the working tree (tracked files) and unpack at the path
+  # omedora/install-4.sh hardcodes (~/.local/share/omarchy). This makes the VM
+  # test THIS branch.
   local tar="$RUN/omedora-src.tar.gz"
   git -C "$REPO" archive --format=tar.gz -o "$tar" HEAD || die "git archive failed"
   vmssh 'rm -rf ~/.local/share/omarchy && mkdir -p ~/.local/share/omarchy' || die "prep dest failed"
@@ -314,19 +318,19 @@ do_install() {
   local fastenv=""
   $fast && fastenv="OMEDORA_VM_FAST=1"
 
-  log "running install.sh in the VM (NONINTERACTIVE; ref=$ref; fast=$fast)"
+  log "running omedora/install-4.sh in the VM (NONINTERACTIVE; ref=$ref; fast=$fast)"
   # OMARCHY_NONINTERACTIVE: drive the fedora-plan coexistence gate's
   # non-interactive branch (it warns + proceeds; backup-then-write is
   # non-destructive). This is the unattended path. The interactive/expect path
   # is exercised separately by run-vm-test.sh's --stage install with a PTY (TODO,
   # see README "Interactive path").
-  # -tt PTY: install.sh aborts silently without a terminal (see vmssh_tty). The
+  # -tt PTY: omedora/install-4.sh aborts silently without a terminal (see vmssh_tty). The
   # in-VM `tee` keeps the full transcript at /tmp/omedora-install.out so the rc
   # we read is the install's, not ssh's PTY-forwarding rc.
   set +e
   vmssh_tty "set -o pipefail; \
-    export OMARCHY_NONINTERACTIVE=1 OMEDORA_REF='$ref' $fastenv; \
-    bash ~/.local/share/omarchy/install.sh 2>&1 | tee /tmp/omedora-install.out; \
+    export OMARCHY_NONINTERACTIVE=1 OMEDORA_PLAN_AUTOCONFIRM=1 OMEDORA_REF='$ref' $fastenv; \
+    bash ~/.local/share/omarchy/omedora/install-4.sh 2>&1 | tee /tmp/omedora-install.out; \
     echo \"INSTALL_RC=\${PIPESTATUS[0]}\" | tee /tmp/omedora-install.rc"
   local rc=$?
   # Prefer the in-VM sentinel rc over ssh's (ssh -tt rc can reflect the PTY).
@@ -336,7 +340,7 @@ do_install() {
   # on purpose (stages capture $? and continue); a stray `set -e` would abort
   # the whole run on the first non-zero stage rc (e.g. a failing assert).
   set +o errexit 2>/dev/null || true
-  log "install.sh exit: $rc"
+  log "omedora/install-4.sh exit: $rc"
   return $rc
 }
 
@@ -417,7 +421,7 @@ run_session_tests() {
   # right env, and prints a TAP report. It copies per-test artifacts under
   # ~/vm-suite/artifacts which we pull back on the host.
   set +e
-  vmssh 'bash ~/vm-suite/run-suite-in-session.sh'
+  vmssh "SCREENSHOT_GEOMETRY_SKIP='$VM_GEOMETRY_SKIP' bash ~/vm-suite/run-suite-in-session.sh"
   local rc=$?
   # NOTE: do not re-enable errexit here — this script runs without `set -e`
   # on purpose (stages capture $? and continue); a stray `set -e` would abort
@@ -471,7 +475,7 @@ main() {
 
   echo
   log "================= L4-VM SUMMARY ================="
-  log "install.sh exit ... $install_rc"
+  log "omedora/install-4.sh exit ... $install_rc"
   log "install asserts ... $assert_rc"
   log "session tests  ... $tests_rc"
   log "artifacts      ... $ARTIFACTS/"

@@ -8,7 +8,7 @@
 #   1. omedora packages installed and their %{from_repo} is the COPR
 #      (copr:...:agaspar:omedora-3), NOT a local repo and NOT a stray mirror.
 #   2. /usr/share/wayland-sessions/omedora.desktop present and owned by
-#      hyprland-omedora.
+#      omedora-settings.
 #   3. config was seeded with backups (at least the bashrc block / a
 #      .pre-omedora-* backup OR a freshly-created config tree).
 #   4. no ERROR/Traceback lines in /var/log/omarchy-install.log.
@@ -30,22 +30,22 @@ fi
 echo "# expected COPR repo-id: ${EXPECT_COPR:-<unresolved>}"
 
 # --- 1. omedora packages came from the COPR ---------------------------------
-# hyprland-omedora is the keystone omedora RPM (owns the session entry). Confirm
+# omedora-settings is the keystone omedora RPM (owns the session entry). Confirm
 # it's installed AND dnf records its origin repo as the COPR.
-if rpm -q hyprland-omedora >/dev/null 2>&1; then
-  pass "hyprland-omedora installed ($(rpm -q hyprland-omedora))"
+if rpm -q omedora-settings >/dev/null 2>&1; then
+  pass "omedora-settings installed ($(rpm -q omedora-settings))"
 else
-  fail "hyprland-omedora installed"
+  fail "omedora-settings installed"
 fi
 
-from_repo=$(dnf repoquery --installed --qf '%{name} %{from_repo}\n' hyprland-omedora 2>/dev/null | awk '{print $2}' | head -1)
-echo "# hyprland-omedora from_repo: ${from_repo:-<none>}"
+from_repo=$(dnf repoquery --installed --qf '%{name} %{from_repo}\n' omedora-settings 2>/dev/null | awk '{print $2}' | head -1)
+echo "# omedora-settings from_repo: ${from_repo:-<none>}"
 if [[ -n "$EXPECT_COPR" && "$from_repo" == "$EXPECT_COPR" ]]; then
-  pass "hyprland-omedora was installed FROM THE COPR ($from_repo)"
+  pass "omedora-settings was installed FROM THE COPR ($from_repo)"
 elif [[ "$from_repo" == copr:*agaspar:omedora* ]]; then
-  pass "hyprland-omedora installed from an agaspar omedora COPR ($from_repo)"
+  pass "omedora-settings installed from an agaspar omedora COPR ($from_repo)"
 else
-  fail "hyprland-omedora installed from the COPR (got: ${from_repo:-<none>}, expected: ${EXPECT_COPR:-copr:...:agaspar:omedora-*})"
+  fail "omedora-settings installed from the COPR (got: ${from_repo:-<none>}, expected: ${EXPECT_COPR:-copr:...:agaspar:omedora-*})"
 fi
 
 # Broader: count how many installed packages trace to the COPR. A healthy
@@ -64,14 +64,14 @@ else
   fail "packages installed from the omedora COPR (count=${copr_count:-0})"
 fi
 
-# --- 2. the session entry is registered + owned by hyprland-omedora ----------
+# --- 2. the session entry is registered + owned by omedora-settings ----------
 if [[ -f /usr/share/wayland-sessions/omedora.desktop ]]; then
   pass "/usr/share/wayland-sessions/omedora.desktop present"
   owner=$(rpm -qf /usr/share/wayland-sessions/omedora.desktop 2>/dev/null || true)
-  if [[ "$owner" == hyprland-omedora-* ]]; then
-    pass "omedora.desktop owned by hyprland-omedora ($owner)"
+  if [[ "$owner" == omedora-settings-* ]]; then
+    pass "omedora.desktop owned by omedora-settings ($owner)"
   else
-    fail "omedora.desktop owned by hyprland-omedora (got: ${owner:-<none>})"
+    fail "omedora.desktop owned by omedora-settings (got: ${owner:-<none>})"
   fi
 else
   fail "/usr/share/wayland-sessions/omedora.desktop present"
