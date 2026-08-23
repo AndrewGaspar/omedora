@@ -29,6 +29,14 @@ export XDG_RUNTIME_DIR="/run/user/$UID_NUM"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 export XDG_CURRENT_DESKTOP="Hyprland"
 
+# lib.sh resolves the TAP helpers (and visual goldens) via $OMARCHY_PATH. Over
+# SSH the profile sets it to the INSTALLED payload (/usr/share/omarchy), which
+# does not ship test/ — and lib.sh's relative fallback breaks too, because this
+# tier copies lib.sh out of the repo into ~/vm-suite. Point it at the checkout
+# do_install synced instead; PATH (and thus the omarchy-* commands under test)
+# still comes from the installed payload.
+export OMARCHY_PATH="$HOME/.local/share/omarchy"
+
 # The committed visual goldens (30/40/50) are captured at the headless tier's
 # 1920x1080 output; the VM renders at the virtio-gpu's advertised mode (often
 # 1280x800), so a pixel-diff against the golden is a geometry mismatch, not a

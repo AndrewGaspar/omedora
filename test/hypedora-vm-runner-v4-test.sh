@@ -23,9 +23,13 @@ assert_output_contains "seam-ul SETUP_FROM_REPO e transmis în VM" "$src" 'OMEDO
 asrt=$(cat "$VM/in-vm/assert-install.sh")
 assert_output_lacks   "assert-install nu mai cere hyprland-omedora ca keystone" "$asrt" 'rpm -q hyprland-omedora'
 assert_output_contains "assert-install cere omedora-settings" "$asrt" 'omedora-settings'
+assert_output_contains "assert-install acceptă sourcing-ul v4 (profile.d)" "$asrt" '/etc/profile.d/omarchy.sh'
+
+assert_output_contains "reboot-ul de sesiune e detectat prin boot id" "$src" 'boot_id'
 
 suite=$(cat "$VM/in-vm/run-suite-in-session.sh")
 assert_output_contains "SCREENSHOT_GEOMETRY_SKIP e configurabil" "$suite" 'SCREENSHOT_GEOMETRY_SKIP="${SCREENSHOT_GEOMETRY_SKIP:-1}"'
+assert_output_contains "suita folosește checkout-ul pentru helpers/goldens" "$suite" 'OMARCHY_PATH="$HOME/.local/share/omarchy"'
 
 grep -qxF 'omedora/test/fedora/vm/run-vm-test.sh' "$ROOT/hypedora/upstream-patches.txt" \
   && pass "run-vm-test.sh e în upstream-patches.txt" || fail "run-vm-test.sh e în upstream-patches.txt"

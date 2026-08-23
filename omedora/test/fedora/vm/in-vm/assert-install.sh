@@ -92,10 +92,14 @@ if [[ -d "$HOME/.config/hypr" ]]; then
 else
   fail "~/.config/hypr seeded"
 fi
-if grep -qF '# >>> omedora >>>' "$HOME/.bashrc" 2>/dev/null; then
-  pass "~/.bashrc has the omedora sourcing block"
+# v4: the env sourcing moved from a ~/.bashrc block (v3) to the system-wide
+# /etc/profile.d/omarchy.sh shipped by omedora-settings; accept either.
+if [[ -r /etc/profile.d/omarchy.sh ]]; then
+  pass "env sourcing present (/etc/profile.d/omarchy.sh from omedora-settings)"
+elif grep -qF '# >>> omedora >>>' "$HOME/.bashrc" 2>/dev/null; then
+  pass "env sourcing present (v3 ~/.bashrc block)"
 else
-  fail "~/.bashrc has the omedora sourcing block"
+  fail "env sourcing present (profile.d/omarchy.sh or ~/.bashrc block)"
 fi
 n_backups=$(find "$HOME/.config" -maxdepth 3 -name '*.pre-omedora-*' 2>/dev/null | wc -l)
 echo "# config backups created (.pre-omedora-*): $n_backups"
@@ -126,7 +130,10 @@ if [[ -r "$LOG" ]]; then
     fail "no error markers in $LOG"
   fi
 else
-  fail "install log readable ($LOG)"
+  # v4: system setup runs with OMARCHY_LOG_TO_STDOUT=1 (see omedora/install/
+  # system.sh), so the transcript lands in the orchestrator's tee capture and
+  # no file log is written — an absent log is the expected unattended path.
+  pass "install log absent ($LOG) — OMARCHY_LOG_TO_STDOUT path; transcript checked by the orchestrator"
 fi
 
 echo
