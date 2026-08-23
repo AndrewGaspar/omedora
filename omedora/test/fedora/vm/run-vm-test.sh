@@ -324,11 +324,14 @@ do_install() {
   # non-destructive). This is the unattended path. The interactive/expect path
   # is exercised separately by run-vm-test.sh's --stage install with a PTY (TODO,
   # see README "Interactive path").
-  # -tt PTY: omedora/install-4.sh aborts silently without a terminal (see vmssh_tty). The
-  # in-VM `tee` keeps the full transcript at /tmp/omedora-install.out so the rc
-  # we read is the install's, not ssh's PTY-forwarding rc.
+  # NO PTY on purpose: install-4.sh's sudo guard is tty-aware — with a tty it
+  # runs `sudo -v`, which Fedora's stock passworded %wheel rule turns into a
+  # password prompt (verifypw=all) even though the VM user also has NOPASSWD;
+  # without a tty it probes `sudo -n true`, the unattended path. The in-VM `tee`
+  # keeps the full transcript at /tmp/omedora-install.out so the rc we read is
+  # the install's, not ssh's.
   set +e
-  vmssh_tty "set -o pipefail; \
+  vmssh "set -o pipefail; \
     export OMARCHY_NONINTERACTIVE=1 OMEDORA_PLAN_AUTOCONFIRM=1 OMEDORA_REF='$ref' $fastenv; \
     bash ~/.local/share/omarchy/omedora/install-4.sh 2>&1 | tee /tmp/omedora-install.out; \
     echo \"INSTALL_RC=\${PIPESTATUS[0]}\" | tee /tmp/omedora-install.rc"

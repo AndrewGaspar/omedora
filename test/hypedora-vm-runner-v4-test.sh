@@ -13,6 +13,8 @@ src=$(cat "$VM/run-vm-test.sh")
 assert_output_contains "install stage rulează omedora/install-4.sh" "$src" "omedora/install-4.sh"
 assert_output_lacks   "install stage nu mai rulează install.sh de la rădăcină" "$src" 'omarchy/install.sh 2>&1'
 assert_output_contains "install stage trece OMEDORA_PLAN_AUTOCONFIRM=1" "$src" "OMEDORA_PLAN_AUTOCONFIRM=1"
+assert_output_lacks   "install stage rulează FĂRĂ PTY (sudo guard tty-aware pe v4)" "$src" 'vmssh_tty "set -o pipefail'
+assert_output_contains "install stage folosește vmssh simplu" "$src" 'vmssh "set -o pipefail'
 assert_output_contains "grafica e parametrizabilă (OMEDORA_VM_GRAPHICS)" "$src" 'OMEDORA_VM_GRAPHICS'
 assert_output_contains "video e parametrizabil (OMEDORA_VM_VIDEO)" "$src" 'OMEDORA_VM_VIDEO'
 assert_output_contains "geometry-skip e transmis în VM" "$src" 'OMEDORA_VM_GEOMETRY_SKIP'
