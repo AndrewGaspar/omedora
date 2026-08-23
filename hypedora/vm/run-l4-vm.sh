@@ -10,16 +10,23 @@ DEV="${HYPEDORA_DEV_ROOT:-/dev}"
 RENDER="${HYPEDORA_RENDER_NODE:-$(ls "$DEV"/dri/renderD* 2>/dev/null | head -1)}"
 [[ -n "$RENDER" ]] || { echo "niciun render node în $DEV/dri — fără GL nu rulăm" >&2; exit 1; }
 
+# Rezoluția intră prin <video><model><resolution> (libvirt nativ, injectat cu
+# xpath.set — virt-install 5.1 nu are model.resolution.*). Lever-ul upstream
+# OMEDORA_VM_RES (qemu -set device.video0.xres) e RUPT pe libvirt 12: -device e
+# pasat ca JSON și -set nu-l mai vede → îl dezactivăm explicit cu string gol.
+RES="${HYPEDORA_VM_RES:-1920x1080}"
+XRES="${RES%x*}" YRES="${RES#*x}"
+
 export OMEDORA_VM_GRAPHICS="egl-headless,rendernode=$RENDER"
-export OMEDORA_VM_VIDEO="model.type=virtio,model.acceleration.accel3d=yes"
-export OMEDORA_VM_RES="${OMEDORA_VM_RES:-1920x1080}"
-export OMEDORA_VM_RES_ALIAS="${OMEDORA_VM_RES_ALIAS:-video0}"
+export OMEDORA_VM_VIDEO="model.type=virtio,model.acceleration.accel3d=yes,xpath0.set=./model/resolution/@x=$XRES,xpath1.set=./model/resolution/@y=$YRES"
+export OMEDORA_VM_RES=""
 export OMEDORA_VM_GEOMETRY_SKIP="${OMEDORA_VM_GEOMETRY_SKIP:-0}"
 export OMEDORA_VM_RAM_MB="${OMEDORA_VM_RAM_MB:-6144}"
 export OMEDORA_VM_VCPUS="${OMEDORA_VM_VCPUS:-4}"
 
 echo "hypedora L4-VM env:"
-for v in OMEDORA_VM_GRAPHICS OMEDORA_VM_VIDEO OMEDORA_VM_RES OMEDORA_VM_RES_ALIAS OMEDORA_VM_GEOMETRY_SKIP OMEDORA_VM_RAM_MB OMEDORA_VM_VCPUS; do
+echo "  HYPEDORA_VM_RES=$RES"
+for v in OMEDORA_VM_GRAPHICS OMEDORA_VM_VIDEO OMEDORA_VM_RES OMEDORA_VM_GEOMETRY_SKIP OMEDORA_VM_RAM_MB OMEDORA_VM_VCPUS; do
   printf '  %s=%s\n' "$v" "${!v}"
 done
 echo "  cmd: omedora/test/fedora/vm/run-vm-test.sh $*"

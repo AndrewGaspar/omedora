@@ -10,8 +10,9 @@ TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/dev/dri"; : > "$TMP/dev/dri/renderD128"
 out=$(HYPEDORA_DRY_RUN=1 HYPEDORA_DEV_ROOT="$TMP/dev" HYPEDORA_SKIP_PREFLIGHT=1 bash "$S" --keep 2>&1)
 assert_output_contains "egl-headless cu rendernode" "$out" "OMEDORA_VM_GRAPHICS=egl-headless,rendernode=$TMP/dev/dri/renderD128"
-assert_output_contains "virtio accel3d"             "$out" "OMEDORA_VM_VIDEO=model.type=virtio,model.acceleration.accel3d=yes"
-assert_output_contains "1920x1080"                  "$out" "OMEDORA_VM_RES=1920x1080"
+assert_output_contains "virtio accel3d + resolution prin xpath" "$out" "OMEDORA_VM_VIDEO=model.type=virtio,model.acceleration.accel3d=yes,xpath0.set=./model/resolution/@x=1920,xpath1.set=./model/resolution/@y=1080"
+assert_output_contains "1920x1080"                  "$out" "HYPEDORA_VM_RES=1920x1080"
+assert_output_contains "lever-ul -set upstream dezactivat" "$out" "OMEDORA_VM_RES="
 assert_output_contains "geometry skip off"          "$out" "OMEDORA_VM_GEOMETRY_SKIP=0"
 assert_output_contains "RAM 6144"                   "$out" "OMEDORA_VM_RAM_MB=6144"
 assert_output_contains "argumentele trec mai departe" "$out" "run-vm-test.sh --keep"
