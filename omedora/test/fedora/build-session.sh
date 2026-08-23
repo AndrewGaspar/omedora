@@ -86,6 +86,14 @@ STD_BASE_IMAGE="omedora-test:fedora44-session-4-base"
 COPR_DIR="$REPO/omedora/packaging/copr"
 SESSION_DIR="$REPO/omedora/test/fedora/omedora-session"
 STAGED_IN_IMAGE=/home/omedora/.local/share/omarchy/omedora/test/fedora/omedora-session/staged-install-4.sh
+# SELinux-enforcing hosts (default Fedora): the build container runs systemd and
+# bind-mounts staged-install-4.sh from the checkout. Confined (container_t),
+# the bind-mounted file is unreadable (no :z label) and systemd's sandboxed
+# services cannot set up their /proc + cgroupfs mount namespaces (AVC mounton
+# proc_t/cgroup_t) — logind crashloops, user@1000 never starts and the phase
+# dies with "Permission denied". This is test scaffolding, not the product:
+# run the build container unconfined. No-op where SELinux is off.
+SELINUX_OPT=(--security-opt label=disable)
 
 rebuild=false
 rebuild_repo=false
@@ -241,7 +249,7 @@ if $fast; then
   log "Fast (config-only) build: booting packages image $PKGS_IMAGE"
   podman rm -f "$BUILD_CTR" >/dev/null 2>&1 || true
   podman volume exists "$DNF_CACHE_VOL" >/dev/null 2>&1 || podman volume create "$DNF_CACHE_VOL" >/dev/null
-  podman run -d --name "$BUILD_CTR" --systemd=always \
+  podman run -d --name "$BUILD_CTR" --systemd=always "${SELINUX_OPT[@]}" \
     -v "$DNF_CACHE_VOL:$DNF_CACHE_DIR" \
     -v "$SESSION_DIR/staged-install-4.sh:$STAGED_IN_IMAGE:ro" \
     "$PKGS_IMAGE" >/dev/null
@@ -304,7 +312,7 @@ if $build_packages; then
   podman volume exists "$DNF_CACHE_VOL" >/dev/null 2>&1 || podman volume create "$DNF_CACHE_VOL" >/dev/null
   # Mount the dnf cache volume so the bootstrap's dnf downloads persist across
   # builds (the base image set keepcache=True so rpms actually stick).
-  podman run -d --name "$BUILD_CTR" --systemd=always \
+  podman run -d --name "$BUILD_CTR" --systemd=always "${SELINUX_OPT[@]}" \
     -v "$DNF_CACHE_VOL:$DNF_CACHE_DIR" \
     -v "$SESSION_DIR/staged-install-4.sh:$STAGED_IN_IMAGE:ro" \
     "$BASE_IMAGE" >/dev/null
@@ -329,7 +337,7 @@ fi
 log "Booting $PKGS_IMAGE under systemd (config phase)"
 podman rm -f "$BUILD_CTR" >/dev/null 2>&1 || true
 podman volume exists "$DNF_CACHE_VOL" >/dev/null 2>&1 || podman volume create "$DNF_CACHE_VOL" >/dev/null
-podman run -d --name "$BUILD_CTR" --systemd=always \
+podman run -d --name "$BUILD_CTR" --systemd=always "${SELINUX_OPT[@]}" \
   -v "$DNF_CACHE_VOL:$DNF_CACHE_DIR" \
   -v "$SESSION_DIR/staged-install-4.sh:$STAGED_IN_IMAGE:ro" \
   "$PKGS_IMAGE" >/dev/null
