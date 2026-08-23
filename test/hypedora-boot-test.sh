@@ -46,3 +46,13 @@ assert_equals "tweak-ul de cursor scris o singură dată după două rulări" "$
 rm -f "$BIN/flatpak"; rc=$(runboot VIRT_RC=1)
 assert_equals "fără flatpak → exit 1" "$rc" "1"
 assert_output_contains "explică grupul Workstation" "$(cat "$TMP/out")" "workstation-product-environment"
+
+# 4) sudo: fără timestamp cald (sudo -n eșuează) boot.sh cere parola de la /dev/tty, nu moare
+printf '#!/bin/bash\nif [[ "$1" == "-n" ]]; then exit 1; fi; echo "sudo $*" >> "%s"\n' "$LOG" > "$BIN/sudo"; chmod +x "$BIN/sudo"
+printf '#!/bin/bash\nexit 0\n' > "$BIN/flatpak"; chmod +x "$BIN/flatpak"
+: > "$LOG"; printf 'parola\n' > "$TMP/tty"; rc=$(runboot VIRT_RC=1 HYPEDORA_TTY="$TMP/tty")
+assert_equals "sudo -n eșuează → boot.sh continuă după sudo -v" "$rc" "0"
+assert_output_contains "a apelat sudo -v" "$(cat "$LOG")" "sudo -v"
+rc=$(runboot VIRT_RC=1 HYPEDORA_TTY="$TMP/nu-exista")
+assert_equals "sudo -n eșuează și nu e terminal → exit 1 cu instrucțiune" "$rc" "1"
+assert_output_contains "spune să rulezi sudo -v" "$(cat "$TMP/out")" "sudo -v"

@@ -23,6 +23,19 @@ command -v flatpak >/dev/null 2>&1 || die "lipsește flatpak → instalarea cere
 command -v gdm >/dev/null 2>&1 || systemctl list-unit-files gdm.service >/dev/null 2>&1 || die "lipsește GDM → sudo dnf group install workstation-product-environment"
 echo "preflight hypedora: OK"
 
+# sudo: sub `curl | bash` stdin nu e terminal, iar omedora/boot.sh probează cu
+# `sudo -n true` (fără prompt) și moare. Cerem parola noi, o dată, de la /dev/tty,
+# ca timestamp-ul sudo să fie cald când intră installer-ul.
+TTY="${HYPEDORA_TTY:-/dev/tty}"
+if ! sudo -n true 2>/dev/null; then
+  if ( exec <"$TTY" ) 2>/dev/null; then
+    # shellcheck disable=SC2024 # intenționat: sudo citește parola de pe terminal
+    sudo -v <"$TTY" || die "sudo necesar (userul trebuie să fie în grupul wheel)"
+  else
+    die "sudo necesar: rulează întâi 'sudo -v', apoi comanda din nou"
+  fi
+fi
+
 # --- checkout: existent (HYPEDORA_BOOT_DIR) sau clone shallow -----------------
 if [[ -n "${HYPEDORA_BOOT_DIR:-}" && -f "$HYPEDORA_BOOT_DIR/omedora/boot.sh" ]]; then
   CO="$HYPEDORA_BOOT_DIR"
