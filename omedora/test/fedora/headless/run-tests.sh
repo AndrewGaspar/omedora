@@ -87,6 +87,13 @@ trap cleanup EXIT
 podman rm -f "$CTR" >/dev/null 2>&1 || true
 
 run_args=(-d --name "$CTR" --systemd=always --device /dev/dri)
+# SELinux-enforcing hosts (default Fedora): systemd inside the container sets up
+# mount namespacing over /proc and cgroupfs for sandboxed services (logind,
+# polkit, upower); container_init_t is denied those mounts (AVC: mounton
+# proc_t/cgroup_t), logind crashloops with 226/NAMESPACE and user@1000 never
+# starts. Like the SYS_ADMIN grant below, this is test scaffolding, not the
+# omedora product — run the container unconfined. No-op where SELinux is off.
+run_args+=(--security-opt label=disable)
 [[ -e /dev/rfkill ]] && run_args+=(--device /dev/rfkill)
 # xdg-document-portal FUSE-mounts a document store at /run/user/1000/doc. That
 # needs BOTH /dev/fuse AND the ability to call mount(2): rootless podman's
