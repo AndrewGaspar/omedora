@@ -177,6 +177,100 @@ function pickPanelSlot(candidates, focusedScreen) {
   return pickDrawnSlot(pool.map(function(row) { return row.slot }))
 }
 
+// ---------------------------------------------------------------- bar ring
+//
+// Keyboard/controller navigation over the bar's own icons. Everything here is
+// pure: the ordering, the wrap, and the key map. BarNavigator.qml owns the
+// surface, the focus and the drawing; this file owns the decisions, so they
+// can be enumerated in a test instead of driven through a compositor.
+
+// The ring's stops, in the order the bar reads them: along the bar, and by
+// registration order for anything that starts at the same offset — a centered
+// module is mounted twice, and its zero-size placeholder must not be able to
+// overtake the copy that is drawn.
+//
+// Rows are `{ target, x, y, width, height, region }`. A row with no size is
+// dropped: it is either a placeholder or a widget that has hidden itself, and
+// neither is somewhere a focus ring can land.
+function navOrder(rows, vertical) {
+  var list = Array.isArray(rows) ? rows : []
+  var kept = []
+  for (var i = 0; i < list.length; i++) {
+    var row = list[i]
+    if (!row || !row.target) continue
+    if (!(Number(row.width) > 0) || !(Number(row.height) > 0)) continue
+    kept.push({ row: row, key: Number(vertical ? row.y : row.x), order: kept.length })
+  }
+  kept.sort(function(a, b) {
+    if (!isFinite(a.key) || !isFinite(b.key)) return a.order - b.order
+    if (a.key === b.key) return a.order - b.order
+    return a.key - b.key
+  })
+  return kept.map(function(entry) { return entry.row })
+}
+
+// Where the ring lands when it is raised cold. The preferred section first —
+// the right-hand one by default, because that is where the controls live that
+// a keyboard or a controller is reaching for — and the start of the bar when
+// that section has nothing to focus.
+function navStartIndex(rows, preferredRegion) {
+  var list = Array.isArray(rows) ? rows : []
+  if (list.length === 0) return -1
+  var region = String(preferredRegion || "")
+  if (region) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && String(list[i].region || "") === region) return i
+    }
+  }
+  return 0
+}
+
+// One step around the ring. Wraps in both directions, and a step taken with
+// nothing focused enters from the end the step came from.
+function navStepIndex(count, current, delta) {
+  var size = Number(count)
+  if (!(size > 0)) return -1
+  var step = Number(delta) || 0
+  var at = Number(current)
+  if (!isFinite(at) || at < 0 || at >= size) return step >= 0 ? 0 : size - 1
+  var next = at + step
+  return ((next % size) + size) % size
+}
+
+// The arrow that steps OFF the bar: the one pointing away from the edge the
+// bar is anchored to. Always perpendicular to the axis the ring walks, which
+// is what stops "move" and "leave" from ever being the same press.
+function navLeaveKey(position) {
+  var pos = normalizePosition(position)
+  if (pos === "bottom") return "up"
+  if (pos === "left") return "right"
+  if (pos === "right") return "left"
+  return "down"
+}
+
+// The whole key map, as data. Keys arrive named rather than as Qt.Key_*
+// constants so this stays testable outside QML — BarNavigator does the one
+// switch that turns an event into a name.
+//
+// Escape and Back both leave, which is what lets a TV remote's Back button and
+// a controller's B (Omarchy sends XF86Back) land on the same behaviour as the
+// keyboard's Escape. Tab and Shift-Tab step the ring, so the bumpers mean the
+// same thing here as they already do inside an open panel.
+function navKeyRole(key, position) {
+  var name = String(key || "").toLowerCase()
+  if (name === "escape" || name === "back") return "leave"
+  if (name === "return" || name === "enter" || name === "space") return "activate"
+  if (name === "tab") return "next"
+  if (name === "backtab") return "prev"
+
+  var pos = normalizePosition(position)
+  var vertical = pos === "left" || pos === "right"
+  if (name === (vertical ? "down" : "right")) return "next"
+  if (name === (vertical ? "up" : "left")) return "prev"
+  if (name === navLeaveKey(pos)) return "leave"
+  return ""
+}
+
 // Resolve a pointer anywhere along the bar to the closest insertion edge.
 // Requiring the pointer to sit inside another widget makes the empty space
 // around a centered group a dead zone, even though it visually reads as the
@@ -214,6 +308,11 @@ if (typeof module !== "undefined") {
     pickDrawnSlot: pickDrawnSlot,
     pickPanelSlot: pickPanelSlot,
     nearestDropTarget: nearestDropTarget,
+    navOrder: navOrder,
+    navStartIndex: navStartIndex,
+    navStepIndex: navStepIndex,
+    navLeaveKey: navLeaveKey,
+    navKeyRole: navKeyRole,
     normalizePosition: normalizePosition,
     entrySettings: entrySettings,
     entryId: entryId,
