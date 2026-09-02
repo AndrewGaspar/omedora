@@ -60,6 +60,36 @@ Every panel takes the keyboard as well as the mouse: arrows move, Return activat
 
 `Super + Ctrl + 1-9` counts panels left to right in the right section, skipping the tray since it has no panel of its own. So the number matches the icon you'd point at.
 
+## Walking the bar without a mouse
+
+The hotkeys above open a *panel*. They can't reach the widgets that don't have one — workspace numbers, the tray chevron, the update badge, a custom module you wrote — and they can't help you if you don't already know that Bluetooth is number two.
+
+So the bar also takes a focus ring: an accent outline that sits on one bar icon, walks along the bar with the arrow keys, and presses what it lands on. It's the keyboard equivalent of pointing.
+
+There's no default hotkey for it, because the shell doesn't spend a keystroke you might want. Add one to your `bindings.lua`:
+
+```lua
+o.bind("SUPER + CTRL + Up", "Focus the bar", "omarchy-shell -q omarchy.bar toggleNavigate")
+```
+
+Then, with the ring up:
+
+| Key | What it does |
+| --- | --- |
+| `←` `→` | step along the bar (`↑` `↓` on a vertical bar) |
+| `Tab` / `Shift+Tab` | the same, so the key means one thing here and inside a panel |
+| `Return` / `Space` | press the focused widget — exactly what a left click does |
+| `Escape` | leave the bar |
+| `↓` | also leaves — you're stepping off the bar, away from the edge it's on |
+
+The ring names what it's on: the widget's tooltip appears as you land, so you don't have to recognise the glyph.
+
+Pressing `Return` on a widget with a panel opens it, and the ring gets out of the way — the panel takes the keyboard and behaves exactly as it does when you open it with a hotkey, `Tab` and all. `Escape` closes the panel and hands you back to the ring, on whichever icon you ended up at; `Escape` again leaves the bar. Three presses from the deepest thing you can be doing back to your work, each one a visible step.
+
+This is also what makes the bar reachable from a couch. A TV remote's Back button and a game controller's B both send `XF86Back`, which leaves the ring the same way `Escape` does, so anything that can send arrows, Return and Back can drive the whole bar. While the ring is up the shell maps a layer surface named `omarchy-bar-nav`, which is how an outside daemon can tell that the bar is in navigation mode and route its D-pad accordingly.
+
+`omarchy-shell -q omarchy.bar navigate`, `leave`, `focusNext`, `focusPrev`, `activate` and `activateSecondary` (the widget's right-click action) drive the same ring from a script.
+
 ### Tailscale and Dropbox
 
 Two more widgets appear on the bar only once you install the matching service from **Install → Service**, and both are worth knowing about because they do more than report status.
