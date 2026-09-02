@@ -327,6 +327,12 @@ Item {
     pluginBarApis = ({})
   }
 
+  // Keyboard/controller navigation over the bar's own icons. The state lives in
+  // BarNavigator; these mirrors are what the rest of the bar reads, so nothing
+  // else has to know the navigator exists.
+  readonly property bool navActive: barNavigator.active
+  readonly property var navTarget: barNavigator.target
+
   function registerClickTarget(target) {
     if (!target || clickTargets.indexOf(target) !== -1) return
     var next = clickTargets.slice()
@@ -396,8 +402,13 @@ Item {
     return !!left.screen && !!right.screen && !!left.screen.name && !!right.screen.name && left.screen.name === right.screen.name
   }
 
+  // The ring's focused widget counts as hovered. That is the whole tooltip
+  // integration: `showTooltip` refuses a target this says is not hovered, and
+  // the watchdog that hides a stale tooltip asks the same question, so naming
+  // the focused widget needs no second path through either.
   function targetTooltipHovered(target) {
-    return !!target && target.visible !== false && target.opacity !== 0 && target.tooltipHovered === true
+    return !!target && target.visible !== false && target.opacity !== 0
+      && (target.tooltipHovered === true || target === navTarget)
   }
 
   function clearTooltip() {
@@ -1162,6 +1173,15 @@ Item {
     onTriggered: if (!root.targetTooltipHovered(root.tooltipTarget)) root.hideTooltip(root.tooltipTarget)
   }
 
+  // Keyboard/controller navigation over the bar's icons — the ring, its layer
+  // surface, and the key map. Everything about it is in its own file so that
+  // the hooks it needs here stay down to two mirrored properties, one clause in
+  // `targetTooltipHovered`, and the verbs below.
+  BarNavigator {
+    id: barNavigator
+    bar: root
+  }
+
   // Presence of the `bar-off` flag = bar hidden. Watching the parent toggles
   // directory because FileView can't observe a file that doesn't exist yet,
   // and the flag is created/removed by `omarchy-toggle-bar`.
@@ -1190,6 +1210,48 @@ Item {
     // killing it here can swallow the result entirely.
     function syncHidden(): void {
       barHiddenProbe.running = true
+    }
+
+    // The focus ring (see BarNavigator.qml). These live on `omarchy.bar` rather
+    // than on the `shell` target because `shell call <id> ...` cannot reach the
+    // bar at all: callIfLoaded looks in panelLoaders, and the bar is not a
+    // panel.
+    //
+    // `navigate` and `toggleNavigate` are what a hotkey binds. The rest exist
+    // for scripts and for anything driving the bar from outside — a remote, an
+    // accessibility tool — that would rather send a verb than a keystroke.
+    function navigate(): void {
+      barNavigator.enter()
+    }
+
+    function leave(): void {
+      barNavigator.leave()
+    }
+
+    function toggleNavigate(): void {
+      barNavigator.toggle()
+    }
+
+    function focusNext(): void {
+      barNavigator.step(1)
+    }
+
+    function focusPrev(): void {
+      barNavigator.step(-1)
+    }
+
+    function activate(): void {
+      barNavigator.press(Qt.LeftButton)
+    }
+
+    // What a right click on the focused widget does — the actions that have no
+    // IPC verb of their own (audio's mute-all, the clock's format cycle).
+    function activateSecondary(): void {
+      barNavigator.press(Qt.RightButton)
+    }
+
+    function isNavigating(): string {
+      return barNavigator.active ? "true" : "false"
     }
   }
 

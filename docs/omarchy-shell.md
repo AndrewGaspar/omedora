@@ -107,6 +107,35 @@ individual plugins (`bar`, `image-selector`, …).
 
 `setPluginEnabled` takes a string; only literal `"true"` enables.
 
+### `omarchy.bar`
+
+The bar's own target. `shell call <id> …` cannot reach the bar — `callIfLoaded`
+looks in `panelLoaders`, and the bar is not a panel — so anything addressed to
+the bar itself lives here.
+
+| Method                          | Effect                                     |
+|---------------------------------|--------------------------------------------|
+| `omarchy.bar syncHidden`        | re-read the `bar-off` flag                 |
+| `omarchy.bar navigate`          | raise the focus ring on the bar's icons    |
+| `omarchy.bar leave`             | drop the focus ring                        |
+| `omarchy.bar toggleNavigate`    | raise it, or drop it if it is up           |
+| `omarchy.bar focusNext`         | step the ring along the bar                |
+| `omarchy.bar focusPrev`         | step it back                               |
+| `omarchy.bar activate`          | left-click the focused widget              |
+| `omarchy.bar activateSecondary` | right-click it                             |
+| `omarchy.bar isNavigating`      | `true` / `false`                           |
+
+The ring is the keyboard's way to reach the bar *icons*, as against the panels
+they open — see [the manual](../manual/05-the-top-bar.md). While it is up, the
+shell maps a 1×1 click-through layer surface with the namespace
+**`omarchy-bar-nav`**; nothing is drawn on it. It exists to hold the keyboard,
+and its namespace is how something outside the shell — a controller daemon
+keyed on `openlayer`/`closelayer`, an accessibility tool — can tell that the bar
+is being navigated without polling `isNavigating`.
+
+`navigate` refuses on a hidden bar, and the ring walks one bar surface: the one
+on the focused output, the same rule the panel hotkeys follow.
+
 ## shell.json
 
 ```json

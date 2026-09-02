@@ -164,6 +164,39 @@ Widgets receive `bar` (the shell root), `moduleName` (string), and `settings` (o
 - `bar.shellQuote(value)` — safe shell-quote a string
 - `bar.showTooltip(target, text)` / `bar.hideTooltip(target)` — shared tooltip popup
 - `bar.requestPopout(owner)` / `bar.releasePopout(owner)` — one-popup-at-a-time coordinator
+- `bar.navActive` / `bar.navTarget` — whether the focus ring is up, and the click target it is on
+
+## The focus ring
+
+`BarNavigator.qml` walks the bar's icons with the keyboard: an accent outline on
+one click target, moved with the arrows, activated with Return. It is what makes
+the widgets *without* a panel reachable without a mouse — workspace numbers,
+indicators, the tray chevron, a custom module — and what makes the bar usable
+from a TV remote or a game controller.
+
+A widget needs no code for it. Anything built on `WidgetButton` (which is
+everything built on `BarIconButton` or `BarIndicator`) already registers as a
+click target and already implements activation, because activating is
+`triggerPress(button)` — the very call the widget's own `MouseArea` makes. A
+custom module's `onClick`/`onRightClick` therefore work from the ring on the day
+they are written.
+
+Three things follow from that, worth knowing if you write a widget:
+
+- **Visibility rules are the bar's, not yours.** A stop exists exactly when
+  `moduleTargetClickable` says a mouse could click it, so hiding your widget or
+  marking it `concealed`/`interactive: false` removes it from the ring for free.
+- **`tooltipText` is the label.** The ring shows the focused widget's tooltip on
+  arrival, so a widget with no tooltip is an unnamed stop on the ring.
+- **Multi-target widgets get one stop each.** A widget that registers several
+  `WidgetButton`s — the workspaces module, the indicator row — is walked button
+  by button rather than as a single slot.
+
+The ring's ordering, wrap and key map are pure functions in `BarModel.js`
+(`navOrder`, `navStartIndex`, `navStepIndex`, `navKeyRole`, `navLeaveKey`),
+covered by `test/shell.d/bar-navigation-test.sh`. Verbs and the
+`omarchy-bar-nav` surface are documented in
+[docs/omarchy-shell.md](../../../docs/omarchy-shell.md).
 
 First-party bar widgets are manifest-backed just like third-party widgets.
 Simple widgets carry sibling manifests such as `widgets/Workspaces.manifest.json`;
