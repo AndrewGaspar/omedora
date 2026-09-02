@@ -280,17 +280,86 @@ function searchableToken(value) {
   return String(value || "").replace(/[._-]+/g, " ")
 }
 
+// Both sides of a comparison get folded the same way, because a query and the
+// name it is looking for rarely agree about punctuation: "nodejs" and Node.js,
+// "cities skylines" and Cities: Skylines, a dictated "Spotify." and Spotify.
+// Ids and aliases were already folded by searchableToken; this extends the
+// same rule to labels, descriptions, and the query itself.
+function normalizeSearchText(value) {
+  return searchableToken(value)
+    .toLowerCase()
+    .replace(/[\/,;:!?]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
 function leafIdFor(id) {
   var parts = String(id || "").split(".")
   return parts.length > 0 ? parts[parts.length - 1] : id
 }
 
+// Words a spoken sentence puts around a name, and that no name contains.
+// Dictation arrives as "Open Spotify, please." rather than "spotify", and an
+// on-screen keyboard's suggestions do the same thing; what is left once these
+// go is the part that actually names something.
+var FILLER_WORDS = ["the", "a", "an", "please", "open", "launch", "start", "run", "go", "to"]
+
+// The query, as the terms to match with. Nothing here touches filterText: the
+// search field still shows the sentence that was said and dmenu still returns
+// it verbatim, so only the matching is forgiving.
+function searchTerms(query) {
+  var raw = String(query || "").trim()
+  if (!raw) return []
+
+  var folded = normalizeSearchText(raw).split(" ")
+  var all = []
+  var named = []
+  for (var i = 0; i < folded.length; i++) {
+    if (!folded[i]) continue
+    all.push(folded[i])
+    if (FILLER_WORDS.indexOf(folded[i]) < 0) named.push(folded[i])
+  }
+
+  // A query that is *only* filler or only punctuation — "open", "." — is
+  // someone typing, not someone dictating a name. Keep filtering by what they
+  // typed rather than emptying the query, which would list every row.
+  if (named.length > 0) return named
+  if (all.length > 0) return all
+  return raw.toLowerCase().split(/\s+/)
+}
+
+// The last chance a term gets: its letters in order inside one of the name's
+// words, so a misheard "gogle chrome" still reaches Google Chrome. Anchored to
+// a word start, because an unanchored subsequence finds "theme" in "Virtual
+// Machine Manager" and buries the real answer in noise; and only from three
+// characters up, since a shorter term is a subsequence of nearly everything.
+function subsequenceMatch(term, text) {
+  if (!term || term.length < 3) return false
+
+  for (var start = 0; start < text.length; start++) {
+    if (start > 0 && text.charAt(start - 1) !== " ") continue
+    if (text.charAt(start) !== term.charAt(0)) continue
+
+    var matched = 1
+    for (var i = start + 1; i < text.length && matched < term.length; i++) {
+      if (text.charAt(i) === term.charAt(matched)) matched += 1
+    }
+    if (matched === term.length) return true
+  }
+
+  return false
+}
+
 function nameSearchText(entry) {
   if (!entry) return ""
-  var aliases = []
-  var values = Array.isArray(entry.aliases) ? entry.aliases : []
-  for (var i = 0; i < values.length; i++) aliases.push(searchableToken(values[i]))
-  return [entry.label, searchableToken(leafIdFor(entry.id)), aliases.join(" ")].join(" ").toLowerCase()
+  var aliases = Array.isArray(entry.aliases) ? entry.aliases : []
+  // An app row's id is "apps." plus the whole desktop-file stem, and a stem is
+  // dotted for reverse-DNS names, so its leaf is a vendor-stripped fragment
+  // (org.gnome.Nautilus -> "Nautilus") or the literal word "desktop"
+  // (org.telegram.desktop). The stem is on the row as appId; menu ids keep
+  // taking their leaf, which is what makes style.theme searchable as "theme".
+  var idText = entry.appId || leafIdFor(entry.id)
+  return normalizeSearchText([entry.label, idText, aliases.join(" ")].join(" "))
 }
 
 function termInSearchWords(term, text) {
@@ -302,7 +371,7 @@ function termInSearchWords(term, text) {
 }
 
 function descriptionTextMatches(query, text) {
-  var terms = String(query || "").toLowerCase().trim().split(/\s+/)
+  var terms = searchTerms(query)
   for (var i = 0; i < terms.length; i++) {
     if (terms[i] && !termInSearchWords(terms[i], text)) return false
   }
@@ -314,13 +383,15 @@ function matchesQuery(entry, query, visible) {
   if (!visible) return false
 
   var nameText = nameSearchText(entry)
-  var descriptionText = String(entry.description || "").toLowerCase()
-  var terms = String(query || "").toLowerCase().trim().split(/\s+/)
+  var labelText = normalizeSearchText(entry.label)
+  var descriptionText = normalizeSearchText(entry.description)
+  var terms = searchTerms(query)
 
   for (var i = 0; i < terms.length; i++) {
     if (!terms[i]) continue
     if (nameText.indexOf(terms[i]) >= 0) continue
     if (termInSearchWords(terms[i], descriptionText)) continue
+    if (subsequenceMatch(terms[i], labelText)) continue
     return false
   }
 
@@ -328,10 +399,10 @@ function matchesQuery(entry, query, visible) {
 }
 
 function searchScore(items, entry, query) {
-  var needle = String(query || "").toLowerCase().trim()
-  var label = entry.label.toLowerCase()
+  var needle = searchTerms(query).join(" ")
+  var label = normalizeSearchText(entry.label)
   var nameText = nameSearchText(entry)
-  var descriptionText = String(entry.description || "").toLowerCase()
+  var descriptionText = normalizeSearchText(entry.description)
   var score = 80
 
   if (label === needle) score = entry.parent === "root" ? 2 : 0
@@ -342,6 +413,9 @@ function searchScore(items, entry, query) {
   else if (label.indexOf(needle) >= 0) score = 30
   else if (nameText.indexOf(needle) >= 0) score = 40
   else if (descriptionTextMatches(needle, descriptionText)) score = 60
+  // A subsequence is the weakest thing matchesQuery accepts, so it sorts below
+  // every literal hit rather than lifting a mishearing above an exact name.
+  else if (subsequenceMatch(needle, label)) score = 70
 
   if (entry.kind === "menu" || entry.kind === "link") score -= 2
   // App rows sort after all menu items, so they lose the tiebreak below to an
@@ -499,6 +573,9 @@ if (typeof module !== "undefined") {
     isVisible: isVisible,
     labelFor: labelFor,
     searchableToken: searchableToken,
+    normalizeSearchText: normalizeSearchText,
+    searchTerms: searchTerms,
+    subsequenceMatch: subsequenceMatch,
     leafIdFor: leafIdFor,
     nameSearchText: nameSearchText,
     termInSearchWords: termInSearchWords,
