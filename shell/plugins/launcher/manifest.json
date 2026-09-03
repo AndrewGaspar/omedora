@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "omarchy.launcher",
+  "name": "Launcher",
+  "version": "1.0.0",
+  "author": "Omarchy",
+  "description": "Fullscreen gamepad-friendly application grid: paged tiles, pinning, type-to-filter",
+  "kinds": [
+    "overlay"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "Launcher.qml"
+  }
+}
