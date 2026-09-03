@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# omarchy:summary=Control the fullscreen application launcher grid
+# omarchy:args=[toggle|summon|close|ping]
+# omarchy:examples=omarchy launcher | omarchy launcher toggle | omarchy launcher summon
+
+# Thin wrapper around the standard plugin IPC surface. The launcher is the
+# first-party `omarchy.launcher` overlay plugin: a paged app grid for
+# keyboard, mouse, and gamepad (Hyprpad) use.
+#
+# Gamepad contract (bind controller inputs to these keys in Hyprland):
+#   arrows     move across the grid, turning pages at the edges
+#   Enter      launch the selected app
+#   P          pin/unpin the selected app (outside search)
+#   PageUp/Dn  turn pages directly; Home/End jump to first/last
+#   Escape     clear search, then close; typing filters
+
+set -euo pipefail
+
+verb="${1-toggle}"
+
+case "$verb" in
+  toggle)
+    exec omarchy-shell shell toggle omarchy.launcher '{}'
+    ;;
+  summon)
+    exec omarchy-shell shell summon omarchy.launcher '{}'
+    ;;
+  close)
+    exec omarchy-shell shell hide omarchy.launcher
+    ;;
+  ping)
+    exec omarchy-shell shell call omarchy.launcher ping '{}'
+    ;;
+  -h | --help | help)
+    cat <<USAGE
+Usage: omarchy launcher [verb]
+
+Verbs:
+  toggle   Open the launcher, or close it if already open. Default verb.
+  summon   Always open the launcher (no close-if-visible toggle).
+  close    Close the launcher if it is visible.
+  ping     Health check.
+
+Keys inside the launcher:
+  arrows     Move across the grid, turning pages at the edges
+  Enter      Launch the selected app
+  P          Pin/unpin the selected app (when not searching)
+  PageUp/Dn  Turn pages directly; Home/End jump to first/last
+  type       Filter apps; Escape clears the filter, then closes
+USAGE
+    exit 0
+    ;;
+  *)
+    echo "omarchy-launcher: unknown verb '$verb'. Try 'omarchy launcher --help'." >&2
+    exit 2
+    ;;
+esac
