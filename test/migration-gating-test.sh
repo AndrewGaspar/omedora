@@ -39,6 +39,8 @@ ARCH_TOKEN_RE='(^|[^[:alnum:]_])(pacman|snapper|mkinitcpio)([^[:alnum:]_]|$)|lim
 # Add here only after confirming the migration truly cannot wedge on Fedora.
 declare -A REVIEWED_SAFE
 REVIEWED_SAFE["1782049344.sh"]='limine appears only in a $HOME/.config/autostart filename and a `|| true`-guarded systemctl --user unit name; writes a Hidden autostart, executes no limine binary.'
+REVIEWED_SAFE["1787589206.sh"]='every Arch token (pacman-key, pacman.conf sed, omarchy-update-keyring) sits inside an `[[ -f /etc/pacman.conf ]]` guard that is false on Fedora; the body no-ops without executing anything.'
+REVIEWED_SAFE["1788112314.sh"]='reads /etc/pacman.d/mirrorlist and /etc/pacman.conf in an `if` condition; both paths are absent on Fedora so grep fails the condition and the sudo sed never executes.'
 
 # A migration is "gated" if it short-circuits on Fedora before the Arch work.
 is_gated() { grep -Eq 'fedora.*exit 0|== "fedora" \]\] && exit 0|fedora\)' "$1"; }
