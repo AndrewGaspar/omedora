@@ -87,6 +87,13 @@ xdg-mime default HEY.desktop x-scheme-handler/mailto'
 # installed -cuda/-migraphx subpackages), so it has NO allowlist entry.
 ALLOW["bin/omarchy-voxtype-install"]='  omarchy-pkg-add wtype voxtype-bin'
 
+# printer-discovery migration: the bare `systemctl daemon-reload` /
+# `try-reload-or-restart` moved one level deeper under a /run/systemd/system
+# guard (verbatim) so CI containers without a system bus skip the reload.
+# Real machines always have the directory; their behavior is unchanged.
+ALLOW["migrations/1787815267.sh"]='  sudo systemctl daemon-reload
+  sudo systemctl try-reload-or-restart cups.service'
+
 ALLOW["bin/omarchy-update"]='if [[ -z ${OMARCHY_UPDATE_LOGGED:-} ]]; then
 trap '"'"'echo ""; echo -e "\033[0;31mSomething went wrong during the update!\n\nPlease review the output above carefully, correct the error, and retry the update.\n\nIf you need assistance, get help from the community at https://omarchy.org/discord\033[0m"'"'"' ERR'
 
