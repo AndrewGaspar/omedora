@@ -4,6 +4,12 @@
 
 set -euo pipefail
 
+# omedora: outside a session OMARCHY_PATH is unset, and package-backed installs
+# own /usr/share/omarchy with no dev checkout. Default it so the strict
+# comparison below exits 0 instead of tripping `set -u`. Arch sessions always
+# set it, so the Arch path is unchanged.
+OMARCHY_PATH=${OMARCHY_PATH:-/usr/share/omarchy}
+
 [[ $OMARCHY_PATH != "/usr/share/omarchy" ]] || exit 0
 
 if ! git -C "$OMARCHY_PATH" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
