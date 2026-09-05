@@ -1,5 +1,7 @@
 echo "Switch mise to the mise-bin package from the Omarchy repo"
 
+[[ ${OMARCHY_DISTRO:-$(omarchy-distro)} == "fedora" ]] && { return 0 2>/dev/null || exit 0; }
+
 # mise-bin carries mise's own release artifacts -- PGO+BOLT-optimized on x86_64,
 # glibc-native on both arches -- and takes over from Arch's mise, which it both
 # provides and conflicts with.
