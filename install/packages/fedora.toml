@@ -46,6 +46,11 @@ names = ["neovim"]
 source = "dnf"
 names = ["qt5-qtwayland"]
 
+[qt6-imageformats]
+source = "dnf"
+names = ["qt6-qtimageformats"]
+reason = "Arch/Fedora name translation (Fedora prefixes the Qt module: qt6-qtimageformats). New Omarchy 4.0.2 base dependency; ships in Fedora main."
+
 [python-gobject]
 source = "dnf"
 names = ["python3-gobject"]
@@ -121,6 +126,11 @@ app_id = "org.localsend.localsend_app"
 source = "dnf"
 names = ["mise"]
 reason = "Not in Fedora repos or RPM Fusion. Upstream ships a prebuilt linux-x64 tarball; binary-repackaged by omedora/packaging/copr/mise.spec (binary + man page + fish activation snippet)."
+
+[mise-bin]
+source = "dnf"
+names = ["mise"]
+reason = "Omarchy 4.0.2 renamed the base package to Arch's PGO+BOLT-optimized mise-bin (built from mise's own release artifacts in the omarchy repo). Omedora keeps serving its binary-repackaged mise RPM (omedora/packaging/copr/mise.spec) under the same name; the Fedora-gated migration skips Arch's package-replacement transaction."
 
 [claude-code]
 source = "skip"
