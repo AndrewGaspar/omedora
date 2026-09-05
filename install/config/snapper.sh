@@ -1,3 +1,10 @@
+# omedora: Arch-only (Limine/snapper boot snapshots are out of scope;
+# omedora never owns the bootloader or snapshot boot chain — see
+# omedora/architecture.md §14). The body below is byte-identical to upstream.
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" != "arch" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
+
 SNAPPER_CONFIG_PATH="${OMARCHY_SNAPPER_CONFIG_PATH:-/etc/snapper/configs/root}"
 SNAPPER_CONF_PATH="${OMARCHY_SNAPPER_CONF_PATH:-/etc/conf.d/snapper}"
 template="${OMARCHY_SNAPPER_TEMPLATE:-${OMARCHY_PATH:-/usr/share/omarchy}/default/snapper/root}"

@@ -226,6 +226,7 @@ change even though they share that directory.
 | `install/config/increase-lockout-limit.sh` | Gate; Fedora PAM is authselect-managed and Omedora does not install SDDM |
 | `bin/omarchy-setup-lock` | Dispatch to `bin/fedora/setup-lock` using Fedora's `system-auth` include |
 | `install/config/docker.sh` | Dispatch; add group and apply daemon defaults only when absent |
+| `install/config/snapper.sh` | Gate; Limine/snapper boot snapshots are out of scope (§14) |
 | `install/config/enable-services.sh` | Dispatch; enable only present, reviewed services |
 | `install/config/firewall.sh` | Dispatch to narrow firewalld application rules without changing zone defaults |
 | `install/hardware/all.sh` | Dispatch to `all-fedora.sh`, an explicit portable subset |
