@@ -19,8 +19,9 @@ enable_if_present() {
   local unit="$1" state
   state="$(systemctl is-enabled "$unit" 2>/dev/null || true)"
   case "$state" in
-    "") ;;                                # unit doesn't exist here — skip
+    "" | not-found) ;;                    # unit doesn't exist here — skip
     enabled | enabled-runtime | static | alias) ;; # already on — leave alone
+    masked) ;;                            # admin-masked — respect it
     *) systemctl enable "$unit" ;;
   esac
 }
