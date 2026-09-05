@@ -25,6 +25,8 @@
 #     user; revisit on demand), apple/fix-suspend-nvme.sh (Mac support on
 #     Fedora is t2linux territory).
 
-run_logged "$OMARCHY_INSTALL/hardware/input-group.sh"
+# input-group.sh retired upstream in v4.0.2 (#9200 closed the unprivileged
+# input escalation path; existing installs are trimmed by migration
+# 1787865477). Nothing to grant on fresh installs.
 run_logged "$OMARCHY_INSTALL/hardware/fix-synaptic-touchpad.sh"
 run_logged "$OMARCHY_INSTALL/hardware/framework/qmk-hid.sh"
