@@ -51,6 +51,20 @@ source = "dnf"
 names = ["qt6-qtimageformats"]
 reason = "Arch/Fedora name translation (Fedora prefixes the Qt module: qt6-qtimageformats). New Omarchy 4.0.2 base dependency; ships in Fedora main."
 
+[vulkan-intel]
+source = "dnf"
+names = ["mesa-vulkan-drivers"]
+reason = "Arch splits Intel Vulkan (ANV) into vulkan-intel; Fedora ships ANV inside mesa-vulkan-drivers (default on Workstation)."
+
+[vulkan-radeon]
+source = "dnf"
+names = ["mesa-vulkan-drivers"]
+reason = "Arch splits AMD Vulkan (RADV) into vulkan-radeon; Fedora ships RADV inside mesa-vulkan-drivers (default on Workstation)."
+
+[vulkan-asahi]
+source = "skip"
+reason = "Apple Silicon Vulkan is Asahi-Remix territory (not Fedora main); no Fedora analogue to install. The migration's lspci gate never fires on supported hardware."
+
 [python-gobject]
 source = "dnf"
 names = ["python3-gobject"]
