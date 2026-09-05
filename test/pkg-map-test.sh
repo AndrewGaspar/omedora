@@ -48,6 +48,8 @@ expected = {
   "omacalc": ["omacalc"],
   "ttfx": ["ttfx"],
   "quickshell-git": ["quickshell"],
+  "mise-bin": ["mise"],
+  "qt6-imageformats": ["qt6-qtimageformats"],
 }
 for package, names in expected.items():
   entry = package_map.get(package)
