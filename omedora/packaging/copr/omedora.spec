@@ -20,7 +20,7 @@
 Name:           omedora
 # Version is normally read from the repo's omedora/version file; hardcoded here
 # for now — a follow-up wires .copr/srpm.sh to substitute it at SRPM-gen time.
-Version:        0.2.0~beta.2
+Version:        0.2.0~beta.3
 Release:        1%{?dist}
 Summary:        Omedora runtime: omarchy commands, installer, migrations, themes, Quickshell desktop
 

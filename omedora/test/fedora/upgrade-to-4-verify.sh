@@ -201,14 +201,19 @@ echo "# --- assertions ---"
 
 check "omedora installed" rpm -q omedora
 check "omedora-settings installed" rpm -q omedora-settings
-[[ $(rpm -q --qf '%{VERSION}' omedora 2>/dev/null) == "0.2.0~beta.2" ]] \
-  && ok "Omedora core migrated to the Quattro beta package" \
+# At-least-beta.2 (sort -V honors the ~ prerelease ordering): the live COPR
+# moves on with each beta, and the upgrade must land on the current payload,
+# not a pinned one.
+core_version=$(rpm -q --qf '%{VERSION}' omedora 2>/dev/null || true)
+[[ -n $core_version && $(printf '%s\n%s\n' "0.2.0~beta.2" "$core_version" | sort -V | tail -1) == "$core_version" ]] \
+  && ok "Omedora core migrated to the Quattro beta package ($core_version)" \
   || nok "Omedora core migrated to the Quattro beta package" \
-    "version: $(rpm -q --qf '%{VERSION}' omedora 2>/dev/null || true)"
-[[ $(rpm -q --qf '%{VERSION}' omedora-settings 2>/dev/null) == "0.2.0~beta.2" ]] \
-  && ok "Omedora settings migrated to the Quattro beta package" \
+    "version: ${core_version:-not installed}"
+settings_version=$(rpm -q --qf '%{VERSION}' omedora-settings 2>/dev/null || true)
+[[ -n $settings_version && $(printf '%s\n%s\n' "0.2.0~beta.2" "$settings_version" | sort -V | tail -1) == "$settings_version" ]] \
+  && ok "Omedora settings migrated to the Quattro beta package ($settings_version)" \
   || nok "Omedora settings migrated to the Quattro beta package" \
-    "version: $(rpm -q --qf '%{VERSION}' omedora-settings 2>/dev/null || true)"
+    "version: ${settings_version:-not installed}"
 
 for p in walker elephant swayosd hypridle hyprlock hyprshot gazelle-tui \
          waybar mako swaybg hyprland-omedora; do
