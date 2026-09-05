@@ -29,11 +29,14 @@ set -euo pipefail
 owner="${OMEDORA_COPR_OWNER:-agaspar}"
 
 # Resolve the Omarchy base version file: prefer the installed payload, then the
-# repo this script lives in.
+# repo this script lives in, then the packaged payload location (installed
+# /usr/bin copies resolve beside /usr, where no version file lives, and
+# OMARCHY_PATH is unset outside a session).
 if [[ -n ${OMARCHY_PATH:-} && -f "$OMARCHY_PATH/version" ]]; then
   base_file="$OMARCHY_PATH/version"
 else
   base_file="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/version"
+  [[ -f $base_file ]] || base_file="/usr/share/omarchy/version"
 fi
 base="$(cat "$base_file" 2>/dev/null || echo unknown)"
 major="${base%%.*}"   # 3.8.2 -> 3 ; one COPR per Omarchy major line
