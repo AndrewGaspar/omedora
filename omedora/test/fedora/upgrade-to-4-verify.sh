@@ -245,7 +245,9 @@ fi
 # Every mandatory XR leaf/meta/session package must remain installed and be
 # resolvable with the old COPR disabled. Equal-NEVR leaves can legitimately
 # retain their original from_repo provenance after `dnf install`; the packages
-# with Omedora 4 payload changes are checked separately by their bumped release.
+# with Omedora 4 payload changes are checked separately by omedora-4 provenance
+# (release numbers reset whenever the version bumps, so release magnitude
+# cannot identify the payload).
 # monado-xreal was explicitly installed in FROM and must survive by the same
 # mechanism even though it remains optional for fresh installs.
 for package in "${xr_v4_packages[@]}" monado-xreal; do
@@ -265,13 +267,13 @@ done
 
 for package in \
   hypxrland hypxrvoice monado-xreal hypxrland-stack hypxrland-omedora; do
-  package_release=$(rpm -q --qf '%{RELEASE}' "$package" 2>/dev/null || true)
-  package_release_number=${package_release%%[^0-9]*}
-  if [[ -n $package_release_number ]] && (( package_release_number >= 2 )); then
-    ok "$package has the Omedora 4 release ($package_release)"
+  package_evr=$(rpm -q --qf '%{VERSION}-%{RELEASE}' "$package" 2>/dev/null || true)
+  package_repo=$(dnf repoquery --installed --qf '%{from_repo}' "$package" 2>/dev/null || true)
+  if grep -Eq 'omedora-4$' <<<"$package_repo"; then
+    ok "$package has the Omedora 4 payload ($package_evr from $package_repo)"
   else
-    nok "$package has the Omedora 4 release" \
-      "release: ${package_release:-not installed}"
+    nok "$package has the Omedora 4 payload" \
+      "evr: ${package_evr:-not installed}; repo: ${package_repo:-unknown}"
   fi
 done
 check "HypXRland owns the private compositor" \
