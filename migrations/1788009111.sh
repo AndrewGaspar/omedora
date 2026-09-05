@@ -1,5 +1,7 @@
 echo "Temporarily remove automatic printer discovery"
 
+[[ ${OMARCHY_DISTRO:-$(omarchy-distro)} == "fedora" ]] && { return 0 2>/dev/null || exit 0; }
+
 machine_marker="${OMARCHY_CUPS_BROWSED_REMOVAL_MARKER:-/var/lib/omarchy/migrations/1788009111}"
 
 [[ ! -e $machine_marker ]] || exit 0

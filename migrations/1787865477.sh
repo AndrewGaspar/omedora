@@ -1,5 +1,7 @@
 echo "Drop the default input group grant, which allowed unprivileged keylogging"
 
+[[ ${OMARCHY_DISTRO:-$(omarchy-distro)} == "fedora" ]] && { return 0 2>/dev/null || exit 0; }
+
 # Membership of `input` gives raw read/write access to /dev/input/event*: any
 # process running as the user can capture keystrokes and synthesize input. The
 # blanket grant is unnecessary: the Xbox-controller and ydotool installers add
