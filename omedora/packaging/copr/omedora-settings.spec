@@ -368,8 +368,9 @@ desktop-file-validate %{buildroot}%{_datadir}/wayland-sessions/omedora.desktop
 %dir %{_sysconfdir}/fastfetch
 %config(noreplace) %{_sysconfdir}/fastfetch/config.jsonc
 %{_sysconfdir}/profile.d/omarchy.sh
-%config(noreplace) %{_sysconfdir}/sudoers.d/omarchy-asdcontrol
+%config(noreplace) %{_sysconfdir}/sudoers.d/omarchy-dns
 %config(noreplace) %{_sysconfdir}/sudoers.d/omarchy-passwd-tries
+%config(noreplace) %{_sysconfdir}/sudoers.d/omarchy-theme-browser
 %config(noreplace) %{_sysconfdir}/sudoers.d/omarchy-tzupdate
 %config(noreplace) %{_sysconfdir}/sysctl.d/90-omarchy-file-watchers.conf
 %config(noreplace) %{_sysconfdir}/sysctl.d/99-omarchy-sysctl.conf
