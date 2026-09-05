@@ -42,8 +42,13 @@ if systemctl is-active --quiet cups-browsed.service 2>/dev/null; then
 fi
 
 if omarchy-pkg-present cups; then
-  sudo systemctl daemon-reload
-  sudo systemctl try-reload-or-restart cups.service
+  # CI containers have no system bus (PID 1 is not systemd) and the units are
+  # inert there; only touch systemd where it actually runs. Real machines are
+  # unaffected (the directory always exists under systemd).
+  if [[ -d /run/systemd/system ]]; then
+    sudo systemctl daemon-reload
+    sudo systemctl try-reload-or-restart cups.service
+  fi
 fi
 
 # Resume on whether the unit is enabled, not on whether it was running when this
