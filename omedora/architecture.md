@@ -1,10 +1,9 @@
 # Omedora 4 architecture
 
-> **Current base (2026-08-20):** official Omarchy `v4.0.0`, commit
-> `f0020448ca87329199de7cb12f2015ebc4a3e5e7`. The prepared immutable Omedora
-> pin label is `omedora-base-20260820-omarchy4-f0020448`. Create and push that
-> tag only when this rebase is promoted; this delegated branch intentionally
-> does not create it.
+> **Current base (2026-09-05):** official Omarchy `v4.0.2`, commit
+> `346e69e1cec6c4e8924531874af6ba010a1bc99e7`. The immutable Omedora
+> pin is `omedora-base-20260905-omarchy4-346e69e1`, cut locally on this
+> branch; push the tag before the branch at promote time.
 
 Omedora is an additive Fedora port of Omarchy, not a separate implementation.
 The same tree remains runnable on Arch. Fedora behavior is introduced through
