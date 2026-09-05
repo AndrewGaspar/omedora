@@ -16,7 +16,7 @@
 #   2. snapshot.sh  opt-in pre-install btrfs snapshot
 #   3. repos.sh     omedora COPR + RPM Fusion + Flathub (+ consented foreign swap)
 #   4. packages.sh  dnf install omedora, then the mapped omarchy-base set
-#   5. system.sh    sudo omarchy-setup-system (Fedora-gated upstream scripts)
+#   5. system.sh    sudo omarchy apply system (Fedora-gated upstream scripts)
 #   6. adopt.sh     omedora-adopt-user (skel replay, backup-then-write)
 #   7. finalize.sh  omarchy-provision-user --force --first-install
 #   8. first-run.sh omarchy-provision-first-run, only with a live user bus
