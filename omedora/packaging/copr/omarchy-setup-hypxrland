@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Create the default HypXRland session config if it is absent.
+
+set -euo pipefail
+
+: "${HOME:?HOME must be set}"
+
+config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
+config="$config_dir/hyprland-xr.lua"
+template="${HYPXRLAND_OMARCHY_TEMPLATE:-/usr/share/hypxrland/omarchy/hyprland-xr.lua}"
+
+if [[ -e $config || -L $config ]]; then
+  echo "Keeping existing HypXRland config: $config"
+  exit 0
+fi
+
+if [[ ! -r $template ]]; then
+  echo "omarchy-setup-hypxrland: template is not readable: $template" >&2
+  exit 1
+fi
+
+mkdir -p "$config_dir"
+umask 077
+
+temporary=$(mktemp "$config_dir/.hyprland-xr.lua.XXXXXX")
+trap 'rm -f "$temporary"' EXIT
+cp "$template" "$temporary"
+
+# A hard link is an atomic no-clobber install because both paths are in the
+# same directory. If another setup process won the race, preserve its file.
+if ln "$temporary" "$config" 2>/dev/null; then
+  echo "Created HypXRland config: $config"
+elif [[ -e $config || -L $config ]]; then
+  echo "Keeping existing HypXRland config: $config"
+else
+  echo "omarchy-setup-hypxrland: could not create config: $config" >&2
+  exit 1
+fi
