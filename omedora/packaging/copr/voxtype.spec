@@ -154,14 +154,20 @@ engine and OSD waiting/processing states.
 #
 # AVX2 baseline (compatible with most CPUs from 2013+): disable AVX-512 and
 # GFNI in both Rust code and whisper.cpp to prevent SIGILL on older CPUs.
+# NOTE: -fPIC on the whisper.cpp objects is load-bearing, not cosmetic. The
+# tier RUSTFLAGS pin target-cpu/haswell (not the distro default), so the cmake
+# C/C++ flags here are the ONLY hardening the vendored ggml/whisper static
+# libs get; without -fPIC their R_X86_64_32S relocations fail the PIE link
+# (ld: "recompile with -fPIE"). -fPIC links cleanly into PIE and non-PIE alike.
 RUSTFLAGS="-C target-cpu=haswell -C target-feature=-avx512f,-avx512bw,-avx512cd,-avx512dq,-avx512vl,-gfni" \
 GGML_NATIVE=OFF GGML_AVX512=OFF \
-CMAKE_C_FLAGS="-mno-avx512f -mno-gfni" CMAKE_CXX_FLAGS="-mno-avx512f -mno-gfni" \
+CMAKE_C_FLAGS="-mno-avx512f -mno-gfni -fPIC" CMAKE_CXX_FLAGS="-mno-avx512f -mno-gfni -fPIC" \
 CARGO_TARGET_DIR=%{_builddir}/target-avx2 \
 cargo build --release --offline --locked --bin voxtype
 cp %{_builddir}/target-avx2/release/voxtype %{_builddir}/voxtype-avx2
 
 # AVX-512 optimized binary (for Zen 4+, some Intel).
+CMAKE_C_FLAGS="-fPIC" CMAKE_CXX_FLAGS="-fPIC" \
 CARGO_TARGET_DIR=%{_builddir}/target-avx512 \
 cargo build --release --offline --locked --bin voxtype
 cp %{_builddir}/target-avx512/release/voxtype %{_builddir}/voxtype-avx512
@@ -170,7 +176,7 @@ cp %{_builddir}/target-avx512/release/voxtype %{_builddir}/voxtype-avx512
 # Vulkan GPU binary (GPU acceleration on any vendor).
 RUSTFLAGS="-C target-cpu=haswell -C target-feature=-avx512f,-avx512bw,-avx512cd,-avx512dq,-avx512vl,-gfni" \
 GGML_NATIVE=OFF GGML_AVX512=OFF \
-CMAKE_C_FLAGS="-mno-avx512f -mno-gfni" CMAKE_CXX_FLAGS="-mno-avx512f -mno-gfni" \
+CMAKE_C_FLAGS="-mno-avx512f -mno-gfni -fPIC" CMAKE_CXX_FLAGS="-mno-avx512f -mno-gfni -fPIC" \
 CARGO_TARGET_DIR=%{_builddir}/target-vulkan \
 cargo build --release --offline --locked --features gpu-vulkan --bin voxtype
 cp %{_builddir}/target-vulkan/release/voxtype %{_builddir}/voxtype-vulkan
