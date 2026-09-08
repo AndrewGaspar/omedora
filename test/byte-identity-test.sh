@@ -80,11 +80,11 @@ ALLOW["bin/omarchy-provision-user"]='env -u BROWSER xdg-settings set default-web
 xdg-mime default HEY.desktop x-scheme-handler/mailto'
 
 # voxtype install: the upstream unconditional package line moved into the Arch
-# arm of a distro case (verbatim) so Fedora dispatches to the omedora flavor
-# installer (base voxtype RPM + auto-detected GPU add-on) instead of the Arch
+# arm of a distro case (verbatim) so Fedora dispatches to the omedora from-source
+# installer (single voxtype RPM, tiered CPU + Vulkan) instead of the Arch
 # voxtype-bin package. The REMOVE script is byte-identical to upstream again
-# (`omarchy-pkg-drop voxtype-bin` -> dnf remove voxtype, which cascades to the
-# installed -cuda/-migraphx subpackages), so it has NO allowlist entry.
+# (`omarchy-pkg-drop voxtype-bin` -> dnf remove voxtype), so it has NO
+# allowlist entry.
 ALLOW["bin/omarchy-voxtype-install"]='  omarchy-pkg-add wtype voxtype-bin'
 
 # printer-discovery migration: the bare `systemctl daemon-reload` /
