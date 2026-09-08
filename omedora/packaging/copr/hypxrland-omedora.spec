@@ -1,17 +1,21 @@
 # hypxrland-omedora.spec — Omedora's branded HypXRland session entry.
 #
-# This package owns only /usr/share/wayland-sessions/omedora-xr.desktop. The
-# common launcher belongs to hypxrland, while omedora-settings keeps the stable
+# This package owns /usr/share/wayland-sessions/omedora-xr.desktop plus the
+# Lua config seeder, template, and seed-if-absent session wrapper. The common
+# launcher belongs to hypxrland, while omedora-settings keeps the stable
 # "Omedora" session installed beside "Omedora XR" as the fallback.
 
 Name:           hypxrland-omedora
 Version:        1.1.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Omedora XR wayland-session entry
 
 License:        MIT
 URL:            https://github.com/omedora/omedora
 Source0:        omedora-xr.desktop
+Source1:        omarchy-setup-hypxrland
+Source2:        omarchy-xr-session
+Source3:        hyprland-xr.lua
 
 BuildArch:      noarch
 BuildRequires:  desktop-file-utils
@@ -24,11 +28,11 @@ Requires:       omedora-settings >= 0.2.0~beta.2
 %description
 The Omedora XR display-manager session entry. It installs the complete Fedora
 HypXRland runtime stack and launches the private compositor through uwsm using
-~/.config/hypr/hyprland-xr.conf while retaining the ordinary "Omedora"
+~/.config/hypr/hyprland-xr.lua while retaining the ordinary "Omedora"
 Hyprland session as a stable fallback.
 
 %prep
-# Nothing to unpack; Source0 is the package-owned desktop entry.
+# Nothing to unpack; the Sources are installed verbatim below.
 
 %build
 # No build step for this noarch data-only package.
@@ -36,15 +40,32 @@ Hyprland session as a stable fallback.
 %install
 install -Dpm0644 %{SOURCE0} \
   %{buildroot}%{_datadir}/wayland-sessions/omedora-xr.desktop
+install -Dpm0755 %{SOURCE1} \
+  %{buildroot}%{_bindir}/omarchy-setup-hypxrland
+install -Dpm0755 %{SOURCE2} \
+  %{buildroot}%{_bindir}/omarchy-xr-session
+install -Dpm0644 %{SOURCE3} \
+  %{buildroot}%{_datadir}/hypxrland/omarchy/hyprland-xr.lua
 
 %check
 desktop-file-validate \
   %{buildroot}%{_datadir}/wayland-sessions/omedora-xr.desktop
+bash -n %{buildroot}%{_bindir}/omarchy-setup-hypxrland
+bash -n %{buildroot}%{_bindir}/omarchy-xr-session
 
 %files
 %{_datadir}/wayland-sessions/omedora-xr.desktop
+%{_bindir}/omarchy-setup-hypxrland
+%{_bindir}/omarchy-xr-session
+%dir %{_datadir}/hypxrland/
+%dir %{_datadir}/hypxrland/omarchy/
+%{_datadir}/hypxrland/omarchy/hyprland-xr.lua
 
 %changelog
+* Tue Sep 08 2026 omedora <noreply@omedora> - 1.1.0-2
+- Seed the Lua XR entry point absent-only via omarchy-setup-hypxrland and run
+  it through the omarchy-xr-session wrapper the greeter entry now executes.
+
 * Fri Aug 21 2026 omedora <noreply@omedora> - 1.1.0-1
 - Require the fully versioned refreshed XR stack and current Quattro settings
   while preserving the stable Omedora fallback session.

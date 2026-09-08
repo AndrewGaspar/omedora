@@ -41,6 +41,16 @@ grep -qF '%{__cmake_builddir}/hyprctl/hyprctl' "$HYPXR" \
   && pass "HypXRland installs private hyprctl" || fail "HypXRland installs private hyprctl"
 grep -qF 'export PATH="/usr/libexec/hypxrland:$PATH"' "$COPR/hypxrland-session" \
   && pass "XR session injects private hyprctl PATH" || fail "XR session injects private hyprctl PATH"
+grep -qF 'hypr/hyprland-xr.lua' "$COPR/hypxrland-session" \
+  && pass "XR session loads the Lua entry point" || fail "XR session loads the Lua entry point"
+grep -qF 'Exec=/usr/bin/omarchy-xr-session' "$COPR/omedora-xr.desktop" \
+  && pass "XR greeter entry seeds config through the wrapper" || fail "XR greeter entry seeds config through the wrapper"
+for seeded in omarchy-setup-hypxrland omarchy-xr-session hyprland-xr.lua; do
+  [[ -f "$COPR/$seeded" ]] \
+    && pass "XR seeder ships $seeded" || fail "XR seeder ships $seeded"
+done
+grep -qF 'Source3:        hyprland-xr.lua' "$COPR/hypxrland-omedora.spec" \
+  && pass "XR session package carries the Lua template" || fail "XR session package carries the Lua template"
 grep -qE '^Requires:[[:space:]]+hypxrland-legacy-config >= ' "$HYPXR" \
   && pass "HypXRland versions the classic config bridge" || fail "HypXRland versions the classic config bridge"
 
