@@ -8,10 +8,10 @@ set -e
 # Install voxtype and configure it for use.
 
 if gum confirm "Install Voxtype + AI model (~150MB) to enable dictation?"; then
-  # Fedora dispatch — voxtype is hosted in the omedora COPR as a slim base RPM
-  # plus auto-detected GPU flavors, installed by the omedora sibling; voxtype-bin
-  # is the Arch package. After either, `voxtype` is on PATH and the shared setup
-  # below runs unchanged.
+  # Fedora dispatch — voxtype is built from source in the omedora COPR as a
+  # single RPM (tiered CPU + Vulkan whisper binaries), installed by the omedora
+  # sibling; voxtype-bin is the Arch package. After either, `voxtype` is on
+  # PATH and the shared setup below runs unchanged.
   case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
     fedora) "$(dirname -- "${BASH_SOURCE[0]}")/fedora/voxtype-install-pkg" ;;
     *) omarchy-pkg-add wtype voxtype-bin ;;

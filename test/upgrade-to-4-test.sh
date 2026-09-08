@@ -627,8 +627,8 @@ kept_names=$(sed -n '/^v4_kept_packages=(/,/^)/p' "$ROOT/bin/omedora-upgrade-to-
   | sed '1d;$d;s/#.*//' | tr -s '[:space:]' '\n' | sed '/^$/d')
 # On-demand specs the COPR serves but the upgrade must NOT force-install: they
 # are installed only when the user opts in (e.g. clicking Install Dictation), so
-# they are intentionally absent from v4_kept_packages. voxtype (+ its -cuda/
-# -migraphx GPU subpackages, same spec) is the dictation engine — on-demand.
+# they are intentionally absent from v4_kept_packages. voxtype (single
+# from-source RPM) is the dictation engine — on-demand.
 on_demand_specs=" voxtype "
 missing=""
 for s in $spec_names; do

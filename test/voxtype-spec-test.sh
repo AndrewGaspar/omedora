@@ -2,21 +2,34 @@
 #
 # L1 static guard for omedora/packaging/copr/voxtype.spec (+ .sources).
 #
-# voxtype is hosted in the omedora COPR as a SUBPACKAGED binary-repackage of
-# upstream's official Fedora RPM: one spec emits a slim base 'voxtype' (CPU +
-# Vulkan + ONNX-CPU) plus opt-in voxtype-cuda (NVIDIA) and voxtype-migraphx (AMD)
-# GPU add-ons. This audits the spec text so a rebase / edit can't silently
-# collapse the split, leak the heavyweight GPU trees into the slim base, drop the
-# subpackage version-lock, or desync the source pin. Pure bash + grep; no build.
+# voxtype is hosted in the omedora COPR as a SINGLE from-source RPM built from
+# the AndrewGaspar/voxtype fork branch feat/muse-stack-v1.0.1 (v1.0.1 + Muse
+# streaming-transcribe engine + OSD states), compiled fully offline against a
+# `cargo vendor` tarball of the fork's pinned Cargo.lock (satty.spec shape).
+# CPU-only dep set: the old 0.7.5 binary-repackage's voxtype-cuda /
+# voxtype-migraphx subpackages and the ONNX-CPU engine variants are GONE (ort
+# prebuilts + CUDA/ROCm toolchains aren't available to offline COPR builds);
+# GPU users keep the Vulkan whisper tier. This audits the spec text so a rebase
+# / edit can't silently reintroduce the subpackage split, break the offline
+# seal, drop the tiered binaries or OSD helpers, or desync the source pin.
+# Pure bash + grep; no build.
 #
 # Asserts:
-#   - the spec declares `%package cuda` and `%package migraphx`
-#   - the base %files excludes the cuda-*/migraphx variant trees
-#   - each subpackage %files owns its variant tree
-#   - each subpackage Requires: voxtype = %{version}-%{release} (cascade lock)
-#   - the base Requires: vulkan-loader (a HARD dep — pkg.py installs with
-#     weak-deps off, so it must not be a Recommends)
-#   - voxtype.spec.sources pins the sha for exactly Source0's basename
+#   - spec + .sources exist
+#   - NO `%package cuda` / `%package migraphx` (the split stays dead)
+#   - the build is vendored/offline: a Source1 *-vendor.tar.* + `%cargo_prep -v
+#     vendor` (the offline .cargo/config.toml seal) and NO crate fetch at %build
+#   - the fork pin is coherent: %global fork_commit matches the commit baked
+#     into the .sources-pinned Source0 basename
+#   - %files owns the tiered whisper binaries (avx2/avx512/vulkan) + the
+#     %ghost /usr/bin/voxtype symlink + the OSD helpers + quickshell tree +
+#     config + service + man pages
+#   - the base Requires curl + pipewire-alsa (HARD deps — pkg.py installs with
+#     weak-deps off) and carries vulkan-loader for the Vulkan tier
+#   - ExclusiveArch x86_64 (the tiered binaries are x86_64-only)
+#   - voxtype.spec.sources pins the sha for exactly Source0's basename, and the
+#     generated vendor tarball is NOT pinned there (build-local.sh regenerates
+#     it deterministically at SRPM-gen time)
 
 set -euo pipefail
 
@@ -29,105 +42,116 @@ SOURCES="$ROOT/omedora/packaging/copr/voxtype.spec.sources"
 assert_file_exists "voxtype.spec exists" "$SPEC"
 assert_file_exists "voxtype.spec.sources exists" "$SOURCES"
 
-# --- subpackage declarations -------------------------------------------------
-grep -qE '^%package[[:space:]]+cuda\b' "$SPEC" \
-  && pass "spec declares %package cuda" \
-  || fail "spec declares %package cuda"
-grep -qE '^%package[[:space:]]+migraphx\b' "$SPEC" \
-  && pass "spec declares %package migraphx" \
-  || fail "spec declares %package migraphx"
-
-# --- carve the %files sections (base / cuda / migraphx) ----------------------
-# awk splits the spec into per-section blobs keyed by the %files header.
-files_section() {
-  # $1 = "" for base (%files with no arg), else the subpackage name.
-  awk -v want="$1" '
-    /^%files([[:space:]]|$)/ {
-      # capture the arg after %files (may be empty)
-      arg = $2
-      cur = (arg == want)
-      next
-    }
-    /^%(package|description|changelog|prep|build|install|post|files)\b/ && !/^%files/ {
-      cur = 0
-    }
-    cur { print }
-  ' "$SPEC"
-}
-
-BASE_FILES="$(files_section "")"
-CUDA_FILES="$(files_section "cuda")"
-MIGRAPHX_FILES="$(files_section "migraphx")"
-
-[[ -n $BASE_FILES ]]     || fail "could not locate the base %files section"
-[[ -n $CUDA_FILES ]]     || fail "could not locate the %files cuda section"
-[[ -n $MIGRAPHX_FILES ]] || fail "could not locate the %files migraphx section"
-
-# --- base %files must NOT carry the GPU trees --------------------------------
-if grep -qiE 'cuda|migraphx|rocm' <<<"$BASE_FILES"; then
-  printf '%s\n' "$BASE_FILES" >&2
-  fail "base %files excludes cuda-*/migraphx/rocm trees"
+# --- the subpackage split stays dead -----------------------------------------
+# The 0.7.5 binary-repackage emitted voxtype-cuda / voxtype-migraphx; the
+# from-source build must not resurrect them (nothing in fedora.toml or the
+# installer references them anymore).
+if grep -qE '^%package[[:space:]]+(cuda|migraphx)\b' "$SPEC"; then
+  fail "spec declares NO %package cuda/migraphx (single-package build)"
 else
-  pass "base %files excludes cuda-*/migraphx/rocm trees"
+  pass "spec declares NO %package cuda/migraphx (single-package build)"
 fi
 
-# Base must still own the wrapper + the slim variant binaries.
-grep -qE '%\{_bindir\}/voxtype\b' <<<"$BASE_FILES" \
-  && pass "base %files owns the /usr/bin/voxtype wrapper" \
-  || fail "base %files owns the /usr/bin/voxtype wrapper"
-grep -qE 'voxtype-avx2\b' <<<"$BASE_FILES" \
-  && pass "base %files owns the avx2 variant" \
-  || fail "base %files owns the avx2 variant"
-grep -qE 'voxtype-vulkan\b' <<<"$BASE_FILES" \
-  && pass "base %files owns the vulkan variant" \
-  || fail "base %files owns the vulkan variant"
+# --- hermetic vendored / offline build (COPR mock has no network at %build) --
+grep -qE '^Source1:.*-vendor\.tar\.' "$SPEC" \
+  && pass "spec declares a Source1 *-vendor.tar.* (cargo-vendor tarball)" \
+  || fail "spec declares a Source1 *-vendor.tar.* (cargo-vendor tarball)"
+grep -qE '^%cargo_prep[[:space:]].*-v[[:space:]]+vendor' "$SPEC" \
+  && pass "%cargo_prep -v vendor writes the offline .cargo/config.toml seal" \
+  || fail "%cargo_prep -v vendor writes the offline .cargo/config.toml seal"
+# No online crate fetch may sneak into the build phase.
+if grep -qE '^[[:space:]]*cargo[[:space:]]+(fetch|update|vendor)\b' "$SPEC"; then
+  fail "spec must not run cargo fetch/update/vendor at %build (offline mock)"
+else
+  pass "no cargo fetch/update/vendor at %build (offline mock safe)"
+fi
+# The offline flag must ride every build invocation (3 whisper tiers + helpers).
+build_lines="$(grep -cE 'cargo build --release --offline --locked' "$SPEC")"
+if (( build_lines >= 4 )); then
+  pass "tiered cargo builds run --offline --locked ($build_lines invocations)"
+else
+  fail "tiered cargo builds run --offline --locked (got $build_lines invocations)"
+fi
 
-# --- each subpackage owns its variant tree -----------------------------------
-grep -qE '/lib/voxtype/cuda-12\b' <<<"$CUDA_FILES" && grep -qE '/lib/voxtype/cuda-13\b' <<<"$CUDA_FILES" \
-  && pass "voxtype-cuda %files owns the cuda-12 + cuda-13 trees" \
-  || fail "voxtype-cuda %files owns the cuda-12 + cuda-13 trees"
-grep -qE '/lib/voxtype/migraphx\b' <<<"$MIGRAPHX_FILES" \
-  && pass "voxtype-migraphx %files owns the migraphx tree" \
-  || fail "voxtype-migraphx %files owns the migraphx tree"
-
-# --- subpackage version-lock (cascade on remove) -----------------------------
-# Both subpackages must Requires: voxtype = %{version}-%{release}.
-for sub in cuda migraphx; do
-  # Pull the lines of the %package <sub> stanza (header up to the next %... block).
-  stanza="$(awk -v want="$sub" '
-    $0 ~ ("^%package[[:space:]]+" want "([[:space:]]|$)") { cur=1; next }
-    /^%(package|description|prep|build|install|post|files|changelog)\b/ { cur=0 }
-    cur { print }
-  ' "$SPEC")"
-  grep -qE '^Requires:[[:space:]]+voxtype[[:space:]]*=[[:space:]]*%\{version\}-%\{release\}' <<<"$stanza" \
-    && pass "voxtype-$sub Requires: voxtype = %{version}-%{release}" \
-    || { printf '%s\n' "$stanza" >&2; fail "voxtype-$sub Requires: voxtype = %{version}-%{release}"; }
-done
-
-# --- base hard Requires: vulkan-loader ---------------------------------------
-# Anchored at the top-level preamble (before the first %package). pkg.py installs
-# with weak deps OFF, so this MUST be a Requires, not a Recommends.
-PREAMBLE="$(awk '/^%package/ {exit} {print}' "$SPEC")"
-grep -qE '^Requires:[[:space:]]+vulkan-loader\b' <<<"$PREAMBLE" \
-  && pass "base Requires: vulkan-loader (hard dep, weak-deps-off safe)" \
-  || fail "base Requires: vulkan-loader (hard dep, weak-deps-off safe)"
-grep -qiE '^Recommends:[[:space:]]+vulkan-loader\b' <<<"$PREAMBLE" \
-  && fail "vulkan-loader is NOT a Recommends (would be skipped with weak-deps off)" \
-  || pass "vulkan-loader is NOT a Recommends"
-
-# --- .sources pins exactly Source0's basename --------------------------------
-src0="$(grep -E '^Source0:' "$SPEC" | head -1)"
-[[ -n $src0 ]] || fail "spec declares Source0:"
-# Macro-expand %{version} from the spec's Version: into the Source0 basename.
-ver="$(grep -E '^Version:' "$SPEC" | head -1 | awk '{print $2}')"
-[[ -n $ver ]] || fail "spec declares Version:"
-src0_expanded="${src0//%\{version\}/$ver}"
-src0_base="$(basename "$src0_expanded")"
+# --- fork pin coherence --------------------------------------------------------
+fork_commit="$(grep -E '^%global[[:space:]]+fork_commit[[:space:]]' "$SPEC" | head -1 | awk '{print $3}')"
+[[ -n $fork_commit ]] || fail "spec declares %global fork_commit"
+[[ $fork_commit =~ ^[0-9a-f]{40}$ ]] \
+  && pass "%global fork_commit is a full 40-hex sha ($fork_commit)" \
+  || fail "%global fork_commit is a full 40-hex sha (got: $fork_commit)"
+# Source0 must be the commit-pinned fork archive for that sha.
+grep -qE '^Source0:.*github\.com/AndrewGaspar/voxtype/archive/%\{fork_commit\}' "$SPEC" \
+  && pass "Source0 is the fork-commit-pinned GitHub archive" \
+  || fail "Source0 is the fork-commit-pinned GitHub archive"
+# The .sources pin must name exactly voxtype-<fork_commit>.tar.gz ...
 pin_file="$(awk 'NF && $1 !~ /^#/ {print $2; exit}' "$SOURCES")"
 pin_hash="$(awk 'NF && $1 !~ /^#/ {print $1; exit}' "$SOURCES")"
-assert_equals ".sources pins exactly Source0's basename ($src0_base)" "$pin_file" "$src0_base"
+assert_equals ".sources pins voxtype-<fork_commit>.tar.gz" "$pin_file" "voxtype-${fork_commit}.tar.gz"
 [[ $pin_hash =~ ^[0-9a-f]{64}$ ]] \
   && pass ".sources pin is a 64-hex sha256" \
   || fail ".sources pin is a 64-hex sha256 (got: $pin_hash)"
+# ... and must NOT pin the generated vendor tarball (regenerated at SRPM-gen).
+if grep -qE 'vendor\.tar\.' "$SOURCES"; then
+  fail ".sources must NOT pin the generated vendor tarball"
+else
+  pass ".sources does NOT pin the generated vendor tarball"
+fi
+
+# --- %files owns the tiers + symlink + OSD helpers -----------------------------
+# Single %files section (no subpackages to carve).
+if grep -qE '^%files[[:space:]]+\S' "$SPEC"; then
+  fail "spec has a single %files section (no subpackage %files)"
+else
+  pass "spec has a single %files section (no subpackage %files)"
+fi
+FILES="$(awk '/^%files([[:space:]]|$)/ {cur=1; next} /^%changelog/ {cur=0} cur {print}' "$SPEC")"
+[[ -n $FILES ]] || fail "could not locate the %files section"
+for tier in avx2 avx512 vulkan; do
+  grep -qE "voxtype/voxtype-$tier\b" <<<"$FILES" \
+    && pass "%files owns the voxtype-$tier whisper binary" \
+    || fail "%files owns the voxtype-$tier whisper binary"
+done
+grep -qE '^%ghost[[:space:]]+%\{_bindir\}/voxtype[[:space:]]*$' <<<"$FILES" \
+  && pass "%files marks the %post-managed /usr/bin/voxtype symlink %ghost" \
+  || fail "%files marks the %post-managed /usr/bin/voxtype symlink %ghost"
+for helper in voxtype-osd voxtype-audio-bridge voxtype-osd-quickshell; do
+  grep -qE "%\\{_bindir\\}/$helper[[:space:]]*$" <<<"$FILES" \
+    && pass "%files owns /usr/bin/$helper" \
+    || fail "%files owns /usr/bin/$helper"
+done
+grep -qE '%\{_datadir\}/voxtype/quickshell' <<<"$FILES" \
+  && pass "%files owns the quickshell OSD tree" \
+  || fail "%files owns the quickshell OSD tree"
+grep -qE '%config\(noreplace\)[[:space:]]+%\{_sysconfdir\}/voxtype/config\.toml' <<<"$FILES" \
+  && pass "%files owns the noreplace voxtype config" \
+  || fail "%files owns the noreplace voxtype config"
+grep -qE '%\{_userunitdir\}/voxtype\.service' <<<"$FILES" \
+  && pass "%files owns the user systemd service" \
+  || fail "%files owns the user systemd service"
+grep -qE '%\{_mandir\}/man1/voxtype' <<<"$FILES" \
+  && pass "%files owns the man pages" \
+  || fail "%files owns the man pages"
+# The dead GPU trees must not leak back into the payload.
+if grep -qiE 'cuda|migraphx|rocm|onnx' <<<"$FILES"; then
+  printf '%s\n' "$FILES" >&2
+  fail "%files carries no cuda/migraphx/rocm/onnx trees"
+else
+  pass "%files carries no cuda/migraphx/rocm/onnx trees"
+fi
+
+# --- hard runtime Requires ------------------------------------------------------
+# Anchored at the top-level preamble (before any %description). pkg.py installs
+# with weak deps OFF, so these MUST be Requires, not Recommends.
+PREAMBLE="$(awk '/^%description/ {exit} {print}' "$SPEC")"
+for dep in curl pipewire-alsa vulkan-loader; do
+  grep -qE "^Requires:[[:space:]]+$dep\b" <<<"$PREAMBLE" \
+    && pass "Requires: $dep (hard dep, weak-deps-off safe)" \
+    || fail "Requires: $dep (hard dep, weak-deps-off safe)"
+done
+
+# --- arch -----------------------------------------------------------------------
+grep -qE '^ExclusiveArch:[[:space:]]+x86_64[[:space:]]*$' "$SPEC" \
+  && pass "ExclusiveArch x86_64 (tiered binaries are x86_64-only)" \
+  || fail "ExclusiveArch x86_64 (tiered binaries are x86_64-only)"
 
 echo "# all voxtype-spec tests passed"
