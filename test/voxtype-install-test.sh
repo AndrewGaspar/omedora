@@ -2,24 +2,25 @@
 #
 # L1 unit test for on-demand voxtype install on Fedora.
 #
-# voxtype is hosted in the omedora COPR as a subpackaged binary-repackage: a slim
-# base 'voxtype' RPM (CPU + Vulkan + ONNX-CPU) plus opt-in voxtype-cuda (NVIDIA)
-# and voxtype-migraphx (AMD) GPU add-ons. The Fedora installer
-# (bin/fedora/voxtype-install-pkg) installs the base, then AUTO-DETECTS the GPU and
-# adds the matching flavor. This covers that sibling + the Fedora/Arch dispatch in
+# voxtype is hosted in the omedora COPR as a single from-source RPM (tiered
+# whisper CPU + Vulkan binaries + OSD helpers; no GPU add-on subpackages — the
+# old voxtype-cuda / voxtype-migraphx split died with the 0.7.5
+# binary-repackage). The Fedora installer (bin/fedora/voxtype-install-pkg)
+# installs the base and nothing else; GPU users get acceleration from the
+# Vulkan tier. This covers that sibling + the Fedora/Arch dispatch in
 # bin/omarchy-voxtype-install and bin/omarchy-voxtype-remove.
 #
-#   PART 1 — voxtype-install-pkg: always adds `wtype voxtype-bin` (base, mapped to
-#            voxtype) via omarchy-pkg-add, then ADDS voxtype-cuda on NVIDIA,
-#            voxtype-migraphx on AMD, and NOTHING extra on Intel/none. Selection is
-#            mutually exclusive (NVIDIA wins). Honors OMARCHY_PKG_DRY_RUN (no-op
-#            here since omarchy-pkg-add is stubbed, but the script never shells out
-#            to dnf directly).
+#   PART 1 — voxtype-install-pkg: always adds exactly `wtype voxtype-bin` (base,
+#            mapped to voxtype) via omarchy-pkg-add on EVERY GPU profile
+#            (NVIDIA / AMD / Intel / none / hybrid) and NEVER adds the retired
+#            voxtype-cuda / voxtype-migraphx names. Honors OMARCHY_PKG_DRY_RUN
+#            (no-op here since omarchy-pkg-add is stubbed, but the script never
+#            shells out to dnf directly).
 #   PART 2 — omarchy-voxtype-install dispatches to the sibling on Fedora and runs
 #            `omarchy-pkg-add wtype voxtype-bin` VERBATIM on Arch.
 #   PART 3 — omarchy-voxtype-remove runs `omarchy-pkg-drop voxtype-bin` on BOTH
 #            distros (the script is byte-identical to upstream; on Fedora pkg.py
-#            maps that to `dnf remove voxtype`, which cascades to the subpackages).
+#            maps that to `dnf remove voxtype`).
 #   PART 4 — omarchy-voxtype-config (the bar mic click): on Fedora, OFFERS THE
 #            INSTALL (launches omarchy-voxtype-install) when voxtype is absent, and
 #            runs `voxtype configure` once it's installed.
@@ -45,9 +46,8 @@ stub() { printf '#!/bin/bash\n%s\n' "$2" >"$SHIM/$1"; chmod +x "$SHIM/$1"; }
 # Record every traced action to $MOCK_LOG so assertions can grep it.
 stub omarchy-pkg-add     'printf "omarchy-pkg-add %s\n" "$*" >>"$MOCK_LOG"'
 stub omarchy-pkg-drop    'printf "omarchy-pkg-drop %s\n" "$*" >>"$MOCK_LOG"'
-# GPU detection is driven entirely by lspci — the installer inlines both
-# `lspci | grep -qi nvidia` and the AMD probe (it does NOT exec the upstream
-# omarchy-hw-nvidia helper, which ships non-executable). Default: no GPU.
+# The installer takes no GPU branch at all (no lspci probe); the stub exists so
+# PART 1 can prove GPU-flavored lspci output is ignored. Default: no GPU.
 stub lspci               'exit 0'   # prints nothing -> no GPU match by default
 
 export PATH="$SHIM:$ROOT/bin:$PATH"
@@ -55,73 +55,47 @@ export PATH="$SHIM:$ROOT/bin:$PATH"
 PKG="$ROOT/bin/fedora/voxtype-install-pkg"
 
 # ===========================================================================
-echo "# --- PART 1: voxtype-install-pkg flavor auto-detect ---"
+echo "# --- PART 1: voxtype-install-pkg installs the base on every GPU ---"
 # ===========================================================================
+# The installer takes NO GPU branch (no lspci probe, no add-on subpackages):
+# every profile below must produce exactly one pkg-add line and never the
+# retired voxtype-cuda / voxtype-migraphx names.
 
-# Helper: stub lspci to print a given line (so the AMD grep can match it).
+# Helper: run the installer and assert the base-only transaction.
+assert_base_only() { # $1 = profile label
+  : >"$MOCK_LOG"
+  ( export OMARCHY_DISTRO=fedora; bash "$PKG" ) >/dev/null 2>&1
+  grep -q "^omarchy-pkg-add wtype voxtype-bin$" "$MOCK_LOG" \
+    && pass "$1: installs the base (wtype voxtype-bin)" \
+    || { cat "$MOCK_LOG" >&2; fail "$1: installs the base (wtype voxtype-bin)"; }
+  grep -qE "voxtype-(cuda|migraphx)" "$MOCK_LOG" \
+    && { cat "$MOCK_LOG" >&2; fail "$1: never adds the retired GPU add-ons"; } \
+    || pass "$1: never adds the retired GPU add-ons"
+  [[ $(grep -c "^omarchy-pkg-add " "$MOCK_LOG") == 1 ]] \
+    && pass "$1: exactly one pkg-add call" \
+    || { cat "$MOCK_LOG" >&2; fail "$1: exactly one pkg-add call"; }
+}
+
+# Helper: stub lspci to print a given line (the installer must ignore it).
 lspci_prints() { stub lspci 'cat <<'"'"'EOF'"'"'
 '"$1"'
 EOF'; }
 
-# --- (a) NVIDIA present -> base + voxtype-cuda (NOT migraphx) -----------------
+# --- (a) NVIDIA present -> base only ------------------------------------------
 lspci_prints '01:00.0 VGA compatible controller: NVIDIA Corporation GA104 [GeForce RTX 3070]'
-: >"$MOCK_LOG"
-( export OMARCHY_DISTRO=fedora; bash "$PKG" ) >/dev/null 2>&1
-grep -q "^omarchy-pkg-add wtype voxtype-bin$" "$MOCK_LOG" \
-  && pass "NVIDIA: installs the base (wtype voxtype-bin)" \
-  || { cat "$MOCK_LOG" >&2; fail "NVIDIA: installs the base (wtype voxtype-bin)"; }
-grep -q "^omarchy-pkg-add voxtype-cuda$" "$MOCK_LOG" \
-  && pass "NVIDIA: adds voxtype-cuda" \
-  || { cat "$MOCK_LOG" >&2; fail "NVIDIA: adds voxtype-cuda"; }
-grep -q "voxtype-migraphx" "$MOCK_LOG" \
-  && fail "NVIDIA: does NOT add voxtype-migraphx" \
-  || pass "NVIDIA: does NOT add voxtype-migraphx"
+assert_base_only "NVIDIA"
 
-# --- (b) AMD present (no NVIDIA) -> base + voxtype-migraphx -------------------
+# --- (b) AMD present -> base only ---------------------------------------------
 lspci_prints '0a:00.0 VGA compatible controller: Advanced Micro Devices, Inc. [AMD/ATI] Navi 31 [Radeon RX 7900 XTX]'
-: >"$MOCK_LOG"
-( export OMARCHY_DISTRO=fedora; bash "$PKG" ) >/dev/null 2>&1
-grep -q "^omarchy-pkg-add wtype voxtype-bin$" "$MOCK_LOG" \
-  && pass "AMD: installs the base (wtype voxtype-bin)" \
-  || { cat "$MOCK_LOG" >&2; fail "AMD: installs the base (wtype voxtype-bin)"; }
-grep -q "^omarchy-pkg-add voxtype-migraphx$" "$MOCK_LOG" \
-  && pass "AMD: adds voxtype-migraphx" \
-  || { cat "$MOCK_LOG" >&2; fail "AMD: adds voxtype-migraphx"; }
-grep -q "voxtype-cuda" "$MOCK_LOG" \
-  && fail "AMD: does NOT add voxtype-cuda" \
-  || pass "AMD: does NOT add voxtype-cuda"
+assert_base_only "AMD"
 
-# --- (c) Intel/none -> base only, no GPU add-on ------------------------------
+# --- (c) Intel/none -> base only ----------------------------------------------
 lspci_prints '00:02.0 VGA compatible controller: Intel Corporation Raptor Lake-S UHD Graphics'
-: >"$MOCK_LOG"
-( export OMARCHY_DISTRO=fedora; bash "$PKG" ) >/dev/null 2>&1
-grep -q "^omarchy-pkg-add wtype voxtype-bin$" "$MOCK_LOG" \
-  && pass "Intel/none: installs the base (wtype voxtype-bin)" \
-  || { cat "$MOCK_LOG" >&2; fail "Intel/none: installs the base (wtype voxtype-bin)"; }
-grep -qE "voxtype-(cuda|migraphx)" "$MOCK_LOG" \
-  && { cat "$MOCK_LOG" >&2; fail "Intel/none: adds NO GPU flavor"; } \
-  || pass "Intel/none: adds NO GPU flavor (base only)"
+assert_base_only "Intel/none"
 
-# --- (d) the AMD probe doesn't false-match generic non-GPU lspci lines -------
-lspci_prints '00:1f.3 Audio device: Intel Corporation Alder Lake PCH-P High Definition Audio'
-: >"$MOCK_LOG"
-( export OMARCHY_DISTRO=fedora; bash "$PKG" ) >/dev/null 2>&1
-grep -q "voxtype-migraphx" "$MOCK_LOG" \
-  && { cat "$MOCK_LOG" >&2; fail "non-GPU lspci line does NOT trigger migraphx"; } \
-  || pass "non-GPU lspci line does NOT trigger migraphx"
-
-# --- (e) hybrid NVIDIA+AMD laptop -> NVIDIA wins (cuda, not migraphx) ---------
-# Guards probe precedence: the installer checks NVIDIA first, so a machine with
-# BOTH discrete GPUs gets the higher-performance CUDA backend, not migraphx.
+# --- (d) hybrid NVIDIA+AMD laptop -> base only --------------------------------
 lspci_prints $'c1:00.0 VGA compatible controller: NVIDIA Corporation GB206M [GeForce RTX 5070]\nc2:00.0 Display controller: Advanced Micro Devices, Inc. [AMD/ATI] Strix [Radeon 890M]'
-: >"$MOCK_LOG"
-( export OMARCHY_DISTRO=fedora; bash "$PKG" ) >/dev/null 2>&1
-grep -q "^omarchy-pkg-add voxtype-cuda$" "$MOCK_LOG" \
-  && pass "hybrid NVIDIA+AMD: NVIDIA wins (adds voxtype-cuda)" \
-  || { cat "$MOCK_LOG" >&2; fail "hybrid NVIDIA+AMD: NVIDIA wins (adds voxtype-cuda)"; }
-grep -q "voxtype-migraphx" "$MOCK_LOG" \
-  && { cat "$MOCK_LOG" >&2; fail "hybrid: does NOT also add voxtype-migraphx"; } \
-  || pass "hybrid: does NOT also add voxtype-migraphx"
+assert_base_only "hybrid NVIDIA+AMD"
 
 # restore defaults
 stub lspci 'exit 0'
@@ -148,10 +122,10 @@ printf 'cfg\n' >"$FAKE_OMARCHY/default/voxtype/config.toml"
 grep -q "^omarchy-pkg-add wtype voxtype-bin$" "$MOCK_LOG" \
   && pass "Fedora install dispatches to the sibling (adds wtype voxtype-bin base)" \
   || { cat "$MOCK_LOG" >&2; fail "Fedora install dispatches to the sibling (adds wtype voxtype-bin base)"; }
-# With all GPU probes off (defaults), Fedora install adds no GPU flavor.
+# The single-package build adds nothing beyond the base, whatever the GPU.
 grep -qE "voxtype-(cuda|migraphx)" "$MOCK_LOG" \
-  && { cat "$MOCK_LOG" >&2; fail "Fedora install with no GPU adds no flavor"; } \
-  || pass "Fedora install with no GPU adds no flavor"
+  && { cat "$MOCK_LOG" >&2; fail "Fedora install never adds the retired GPU add-ons"; } \
+  || pass "Fedora install never adds the retired GPU add-ons"
 
 # --- Arch path: verbatim omarchy-pkg-add wtype voxtype-bin -------------------
 : >"$MOCK_LOG"
@@ -162,8 +136,8 @@ grep -q "^omarchy-pkg-add wtype voxtype-bin$" "$MOCK_LOG" \
   && pass "Arch install runs omarchy-pkg-add wtype voxtype-bin verbatim" \
   || { cat "$MOCK_LOG" >&2; fail "Arch install runs omarchy-pkg-add wtype voxtype-bin verbatim"; }
 grep -qE "voxtype-(cuda|migraphx)" "$MOCK_LOG" \
-  && fail "Arch install never touches the omedora GPU flavors" \
-  || pass "Arch install never touches the omedora GPU flavors"
+  && fail "Arch install never touches the retired GPU add-on names" \
+  || pass "Arch install never touches the retired GPU add-on names"
 
 # ===========================================================================
 echo "# --- PART 3: omarchy-voxtype-remove dispatch (byte-identical) ---"

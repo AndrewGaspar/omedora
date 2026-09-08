@@ -1,54 +1,31 @@
 #!/bin/bash
 #
-# Fedora-only voxtype FLAVOR installer — the omedora-owned sibling exec'd by
+# Fedora-only voxtype installer — the omedora-owned sibling exec'd by
 # bin/omarchy-voxtype-install's Fedora arm (zero upstream rebase surface).
 #
 # voxtype is hosted in the omedora COPR (omedora/packaging/copr/voxtype.spec) as
-# a SUBPACKAGED binary-repackage of upstream's official Fedora RPM:
-#   voxtype           — base: wrapper + config + systemd + whisper(avx2/avx512/
-#                       vulkan) + ONNX-CPU. Slim (~42 MB). Vulkan gives GPU accel
-#                       for the Whisper engine on ANY vendor.
-#   voxtype-cuda      — opt-in NVIDIA CUDA ONNX-GPU backend (~233 MB).
-#   voxtype-migraphx  — opt-in AMD ROCm/MIGraphX ONNX-GPU backend (~13 MB).
+# a single from-source RPM built from the AndrewGaspar/voxtype fork
+# (feat/muse-stack-v1.0.1, CPU-only: tiered whisper avx2/avx512/vulkan binaries
+# + OSD helpers). There are no GPU add-on subpackages — the old voxtype-cuda /
+# voxtype-migraphx split died with the 0.7.5 binary-repackage; GPU users get
+# acceleration from the Vulkan tier instead (the RPM's %post symlinks the best
+# tier, and `voxtype setup gpu --enable` still switches to it at setup time).
 #
-# This installs the slim base for everyone, then ADDS the matching GPU add-on
-# only when the host has a discrete GPU we have a backend for. RPM/dnf can't
-# probe for a GPU, so the selection is driven here in userspace:
-#   - NVIDIA  -> voxtype-cuda      (inline lspci probe)
-#   - AMD/ATI -> voxtype-migraphx  (inline lspci probe)
-#   - else    -> base only (Intel / none / Vulkan-only get the slim install)
+# This installs the base (wtype, the wlroots typing backend native in Fedora
+# repos, plus voxtype-bin -> voxtype via the package map) and nothing else.
 #
 # Everything goes through omarchy-pkg-add, which maps the names via
 # install/packages/fedora.toml and honors $OMARCHY_PKG_DRY_RUN downstream
 # (bin/fedora/pkg.py), so a dry-run logs the dnf calls instead of running them.
 #
-# Updates ride dnf: a `Version:` (+ .sources sha) bump in the spec rebuilds the
-# COPR and `omarchy update` / `dnf update` delivers the fix. No download/sha pin
-# here — the COPR's SRPM step (.copr/srpm.sh) fetches + sha-verifies upstream.
+# Updates ride dnf: a `Version:` / fork-commit (+ .sources sha) bump in the spec
+# rebuilds the COPR and `omarchy update` / `dnf update` delivers the fix. No
+# download/sha pin here — the COPR's SRPM step fetches + sha-verifies upstream.
 
 set -euo pipefail
 
-# Base: wtype (the wlroots typing backend, native in Fedora repos) + the slim
-# voxtype base RPM (voxtype-bin -> voxtype via the package map).
+# Base: wtype (the wlroots typing backend, native in Fedora repos) + the
+# from-source voxtype RPM (voxtype-bin -> voxtype via the package map).
 omarchy-pkg-add wtype voxtype-bin
 
-# GPU add-on auto-detect via inline lspci probes. We do NOT exec the upstream
-# omarchy-hw-nvidia helper: upstream ships it non-executable (mode 0644, unlike
-# omarchy-hw-vulkan at 0755), so exec'ing it fails with "Permission denied" and
-# silently falls through. Inlining the same `lspci | grep -qi nvidia` check keeps
-# it robust and symmetric with the AMD probe. NVIDIA is preferred on hybrid
-# (NVIDIA+AMD) laptops — CUDA is the higher-performance ONNX-GPU backend.
-#
-# The AMD pattern matches a VGA/3D/Display controller line whose vendor is AMD —
-# the "Advanced Micro Devices" vendor string, the "[AMD/ATI]" subsystem tag, or a
-# "Radeon" model. We deliberately do NOT match a bare "ATI": case-insensitively it
-# false-matches the "ATI" inside "Corpor*ATI*on" on Intel/NVIDIA lines.
-if lspci | grep -qi nvidia; then
-  echo "NVIDIA GPU detected — adding the CUDA ONNX-GPU backend (voxtype-cuda)."
-  omarchy-pkg-add voxtype-cuda
-elif lspci | grep -qiE '(VGA|3D|Display).*(Advanced Micro Devices|\[AMD/ATI\]|\bRadeon\b)'; then
-  echo "AMD GPU detected — adding the MIGraphX ONNX-GPU backend (voxtype-migraphx)."
-  omarchy-pkg-add voxtype-migraphx
-else
-  echo "No NVIDIA/AMD discrete GPU detected — installing the base (CPU + Vulkan) only."
-fi
+echo "Installed voxtype (CPU + Vulkan tiers; the Vulkan tier accelerates inference on any GPU vendor)."
