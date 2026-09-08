@@ -2,11 +2,11 @@
 
 set -euo pipefail
 
-config="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland-xr.conf"
+config="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland-xr.lua"
 
 if [[ ! -r $config ]]; then
   echo "hypxrland-session: XR configuration is not readable: $config" >&2
-  echo "Create it as an OpenXR layer over your normal hyprland.conf before starting Omedora XR." >&2
+  echo "Run omarchy-setup-hypxrland or create the file before starting the XR session." >&2
   exit 1
 fi
 
