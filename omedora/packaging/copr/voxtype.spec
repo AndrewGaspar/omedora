@@ -10,7 +10,7 @@
 # HERMETIC / VENDORED build (COPR-ready), same shape as satty.spec: COPR
 # builds in mock where the rpmbuild phase has NO network, so we build fully
 # offline against a `cargo vendor` tarball (Source1) of the fork's pinned
-# Cargo.lock. `%cargo_prep -v vendor` writes .cargo/config.toml with
+# Cargo.lock. `%%cargo_prep -v vendor` writes .cargo/config.toml with
 # `[net] offline = true` + `[source.vendored-sources]`, so cargo never
 # touches crates.io; a successful build proves every needed crate was
 # vendored. build-local.sh generates Source1 deterministically at SRPM-gen
@@ -19,9 +19,9 @@
 #
 # Source0 is a COMMIT-PINNED GitHub archive of the fork branch (immutable for
 # a given sha; same pattern as hyprland-preview-share-picker.spec's Source1).
-# Bump %fork_commit + the .sources pin together to move to a newer snapshot.
+# Bump %%fork_commit + the .sources pin together to move to a newer snapshot.
 # NOTE: the fork tree ships a .cargo/config.toml containing only a cargo
-# alias (xtask); %cargo_prep's hermetic config takes precedence at build time.
+# alias (xtask); %%cargo_prep's hermetic config takes precedence at build time.
 #
 # CPU-ONLY dep set (CUDA/ROCm dropped — offline-vendor risk, see below). The
 # default cargo feature set builds the whisper.cpp engine (CPU tiers below)
@@ -46,7 +46,7 @@
 # Tiered whisper binaries (same matrix as the fork's own RPM spec):
 #   voxtype-avx2    — haswell baseline, AVX-512/GFNI disabled (no SIGILL)
 #   voxtype-avx512  — native build for newer CPUs
-#   voxtype-vulkan  — GPU accel via Vulkan (%bcond_without vulkan to drop;
+#   voxtype-vulkan  — GPU accel via Vulkan (%%bcond_without vulkan to drop;
 #                     needs vulkan-headers + glslc at build time for the
 #                     whisper.cpp Vulkan shaders)
 # %post symlinks /usr/bin/voxtype to the best tier (fork's own fragment).
@@ -56,7 +56,7 @@
 #
 # OSD frontends shipped: quickshell launcher + QML tree (omedora's OSD path,
 # resolved at /usr/share/voxtype/quickshell per voxtype_osd_quickshell.rs),
-# audio-bridge sidecar, and voxtype-osd-gtk4 (%bcond_without osd_gtk4 to drop
+# audio-bridge sidecar, and voxtype-osd-gtk4 (%%bcond_without osd_gtk4 to drop
 # if gtk4-layer-shell-devel is ever missing from the COPR chroot).
 # voxtype-osd-native (wgpu) is NOT built (quickshell covers omedora);
 # voxtype-mirror-registry is a build-tree-only R2 helper, never shipped.
@@ -86,7 +86,7 @@ ExclusiveArch:  x86_64
 # --- Build toolchain -------------------------------------------------------
 BuildRequires:  cargo
 BuildRequires:  rust
-# cargo-rpm-macros provides %cargo_prep / the license macros and the hermetic
+# cargo-rpm-macros provides %%cargo_prep / the license macros and the hermetic
 # offline .cargo/config.toml seal. >= 24 has the -v vendor flag.
 BuildRequires:  cargo-rpm-macros >= 24
 # C/C++ toolchain for the vendored whisper.cpp build (whisper-rs) + linking.
@@ -98,7 +98,7 @@ BuildRequires:  clang-devel
 BuildRequires:  alsa-lib-devel
 # pkg-config drives the -sys crates' library discovery.
 BuildRequires:  pkgconf-pkg-config
-# systemd-rpm-macros supplies %{_userunitdir} + the %systemd_user_* scriptlets.
+# systemd-rpm-macros supplies %%{_userunitdir} + the %%systemd_user_* scriptlets.
 BuildRequires:  systemd-rpm-macros
 %if %{with vulkan}
 # whisper.cpp Vulkan backend: headers + shader compiler + loader for linking.
@@ -144,7 +144,7 @@ engine and OSD waiting/processing states.
 # Commit archive unpacks to voxtype-<sha>/.
 %autosetup -n %{name}-%{fork_commit}
 # Unpack the (build-time-generated) vendor tarball (creates ./vendor/), then
-# have %cargo_prep wire .cargo/config.toml to it with offline mode on.
+# have %%cargo_prep wire .cargo/config.toml to it with offline mode on.
 %setup -q -T -D -a 1 -n %{name}-%{fork_commit}
 %cargo_prep -v vendor
 
