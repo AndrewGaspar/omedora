@@ -73,6 +73,19 @@ else
   fail "tiered cargo builds run --offline --locked (got $build_lines invocations)"
 fi
 
+# --- comments must not break rpm parsing ---------------------------------------
+# rpm macro-expands preamble comments while resolving tags, so a comment naming
+# a macro that isn't loaded yet (%cargo_prep before cargo-rpm-macros,
+# %fork_commit before its %global, systemd macros before systemd-rpm-macros)
+# aborts the parse with "Unknown tag". Those names must be %%-escaped in
+# comments (satty.spec shape); builtins (%post, %bcond_without) are fine bare.
+if grep -E '^#' "$SPEC" | grep -E '(^|[^%])%(cargo|fork_commit|systemd|_userunitdir)' >/dev/null; then
+  grep -E '^#' "$SPEC" | grep -E '(^|[^%])%(cargo|fork_commit|systemd|_userunitdir)' >&2
+  fail "comments %%-escape parse-unknown macros (%cargo*, %fork_commit, %systemd*, %{_userunitdir})"
+else
+  pass "comments %%-escape parse-unknown macros (rpm-parse safe)"
+fi
+
 # --- fork pin coherence --------------------------------------------------------
 fork_commit="$(grep -E '^%global[[:space:]]+fork_commit[[:space:]]' "$SPEC" | head -1 | awk '{print $3}')"
 [[ -n $fork_commit ]] || fail "spec declares %global fork_commit"
