@@ -64,6 +64,13 @@
 %bcond_without osd_gtk4
 %bcond_without vulkan
 
+# No debuginfo/debugsource: the cargo-vendor tree carries third-party crate
+# sources with executable bits and `//!`-style doc lines (e.g. ratatui), which
+# trip brp-mangle-shebangs' "shebang doesn't start with '/'" error when
+# find-debuginfo stages them. Same call as the other leaf-app specs
+# (omacut/starship/mise): a dictation tool needs no debug subpackages.
+%global debug_package %{nil}
+
 Name:           voxtype
 Version:        1.0.1
 Release:        1%{?dist}
