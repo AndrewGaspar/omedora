@@ -318,9 +318,9 @@ grep -qx 'Name=Omedora' /usr/share/wayland-sessions/omedora.desktop \
 grep -qx 'Name=Omedora XR' /usr/share/wayland-sessions/omedora-xr.desktop \
   && ok "XR session is named Omedora XR" \
   || nok "XR session is named Omedora XR"
-grep -qx 'Exec=/usr/bin/hypxrland-session' /usr/share/wayland-sessions/omedora-xr.desktop \
-  && ok "XR session uses the packaged launcher" \
-  || nok "XR session uses the packaged launcher"
+grep -qx 'Exec=/usr/bin/omarchy-xr-session' /usr/share/wayland-sessions/omedora-xr.desktop \
+  && ok "XR session seeds config through the packaged wrapper" \
+  || nok "XR session seeds config through the packaged wrapper"
 check "legacy classic env config present" \
   test -f /usr/share/omarchy/default/hypr/envs.conf
 check "legacy classic autostart config present" \

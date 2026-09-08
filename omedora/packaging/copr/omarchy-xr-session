@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Omedora XR display-manager entry point: seed the per-user Lua config when
+# absent, then hand off to the session launcher.
+
+set -euo pipefail
+
+config="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland-xr.lua"
+
+if [[ ! -r $config ]]; then
+  /usr/bin/omarchy-setup-hypxrland
+fi
+
+exec /usr/bin/hypxrland-session "$@"

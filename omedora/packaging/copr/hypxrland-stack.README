@@ -3,7 +3,7 @@ HypXRland stack on Omedora 4
 
 Installing hypxrland-omedora pulls in this complete runtime stack and keeps the
 ordinary Omedora Hyprland session installed as a fallback. Select "Omedora XR"
-at the display manager; it loads ~/.config/hypr/hyprland-xr.conf.
+at the display manager; it loads ~/.config/hypr/hyprland-xr.lua.
 
 The RPMs do not overwrite files in your home directory. A source-tree setup
 that hard-codes development binaries should be changed to the packaged paths:
@@ -28,12 +28,12 @@ Fedora's packaged hypxrcompose defaults to OpenH264; see
 limitations.
 
 HypXRland now supports both Lua and classic hyprlang XR declarations. Omedora XR
-retains ~/.config/hypr/hyprland-xr.conf as its compatibility entry point, and
+uses ~/.config/hypr/hyprland-xr.lua as its entry point, and
 the hypxrland-legacy-config package keeps the immutable classic default *.conf
 tree beside Quattro's Lua files. The stable Omedora session continues using
 Lua. Advanced users can use /usr/share/doc/hypxrland/contrib/hyprland-xr.lua as
 a reference when migrating an independent XR config to Lua; the RPM never
-overwrites either user entry point.
+overwrites your entry point.
 
 The WiVRn RPM is host-only. Headset camera or raw-microphone capture requires a
 commit-matched custom HypXR APK; the stock WiVRn client supports neither path.
