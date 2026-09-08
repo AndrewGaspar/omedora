@@ -6,7 +6,7 @@ the [root README](../README.md).**
 
 This is the **Omarchy 4** line of Omedora — the re-architected, package-backed
 generation with the new Quickshell shell. It is rebased on official Omarchy
-4.0.2 (codename "quattro"); the Fedora port is currently **beta**. The established line is
+4.0.3 (codename "quattro"); the Fedora port is currently **beta**. The established line is
 [Omedora 3](https://github.com/AndrewGaspar/omedora/tree/omedora-3) (the `omedora-3`
 branch).
 

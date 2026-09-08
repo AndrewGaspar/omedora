@@ -1,8 +1,8 @@
 # Omedora 4 architecture
 
-> **Current base (2026-09-05):** official Omarchy `v4.0.2`, commit
-> `346e69e1cec6c4e8924531874af6ba010a1bc99e7`. The immutable Omedora
-> pin is `omedora-base-20260905-omarchy4-346e69e1`, cut locally on this
+> **Current base (2026-09-08):** official Omarchy `v4.0.3`, commit
+> `0534987009061cbe2dacdde4ad564092ab698d12`. The immutable Omedora
+> pin is `omedora-base-20260908-omarchy4-05349870`, cut locally on this
 > branch; push the tag before the branch at promote time.
 
 Omedora is an additive Fedora port of Omarchy, not a separate implementation.
