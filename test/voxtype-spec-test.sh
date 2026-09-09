@@ -163,13 +163,14 @@ if grep -qE '%\{_prefix\}/lib/voxtype' "$SPEC"; then
 else
   pass "%files has no %{_prefix}/lib/voxtype mismatch"
 fi
-# No `$$` shell vars anywhere: rpm expands $$ to its own PID, so `$$m`
-# silently tests/installs garbage (this shipped zero man pages once).
-if grep -qE '\$\$' "$SPEC"; then
-  grep -nE '\$\$' "$SPEC" >&2
-  fail "spec contains no \$\$ (rpm PID-expansion trap)"
+# No `$$` shell vars in CODE: rpm expands $$ to its own PID, so `$$m` in a
+# scriptlet silently tests/installs garbage (this shipped zero man pages
+# once). Comment lines (^#) are exempt — rpm only macro-expands `%`.
+if grep -vE '^#' "$SPEC" | grep -qE '\$\$'; then
+  grep -vE '^#' "$SPEC" | grep -nE '\$\$' >&2
+  fail "spec code contains no \$\$ (rpm PID-expansion trap)"
 else
-  pass "spec contains no \$\$ (rpm PID-expansion trap)"
+  pass "spec code contains no \$\$ (rpm PID-expansion trap)"
 fi
 
 # --- hard runtime Requires ------------------------------------------------------
