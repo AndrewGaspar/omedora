@@ -165,9 +165,10 @@ else
 fi
 # No `$$` shell vars in CODE: rpm expands $$ to its own PID, so `$$m` in a
 # scriptlet silently tests/installs garbage (this shipped zero man pages
-# once). Comment lines (^#) are exempt — rpm only macro-expands `%`.
-if grep -vE '^#' "$SPEC" | grep -qE '\$\$'; then
-  grep -vE '^#' "$SPEC" | grep -nE '\$\$' >&2
+# once). Comment lines (optional leading whitespace + #) are exempt — rpm only
+# macro-expands `%`.
+if grep -vE '^[[:space:]]*#' "$SPEC" | grep -qE '\$\$'; then
+  grep -vE '^[[:space:]]*#' "$SPEC" | grep -nE '\$\$' >&2
   fail "spec code contains no \$\$ (rpm PID-expansion trap)"
 else
   pass "spec code contains no \$\$ (rpm PID-expansion trap)"
