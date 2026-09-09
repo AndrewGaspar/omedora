@@ -356,7 +356,7 @@ rm -f %{_bindir}/voxtype
 %license cargo-vendor.txt
 %doc %{_docdir}/%{name}/README.md
 %doc %{_docdir}/%{name}/INSTALL.md
-# NOTE: %{_libdir} here MUST match the %install destination above (/usr/lib64
+# NOTE: %%{_libdir} here MUST match the %install destination above (/usr/lib64
 # on x86_64 Fedora). The fork's own spec writes %%{_prefix}/lib/... which
 # resolves to /usr/lib — a different directory — and fails %files.
 %dir %{_libdir}/voxtype
