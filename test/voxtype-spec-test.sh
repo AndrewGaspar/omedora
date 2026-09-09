@@ -152,6 +152,26 @@ else
   pass "%files carries no cuda/migraphx/rocm/onnx trees"
 fi
 
+# --- install/files path + shell hygiene (local-build lessons) -------------------
+# %install stages the tiers under %{_libdir} (/usr/lib64); %files must name the
+# SAME dir (%{_prefix}/lib = /usr/lib there — a different directory).
+grep -qE '%\{_libdir\}/voxtype/voxtype-avx2' "$SPEC" \
+  && pass "%files tiers live under %{_libdir} (matches %install)" \
+  || fail "%files tiers live under %{_libdir} (matches %install)"
+if grep -qE '%\{_prefix\}/lib/voxtype' "$SPEC"; then
+  fail "%files must NOT use %{_prefix}/lib/voxtype (/usr/lib != /usr/lib64)"
+else
+  pass "%files has no %{_prefix}/lib/voxtype mismatch"
+fi
+# No `$$` shell vars anywhere: rpm expands $$ to its own PID, so `$$m`
+# silently tests/installs garbage (this shipped zero man pages once).
+if grep -qE '\$\$' "$SPEC"; then
+  grep -nE '\$\$' "$SPEC" >&2
+  fail "spec contains no \$\$ (rpm PID-expansion trap)"
+else
+  pass "spec contains no \$\$ (rpm PID-expansion trap)"
+fi
+
 # --- hard runtime Requires ------------------------------------------------------
 # Anchored at the top-level preamble (before any %description). pkg.py installs
 # with weak deps OFF, so these MUST be Requires, not Recommends.
