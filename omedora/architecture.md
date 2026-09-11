@@ -143,8 +143,11 @@ symlink and intentionally renders the same Omarchy command help. Fedora reports
 ## 11. Updates
 
 Upstream Quattro's `bin/omarchy-update` is the orchestrator on both distros. On
-Fedora, Arch-only keyring, AUR, and orphan steps exit cleanly. The shared
-`omarchy-update-system-pkgs` dispatches to `bin/fedora/update-system-pkgs`.
+Fedora, the Arch-only package-cache prune, keyring, AUR, and orphan steps exit
+cleanly; the prune is a silent no-op because dnf5 keeps no superseded package
+versions (keepcache defaults to false), so there is nothing to prune and no
+offline-downgrade cache to preserve. The shared `omarchy-update-system-pkgs`
+dispatches to `bin/fedora/update-system-pkgs`.
 
 That sibling resolves one explicit managed package set containing:
 

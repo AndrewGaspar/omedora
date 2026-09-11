@@ -3,7 +3,8 @@
 # Update-flow unit tests for the Omarchy-4 (package-backed) line.
 #
 #   PART 1 — per-step Fedora dispatch in the omarchy-update pipeline:
-#            keyring/aur/orphans are clean no-ops (no pacman/yay reached),
+#            keyring/aur/orphans/pkg-prune are clean no-ops (no pacman/yay/
+#            paccache reached, and no sudo prompt for the prune),
 #            system-pkgs updates only the resolved Omedora-managed RPM set,
 #            update-time restarts chronyd (and never aborts when it's absent),
 #            snapshot `create` routes to omedora-snapshot.
@@ -15,7 +16,8 @@
 #            (pacman is absent there; a bare pacman probe would always prompt
 #            for a reboot).
 #   PART 4 — the Arch path of every gated step emits NO dnf calls
-#            (dual-distro contract).
+#            (dual-distro contract), and pkg-prune still runs the upstream
+#            `sudo paccache -rk2` verbatim there.
 #
 # Everything external is stubbed on PATH; no network, no real package manager.
 
@@ -76,6 +78,7 @@ chmod +x "$SHIM/dnf"
 stub pacman           'printf "pacman %s\n" "$*" >>"$MOCK_LOG"'
 stub pacman-key       'printf "pacman-key %s\n" "$*" >>"$MOCK_LOG"'
 stub yay              'printf "yay %s\n" "$*" >>"$MOCK_LOG"'
+stub paccache         'printf "paccache %s\n" "$*" >>"$MOCK_LOG"'
 stub systemctl        'printf "systemctl %s\n" "$*" >>"$MOCK_LOG"'
 stub rpm              'printf "rpm %s\n" "$*" >>"$MOCK_LOG"; [[ $1 == "-q" && ( $2 == "optional-rpm" || $2 == "unrelated-rpm" ) ]]'
 stub omedora-snapshot 'printf "omedora-snapshot %s\n" "$*" >>"$MOCK_LOG"'
@@ -443,6 +446,36 @@ grep -qE "pacman|dnf" "$MOCK_LOG" \
   && fail "orphan-pkgs on Fedora is a no-op" \
   || pass "orphan-pkgs on Fedora is a no-op"
 
+# pkg-prune: paccache is Arch-only, and dnf5 keeps no superseded versions to
+# prune (keepcache defaults to false), so Fedora must exit 0 before the sudo
+# prompt and before the "Prune package cache" header — silent, like the other
+# gated steps. Both distro seams are covered: the OMARCHY_DISTRO escape hatch
+# and the omarchy-distro fallback a session without the variable relies on.
+prune_out=$(run_fedora bash "$ROOT/bin/omarchy-update-pkg-prune" 2>&1) && rc=0 || rc=$?
+assert_equals "pkg-prune on Fedora exits 0" "$rc" "0"
+grep -qE '^(sudo|paccache)( |$)' "$MOCK_LOG" \
+  && { cat "$MOCK_LOG" >&2; fail "pkg-prune on Fedora never invokes sudo or paccache"; } \
+  || pass "pkg-prune on Fedora never invokes sudo or paccache"
+assert_output_lacks "pkg-prune on Fedora prints no prune header" "$prune_out" "Prune package cache"
+assert_output_lacks "pkg-prune on Fedora never warns about a failed prune" "$prune_out" "Could not prune"
+
+DISTRO_SHIM="$SCRATCH/distro-shim"
+mkdir -p "$DISTRO_SHIM"
+cat >"$DISTRO_SHIM/omarchy-distro" <<'EOF'
+#!/bin/bash
+printf 'omarchy-distro %s\n' "$*" >>"$MOCK_LOG"
+echo fedora
+EOF
+chmod +x "$DISTRO_SHIM/omarchy-distro"
+: >"$MOCK_LOG"
+( unset OMARCHY_DISTRO; PATH="$DISTRO_SHIM:$PATH" bash "$ROOT/bin/omarchy-update-pkg-prune" >/dev/null 2>&1 ) && rc=0 || rc=$?
+assert_equals "pkg-prune consults omarchy-distro when OMARCHY_DISTRO is unset" \
+  "$(grep -c '^omarchy-distro' "$MOCK_LOG")" "1"
+assert_equals "pkg-prune exits 0 when omarchy-distro reports fedora" "$rc" "0"
+grep -qE '^(sudo|paccache)( |$)' "$MOCK_LOG" \
+  && { cat "$MOCK_LOG" >&2; fail "pkg-prune via omarchy-distro never invokes sudo or paccache"; } \
+  || pass "pkg-prune via omarchy-distro never invokes sudo or paccache"
+
 run_fedora bash "$ROOT/bin/omarchy-update-time" >/dev/null
 grep -q "systemctl restart chronyd" "$MOCK_LOG" \
   && pass "update-time on Fedora restarts chronyd" \
@@ -537,7 +570,7 @@ grep -q "pacman" "$MOCK_LOG" \
 echo "# --- PART 4: Arch paths emit no dnf (dual-distro contract) ---"
 # ===========================================================================
 for cmd in omarchy-update-keyring omarchy-update-system-pkgs omarchy-update-aur-pkgs \
-           omarchy-update-orphan-pkgs omarchy-update-time; do
+           omarchy-update-orphan-pkgs omarchy-update-pkg-prune omarchy-update-time; do
   : >"$MOCK_LOG"
   ( export OMARCHY_DISTRO=arch; bash "$ROOT/bin/$cmd" >/dev/null 2>&1 ) || true
   if grep -q "^dnf\|omedora-snapshot" "$MOCK_LOG"; then
@@ -547,5 +580,17 @@ for cmd in omarchy-update-keyring omarchy-update-system-pkgs omarchy-update-aur-
     pass "Arch path of $cmd emits no dnf/omedora calls"
   fi
 done
+
+# Arch keeps the upstream prune verbatim: one `sudo paccache -rk2` under the
+# green header. The sudo stub execs its argv, so the paccache stub logs too.
+: >"$MOCK_LOG"
+arch_prune_out=$( export OMARCHY_DISTRO=arch; bash "$ROOT/bin/omarchy-update-pkg-prune" 2>&1 ) && rc=0 || rc=$?
+assert_equals "pkg-prune on Arch exits 0" "$rc" "0"
+assert_equals "pkg-prune on Arch runs sudo paccache -rk2 exactly once" \
+  "$(grep -c '^sudo paccache -rk2$' "$MOCK_LOG")" "1"
+assert_equals "pkg-prune on Arch reaches paccache through sudo" \
+  "$(grep -c '^paccache -rk2$' "$MOCK_LOG")" "1"
+assert_output_contains "pkg-prune on Arch prints the prune header" "$arch_prune_out" "Prune package cache"
+assert_output_lacks "pkg-prune on Arch does not warn when paccache succeeds" "$arch_prune_out" "Could not prune"
 
 echo "# all update-flow tests passed"
