@@ -79,6 +79,13 @@ Omarchy is released under the [MIT License](https://opensource.org/licenses/MIT)
 ALLOW["bin/omarchy-provision-user"]='env -u BROWSER xdg-settings set default-web-browser chromium.desktop
 xdg-mime default HEY.desktop x-scheme-handler/mailto'
 
+# omarchy-system-lock: the upstream lock call moved verbatim into the Arch arm
+# of a distro branch so Fedora can read the shell's answer (ok / missing-pam /
+# failed) and surface a refused lock instead of silently doing nothing
+# (GitHub AndrewGaspar/omedora#9). Unwind if upstream starts checking the
+# answer itself.
+ALLOW["bin/omarchy-system-lock"]='omarchy-shell lock lock >/dev/null'
+
 # voxtype install: the upstream unconditional package line moved into the Arch
 # arm of a distro case (verbatim) so Fedora dispatches to the omedora from-source
 # installer (single voxtype RPM, tiered CPU + Vulkan) instead of the Arch

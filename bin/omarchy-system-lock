@@ -5,7 +5,39 @@
 # omarchy:name=lock
 # omarchy:examples=omarchy system lock
 
-omarchy-shell lock lock >/dev/null
+# Fedora: the shell answers the lock request on stdout (ok, missing-pam when
+# /etc/pam.d/omarchy-lock-password is absent, failed) and upstream discards
+# that answer, so a refused lock did nothing and said nothing. Read it and
+# surface a refusal instead. Everything below this branch is a lock-time side
+# effect -- resetting the layout, locking the 1password vault, and stopping the
+# screensaver all assume the session is locked -- so on a refusal stop here and
+# leave the still-unlocked desktop as it was: locking the vault while the user
+# keeps working would be a surprise, not security. The Arch branch is
+# byte-identical to upstream (the relocated line is allowlisted in
+# test/byte-identity-test.sh); see omedora/architecture.md.
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  # A shell that is not running or not responding already explained itself on
+  # stderr, and it is the notification daemon too, so there is nobody to tell.
+  result=$(omarchy-shell lock lock) || exit 1
+  case $result in
+    ok) ;;
+    missing-pam)
+      echo "omarchy-system-lock: lock screen unavailable, PAM config missing (run omarchy-apply-lock)" >&2
+      omarchy-notification-send -u critical "Lock screen unavailable" \
+        "PAM config missing. Run: omarchy-apply-lock" \
+        --exec omarchy-launch-floating-terminal-with-presentation omarchy-apply-lock || true
+      exit 1
+      ;;
+    *)
+      echo "omarchy-system-lock: lock screen unavailable, the shell refused to lock (${result:-no answer})" >&2
+      omarchy-notification-send -u critical "Lock screen unavailable" \
+        "The shell refused to lock (${result:-no answer})." || true
+      exit 1
+      ;;
+  esac
+else
+  omarchy-shell lock lock >/dev/null
+fi
 
 # Set keyboard layout to default (first layout)
 hyprctl switchxkblayout all 0 > /dev/null 2>&1
