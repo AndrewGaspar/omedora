@@ -51,6 +51,11 @@ source = "dnf"
 names = ["qt6-qtimageformats"]
 reason = "Arch/Fedora name translation (Fedora prefixes the Qt module: qt6-qtimageformats). New Omarchy 4.0.2 base dependency; ships in Fedora main."
 
+[sof-firmware]
+source = "dnf"
+names = ["alsa-sof-firmware"]
+reason = "Arch/Fedora name translation (Fedora ships Intel Sound Open Firmware as alsa-sof-firmware). Pulled by migrations/1784401744.sh and install/hardware/intel/sof-firmware.sh on Intel audio; the unmapped name has no Fedora match and aborted `omedora update` (issue #10)."
+
 [vulkan-intel]
 source = "dnf"
 names = ["mesa-vulkan-drivers"]
