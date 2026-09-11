@@ -224,6 +224,102 @@ skip_output=$(omarchy-pkg-add ufw grok-bot 2>&1)
 assert_output_contains "ufw is explicitly skipped" "$skip_output" "skipping 'ufw'"
 assert_output_contains "grok-bot is explicitly skipped" "$skip_output" "skipping 'grok-bot'"
 
+echo "=== An existing Docker provider is kept, not fought over (#6) ==="
+# podman-docker is Fedora's own conflicting Docker provider: it Conflicts with
+# moby-engine, and docker-cli Conflicts with it, so before satisfied_by the
+# base transaction died here exactly as it did on a Docker CE machine.
+if omarchy-pkg-missing docker; then
+  pass "docker starts missing with no provider installed"
+else
+  fail "docker starts missing with no provider installed"
+fi
+if dnf -y -q --setopt=install_weak_deps=False install podman-docker >/tmp/podman-docker.out 2>&1; then
+  assert_dnf_installed "podman-docker (a real Fedora Docker provider) is installed" podman-docker
+else
+  cat /tmp/podman-docker.out >&2
+  fail "podman-docker installs as the existing Docker provider"
+fi
+dnf --assumeno install moby-engine docker-cli >/tmp/moby-conflict.out 2>&1 || true
+if grep -qi 'conflict' /tmp/moby-conflict.out; then
+  pass "moby-engine + docker-cli really conflict with podman-docker on this image"
+else
+  cat /tmp/moby-conflict.out >&2
+  fail "moby-engine + docker-cli really conflict with podman-docker on this image"
+fi
+
+if omarchy-pkg-missing docker; then
+  fail "docker is not missing while podman-docker provides it"
+else
+  pass "docker is not missing while podman-docker provides it"
+fi
+if omarchy-pkg-present docker; then
+  pass "docker is present while podman-docker provides it"
+else
+  fail "docker is present while podman-docker provides it"
+fi
+kept_output=$(OMARCHY_PKG_DRY_RUN=1 omarchy-pkg-add docker 2>&1)
+assert_output_lacks "dry-run pkg-add docker issues no dnf install beside podman-docker" \
+  "$kept_output" "dnf install"
+assert_output_contains "pkg-add docker names podman-docker as the kept provider" \
+  "$kept_output" "Keeping installed podman-docker: it satisfies 'docker', so moby-engine docker-cli will not be installed"
+
+# The whole base Docker trio must resolve against the provider: buildx
+# Requires docker-cli (kept out), compose still installs.
+trio_output=$(OMARCHY_PKG_DRY_RUN=1 omarchy-pkg-add docker docker-buildx docker-compose 2>&1)
+trio_install=$(grep '\[dry-run\] sudo dnf install' <<<"$trio_output" || true)
+assert_output_lacks "docker trio: moby-engine is out of the transaction" "$trio_install" "moby-engine"
+assert_output_lacks "docker trio: docker-buildx (Requires docker-cli) is out of the transaction" \
+  "$trio_install" "docker-buildx"
+assert_output_contains "docker trio: docker-compose still installs beside podman-docker" \
+  "$trio_install" "docker-compose"
+dnf --assumeno install docker-compose >/tmp/compose-resolve.out 2>&1 || true
+if grep -q 'Transaction Summary' /tmp/compose-resolve.out; then
+  pass "docker-compose resolves for real against podman-docker"
+else
+  cat /tmp/compose-resolve.out >&2
+  fail "docker-compose resolves for real against podman-docker"
+fi
+
+mapfile -t managed_kept < <(python3 "$REPO/bin/fedora/managed_packages.py")
+managed_kept_text=$(printf '%s\n' "${managed_kept[@]}")
+assert_output_lacks "managed update omits moby-engine while podman-docker is installed" \
+  "$managed_kept_text" "moby-engine"
+assert_output_lacks "managed update never manages podman-docker itself" \
+  "$managed_kept_text" "podman-docker"
+
+# The Fedora setup siblings must cope with a provider that ships no
+# docker.socket (podman-docker is only a CLI shim).
+if OMARCHY_DISTRO=fedora bash "$REPO/install/config/enable-services.sh" >/tmp/enable-services.out 2>&1; then
+  pass "enable-services tolerates a Docker provider without docker.socket"
+else
+  cat /tmp/enable-services.out >&2
+  fail "enable-services tolerates a Docker provider without docker.socket"
+fi
+if OMARCHY_DISTRO=fedora OMARCHY_INSTALL_USER=omedora OMARCHY_PATH="$REPO" \
+  bash "$REPO/install/config/docker.sh" >/tmp/docker-setup.out 2>&1; then
+  pass "docker setup runs beside podman-docker"
+else
+  cat /tmp/docker-setup.out >&2
+  fail "docker setup runs beside podman-docker"
+fi
+if id -nG omedora | grep -qw docker; then
+  pass "docker setup created the docker group and added the install user"
+else
+  id -nG omedora >&2
+  fail "docker setup created the docker group and added the install user"
+fi
+
+dnf -y -q remove podman-docker >/tmp/podman-docker-remove.out 2>&1 || true
+assert_dnf_not_installed "podman-docker is removed again" podman-docker
+if omarchy-pkg-missing docker; then
+  pass "docker is missing again once the provider is gone"
+else
+  fail "docker is missing again once the provider is gone"
+fi
+restored_output=$(OMARCHY_PKG_DRY_RUN=1 omarchy-pkg-add docker 2>&1)
+assert_output_contains "dry-run pkg-add docker resolves to moby-engine docker-cli again" \
+  "$restored_output" "[dry-run] sudo dnf install -y --setopt=install_weak_deps=False moby-engine docker-cli"
+
 echo "=== Managed update resolution with real rpm queries ==="
 mapfile -t managed < <(python3 "$REPO/bin/fedora/managed_packages.py")
 managed_text=$(printf '%s\n' "${managed[@]}")
