@@ -5,13 +5,13 @@
 # local repo). Runs over SSH as the VM user after install.sh completed. TAP out.
 #
 # Checks (each a TAP line):
-#   1. omedora packages installed and their %{from_repo} is the COPR
-#      (copr:...:agaspar:omedora-3), NOT a local repo and NOT a stray mirror.
+#   1. the omedora core RPMs installed and their %{from_repo} is the COPR
+#      (copr:...:agaspar:omedora-4), NOT a local repo and NOT a stray mirror.
 #   2. /usr/share/wayland-sessions/omedora.desktop present and owned by
-#      hyprland-omedora.
-#   3. config was seeded with backups (at least the bashrc block / a
-#      .pre-omedora-* backup OR a freshly-created config tree).
-#   4. no ERROR/Traceback lines in /var/log/omarchy-install.log.
+#      omedora-settings (the Omarchy 4 line's session owner).
+#   3. the user config was seeded (hyprland.lua, ~/.config/omarchy) — backups
+#      are .pre-omedora-* siblings and non-gating on a clean base.
+#   4. no ERROR/Traceback lines in the install transcript.
 
 set -uo pipefail
 
@@ -29,24 +29,26 @@ if [[ -x "$OMARCHY_PATH/bin/omedora-copr" ]]; then
 fi
 echo "# expected COPR repo-id: ${EXPECT_COPR:-<unresolved>}"
 
-# --- 1. omedora packages came from the COPR ---------------------------------
-# hyprland-omedora is the keystone omedora RPM (owns the session entry). Confirm
-# it's installed AND dnf records its origin repo as the COPR.
-if rpm -q hyprland-omedora >/dev/null 2>&1; then
-  pass "hyprland-omedora installed ($(rpm -q hyprland-omedora))"
-else
-  fail "hyprland-omedora installed"
-fi
-
-from_repo=$(dnf repoquery --installed --qf '%{name} %{from_repo}\n' hyprland-omedora 2>/dev/null | awk '{print $2}' | head -1)
-echo "# hyprland-omedora from_repo: ${from_repo:-<none>}"
-if [[ -n "$EXPECT_COPR" && "$from_repo" == "$EXPECT_COPR" ]]; then
-  pass "hyprland-omedora was installed FROM THE COPR ($from_repo)"
-elif [[ "$from_repo" == copr:*agaspar:omedora* ]]; then
-  pass "hyprland-omedora installed from an agaspar omedora COPR ($from_repo)"
-else
-  fail "hyprland-omedora installed from the COPR (got: ${from_repo:-<none>}, expected: ${EXPECT_COPR:-copr:...:agaspar:omedora-*})"
-fi
+# --- 1. the omedora core RPMs came from the COPR -----------------------------
+# omedora (the payload) and omedora-settings (the session owner) are the
+# keystone RPMs of the Omarchy 4 line; hyprland is the vendored compositor.
+# Confirm each is installed AND dnf records its origin repo as the COPR.
+for keystone in omedora omedora-settings hyprland; do
+  if rpm -q "$keystone" >/dev/null 2>&1; then
+    pass "$keystone installed ($(rpm -q "$keystone"))"
+  else
+    fail "$keystone installed"
+  fi
+  from_repo=$(dnf repoquery --installed --qf '%{name} %{from_repo}\n' "$keystone" 2>/dev/null | awk '{print $2}' | head -1)
+  echo "# $keystone from_repo: ${from_repo:-<none>}"
+  if [[ -n "$EXPECT_COPR" && "$from_repo" == "$EXPECT_COPR" ]]; then
+    pass "$keystone was installed FROM THE COPR ($from_repo)"
+  elif [[ "$from_repo" == copr:*agaspar:omedora* ]]; then
+    pass "$keystone installed from an agaspar omedora COPR ($from_repo)"
+  else
+    fail "$keystone installed from the COPR (got: ${from_repo:-<none>}, expected: ${EXPECT_COPR:-copr:...:agaspar:omedora-*})"
+  fi
+done
 
 # Broader: count how many installed packages trace to the COPR. A healthy
 # install pulls the whole vendored stack (hyprland-no-session, aquamarine,
@@ -64,14 +66,14 @@ else
   fail "packages installed from the omedora COPR (count=${copr_count:-0})"
 fi
 
-# --- 2. the session entry is registered + owned by hyprland-omedora ----------
+# --- 2. the session entry is registered + owned by omedora-settings ----------
 if [[ -f /usr/share/wayland-sessions/omedora.desktop ]]; then
   pass "/usr/share/wayland-sessions/omedora.desktop present"
   owner=$(rpm -qf /usr/share/wayland-sessions/omedora.desktop 2>/dev/null || true)
-  if [[ "$owner" == hyprland-omedora-* ]]; then
-    pass "omedora.desktop owned by hyprland-omedora ($owner)"
+  if [[ "$owner" == omedora-settings-* ]]; then
+    pass "omedora.desktop owned by omedora-settings ($owner)"
   else
-    fail "omedora.desktop owned by hyprland-omedora (got: ${owner:-<none>})"
+    fail "omedora.desktop owned by omedora-settings (got: ${owner:-<none>})"
   fi
 else
   fail "/usr/share/wayland-sessions/omedora.desktop present"
@@ -84,25 +86,29 @@ else
   fail "GNOME session entry still present (coexistence preserved)"
 fi
 
-# --- 3. config seeded with backups ------------------------------------------
-# Either a brand-new config tree was created, or existing files were backed up
-# to .pre-omedora-*; the bashrc sourcing block is the additive marker.
-if [[ -d "$HOME/.config/hypr" ]]; then
-  pass "~/.config/hypr seeded"
+# --- 3. config seeded (backups are .pre-omedora-* siblings) ------------------
+# The Omarchy 4 line seeds the Lua compositor config and the omarchy user
+# config dir through the adopt step (backup-then-write for existing files).
+if [[ -f "$HOME/.config/hypr/hyprland.lua" ]]; then
+  pass "~/.config/hypr/hyprland.lua seeded"
 else
-  fail "~/.config/hypr seeded"
+  fail "~/.config/hypr/hyprland.lua seeded"
 fi
-if grep -qF '# >>> omedora >>>' "$HOME/.bashrc" 2>/dev/null; then
-  pass "~/.bashrc has the omedora sourcing block"
+if [[ -d "$HOME/.config/omarchy" ]]; then
+  pass "~/.config/omarchy seeded"
 else
-  fail "~/.bashrc has the omedora sourcing block"
+  fail "~/.config/omarchy seeded"
 fi
 n_backups=$(find "$HOME/.config" -maxdepth 3 -name '*.pre-omedora-*' 2>/dev/null | wc -l)
 echo "# config backups created (.pre-omedora-*): $n_backups"
 pass "config backup mechanism observable (n=$n_backups — non-gating; a clean base may have 0)"
 
-# --- 4. no errors in the install log ----------------------------------------
-LOG=/var/log/omarchy-install.log
+# --- 4. no errors in the install transcript ---------------------------------
+# The orchestrator tees the whole bootstrap to /tmp/omedora-install.out; the
+# root-side apply-system log lands in /var/log/omarchy-install.log only when
+# it is not streamed to stdout, so prefer the transcript and fall back.
+LOG=/tmp/omedora-install.out
+[[ -r "$LOG" ]] || LOG=/var/log/omarchy-install.log
 if [[ -r "$LOG" ]]; then
   # Match the hard error markers, then drop KNOWN-BENIGN lines that a healthy
   # TTY-less install legitimately prints:
