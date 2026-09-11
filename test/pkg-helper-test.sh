@@ -46,6 +46,11 @@ since = "45"
 source = "dnf"
 names = ["former-name-fedora"]
 until = "45"
+
+[docker]
+source = "dnf"
+names = ["moby-engine", "docker-cli"]
+satisfied_by = ["docker-ce", "docker-ee", "podman-docker"]
 EOF
 
 # Prepend our mocks to PATH so the dispatch lands in them, not the real binaries.
@@ -246,6 +251,83 @@ assert_output_contains "pkg-add sof-firmware dry-run installs alsa-sof-firmware"
   "$output" "sudo dnf install -y --setopt=install_weak_deps=False alsa-sof-firmware"
 assert_output_lacks "pkg-add sof-firmware dry-run never passes the Arch name to dnf" \
   "$output" "install_weak_deps=False sof-firmware"
+# --- satisfied_by: an installed provider counts as the entry being installed ---
+# (issue #6: Fedora's moby-engine/docker-cli Conflict with docker-ce, docker-ee
+# and podman-docker, so an existing Docker must be kept, never fought over.)
+
+reset_log
+set +e
+MOCK_RPM_INSTALLED="docker-ce" "$ROOT/bin/omarchy-pkg-missing" docker >/dev/null 2>&1
+exit_code=$?
+set -e
+assert_equals "pkg-missing docker with docker-ce installed → exit 1 (not missing)" "$exit_code" "1"
+
+reset_log
+set +e
+MOCK_RPM_INSTALLED="docker-ce" "$ROOT/bin/omarchy-pkg-present" docker >/dev/null 2>&1
+exit_code=$?
+set -e
+assert_equals "pkg-present docker with docker-ce installed → exit 0 (present)" "$exit_code" "0"
+
+reset_log
+output=$(MOCK_RPM_INSTALLED="docker-ce" "$ROOT/bin/omarchy-pkg-add" docker 2>&1 || true)
+if log_lacks "dnf install"; then
+  pass "pkg-add docker with docker-ce installed → no dnf install"
+else
+  cat "$MOCK_LOG" >&2
+  fail "pkg-add docker with docker-ce installed → unexpectedly ran dnf install"
+fi
+assert_output_contains "pkg-add names the kept provider" \
+  "$output" "Keeping installed docker-ce: it satisfies 'docker', so moby-engine docker-cli will not be installed"
+
+# With no provider the entry installs normally; any listed provider counts,
+# not just the first.
+reset_log
+"$ROOT/bin/omarchy-pkg-add" docker >/dev/null 2>&1 || true
+log_contains "sudo dnf install -y --setopt=install_weak_deps=False moby-engine docker-cli" \
+  && pass "pkg-add docker with no provider → installs moby-engine docker-cli" \
+  || { cat "$MOCK_LOG" >&2; fail "pkg-add docker with no provider → expected moby-engine docker-cli install"; }
+reset_log
+MOCK_RPM_INSTALLED="podman-docker" "$ROOT/bin/omarchy-pkg-add" docker >/dev/null 2>&1 || true
+log_lacks "dnf install" \
+  && pass "pkg-add docker with podman-docker installed → no dnf install" \
+  || { cat "$MOCK_LOG" >&2; fail "pkg-add docker with podman-docker installed → unexpectedly ran dnf install"; }
+
+# A kept provider only removes its own entry from the batch.
+reset_log
+MOCK_RPM_INSTALLED="docker-ce" "$ROOT/bin/omarchy-pkg-add" docker jq >/dev/null 2>&1 || true
+if log_contains "sudo dnf install -y --setopt=install_weak_deps=False jq" && log_lacks "moby-engine"; then
+  pass "pkg-add docker jq with docker-ce installed → installs only jq"
+else
+  cat "$MOCK_LOG" >&2
+  fail "pkg-add docker jq with docker-ce installed → expected a jq-only install"
+fi
+
+# Dry-run resolution is unchanged when nothing is installed.
+reset_log
+output=$(OMARCHY_PKG_DRY_RUN=1 "$ROOT/bin/omarchy-pkg-add" docker 2>&1 || true)
+assert_output_contains "dry-run pkg-add docker with nothing installed → resolves to moby-engine docker-cli" \
+  "$output" "[dry-run] sudo dnf install -y --setopt=install_weak_deps=False moby-engine docker-cli"
+set +e
+"$ROOT/bin/omarchy-pkg-missing" docker >/dev/null 2>&1
+exit_code=$?
+set -e
+assert_equals "pkg-missing docker with nothing installed → exit 0 (missing)" "$exit_code" "0"
+
+# The provider is the user's package: drop never touches it.
+reset_log
+MOCK_RPM_INSTALLED="docker-ce" "$ROOT/bin/omarchy-pkg-drop" docker >/dev/null 2>&1 || true
+if log_lacks "dnf remove"; then
+  pass "pkg-drop docker with docker-ce installed → no dnf remove (provider kept)"
+else
+  cat "$MOCK_LOG" >&2
+  fail "pkg-drop docker with docker-ce installed → must not remove anything"
+fi
+reset_log
+MOCK_RPM_INSTALLED="moby-engine docker-cli" "$ROOT/bin/omarchy-pkg-drop" docker >/dev/null 2>&1 || true
+log_contains "sudo dnf remove -y moby-engine docker-cli" \
+  && pass "pkg-drop docker with omedora's own names installed → removes them" \
+  || { cat "$MOCK_LOG" >&2; fail "pkg-drop docker with moby-engine docker-cli installed → expected dnf remove"; }
 
 # --- omarchy-pkg-drop: dnf remove for installed dnf package ---
 
