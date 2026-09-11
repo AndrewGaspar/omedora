@@ -140,7 +140,7 @@ private libexec path so Omedora's stable Hyprland remains installed and usable
 as a fallback.
 
 The compositor uses the existing per-user
-~/.config/hypr/hyprland-xr.conf configuration through the packaged
+~/.config/hypr/hyprland-xr.lua configuration through the packaged
 hypxrland-session launcher. Install hypxrland-omedora for the visible
 "Omedora XR" display-manager entry.
 
