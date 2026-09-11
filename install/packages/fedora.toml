@@ -7,6 +7,11 @@
 #     Flathub), OR
 #   - The package should be deliberately skipped on Fedora (with a reason).
 #
+# An optional `satisfied_by = [...]` lists RPMs that already cover an entry
+# when installed (another provider, or one that Conflicts with `names`): the
+# entry then counts as installed and its names are never pulled in. Those
+# packages are the user's; omedora never installs, removes, or replaces them.
+#
 # Schema and tier rules are documented in omedora/packages.md.
 # Validate this file with `omarchy dev validate-fedora-packages`.
 

@@ -200,6 +200,42 @@ assert_output_lacks "managed resolver omits an expired base mapping on Fedora 45
 assert_output_contains "managed resolver includes active installed optional entries" \
   "$managed_f45" "optional-rpm"
 
+# A satisfied_by provider (the user's docker-ce, say) Conflicts with the
+# entry's names: the managed transaction must leave them out while it is
+# installed, and never manage the provider itself.
+SATISFIED_MAP="$SCRATCH/satisfied-map.toml"
+SATISFIED_BASE="$SCRATCH/satisfied-base.packages"
+SATISFIED_BASELINE="$SCRATCH/satisfied-baseline.packages"
+cat >"$SATISFIED_MAP" <<'EOF'
+[docker]
+source = "dnf"
+names = ["moby-engine", "docker-cli"]
+satisfied_by = ["docker-ce", "podman-docker"]
+EOF
+printf 'docker\n' >"$SATISFIED_BASE"
+: >"$SATISFIED_BASELINE"
+SATISFIED_SHIM="$SCRATCH/satisfied-shim"
+mkdir -p "$SATISFIED_SHIM"
+printf '#!/bin/bash\n[[ $1 == "-q" && $2 == "docker-ce" ]]\n' >"$SATISFIED_SHIM/rpm"
+chmod +x "$SATISFIED_SHIM/rpm"
+
+managed_provided=$(PATH="$SATISFIED_SHIM:$PATH" \
+  OMARCHY_FEDORA_MAP="$SATISFIED_MAP" \
+  OMARCHY_BASE_PKGS="$SATISFIED_BASE" \
+  OMEDORA_BASELINE_PKGS="$SATISFIED_BASELINE" \
+  python3 "$ROOT/bin/fedora/managed_packages.py")
+assert_output_lacks "managed resolver omits names covered by an installed satisfied_by provider" \
+  "$managed_provided" "moby-engine"
+assert_output_lacks "managed resolver never manages the provider itself" \
+  "$managed_provided" "docker-ce"
+
+managed_unprovided=$(OMARCHY_FEDORA_MAP="$SATISFIED_MAP" \
+  OMARCHY_BASE_PKGS="$SATISFIED_BASE" \
+  OMEDORA_BASELINE_PKGS="$SATISFIED_BASELINE" \
+  python3 "$ROOT/bin/fedora/managed_packages.py")
+assert_output_contains "managed resolver includes the names when no provider is installed" \
+  "$managed_unprovided" "moby-engine"
+
 # Resolver failures must abort before dnf. Process substitution used to detach
 # these statuses and turn malformed or missing inputs into successful no-ops.
 BROKEN_MAP="$SCRATCH/broken-map.toml"
