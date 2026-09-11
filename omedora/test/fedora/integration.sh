@@ -39,6 +39,15 @@ assert_output_contains "shared dispatcher retains upstream branding on Fedora" "
 omedora_help=$("$REPO/bin/omedora" --help 2>&1)
 assert_output_contains "omedora alias reaches the same dispatcher" "$omedora_help" "Omarchy command center"
 
+echo "=== Arch-only update steps exit cleanly on Fedora ==="
+# paccache never ships on Fedora and dnf5 keeps no superseded versions, so an
+# ungated prune would prompt sudo for nothing and warn on every update.
+prune_output=$(omarchy-update-pkg-prune 2>&1)
+prune_status=$?
+assert_equals "omarchy-update-pkg-prune exits 0 on Fedora" "$prune_status" "0"
+assert_output_lacks "omarchy-update-pkg-prune never reports a failed prune on Fedora" \
+  "$prune_output" "Could not prune"
+
 echo "=== Real rpm/dnf package-helper path ==="
 dnf -y remove cowsay >/dev/null 2>&1 || true
 assert_dnf_not_installed "cowsay starts absent" cowsay
