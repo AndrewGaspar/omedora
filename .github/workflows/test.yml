@@ -112,6 +112,9 @@ jobs:
       - name: Run HypXR spec static guard
         run: bash test/hypxr-spec-test.sh
 
+      - name: Run ttfx-spec static guard
+        run: bash test/ttfx-spec-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 
