@@ -311,6 +311,15 @@ do_install() {
   vmscp "$tar" "$VM_USER@127.0.0.1:/tmp/omedora-src.tar.gz" || die "scp src failed"
   vmssh 'tar -xzf /tmp/omedora-src.tar.gz -C ~/.local/share/omarchy' || die "untar src failed"
 
+  # Fedora's stock passworded %wheel rule matches alongside cloud-init's
+  # NOPASSWD grant, and sudo's verifypw=all default then makes `sudo -v` demand
+  # a password anyway. The bootstrap's tty path (this stage runs under a PTY)
+  # and omarchy-update's stay-awake both start with `sudo -v`, so a real user
+  # types their password once there; nobody can here. Give the VM user that
+  # outcome: never authenticate. Test-only; the installer itself is untouched.
+  vmssh "printf 'Defaults:$VM_USER !authenticate\\n' | sudo -n tee /etc/sudoers.d/zz-omedora-vmtest-noauth >/dev/null && sudo -n chmod 0440 /etc/sudoers.d/zz-omedora-vmtest-noauth" \
+    || die "sudo !authenticate setup failed"
+
   local fastenv=""
   $fast && fastenv="OMEDORA_VM_FAST=1"
 
