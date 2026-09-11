@@ -57,6 +57,11 @@ def rpm_names(package: str, package_map: dict[str, dict]) -> list[str]:
     return [package]
   if entry.get("source") not in ("dnf", "copr"):
     return []
+  # A satisfied_by provider (the user's docker-ce, say) already covers the
+  # entry and Conflicts with its names; pulling those into the managed
+  # transaction would fail it. The provider itself is never managed.
+  if any(is_installed(str(name)) for name in entry.get("satisfied_by", [])):
+    return []
   return [str(name) for name in entry.get("names", [package])]
 
 
