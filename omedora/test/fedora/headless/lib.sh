@@ -30,6 +30,12 @@
 OMARCHY_PATH="${OMARCHY_PATH:-$HOME/.local/share/omarchy}"
 _HELPERS="$OMARCHY_PATH/test/helpers.sh"
 if [[ ! -f $_HELPERS ]]; then
+  # The L4-VM runner ships the helpers beside this file (~/vm-suite/helpers.sh):
+  # on an installed system OMARCHY_PATH is the RPM payload, which carries no
+  # test/ tree, and the relative guess below would resolve to the filesystem root.
+  _HELPERS="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/helpers.sh"
+fi
+if [[ ! -f $_HELPERS ]]; then
   # Fall back to a path relative to this file (e.g. running from a checkout).
   # This file lives at omedora/test/fedora/headless/lib.sh; the upstream TAP
   # helpers stay at the repo-root test/helpers.sh (four levels up).

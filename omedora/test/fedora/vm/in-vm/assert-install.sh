@@ -31,9 +31,11 @@ echo "# expected COPR repo-id: ${EXPECT_COPR:-<unresolved>}"
 
 # --- 1. the omedora core RPMs came from the COPR -----------------------------
 # omedora (the payload) and omedora-settings (the session owner) are the
-# keystone RPMs of the Omarchy 4 line; hyprland is the vendored compositor.
+# keystone RPMs of the Omarchy 4 line; hyprland-no-session is the vendored
+# compositor (fedora.toml maps upstream's hyprland to it; omedora-settings
+# owns the only session entry).
 # Confirm each is installed AND dnf records its origin repo as the COPR.
-for keystone in omedora omedora-settings hyprland; do
+for keystone in omedora omedora-settings hyprland-no-session; do
   if rpm -q "$keystone" >/dev/null 2>&1; then
     pass "$keystone installed ($(rpm -q "$keystone"))"
   else
