@@ -47,6 +47,69 @@ prune_status=$?
 assert_equals "omarchy-update-pkg-prune exits 0 on Fedora" "$prune_status" "0"
 assert_output_lacks "omarchy-update-pkg-prune never reports a failed prune on Fedora" \
   "$prune_output" "Could not prune"
+echo "=== Lock screen PAM migration restores the service (GitHub #9) ==="
+# migrations/1788918004.sh re-creates /etc/pam.d/omarchy-lock-password through
+# omarchy-apply-lock -> bin/fedora/setup-lock on a Fedora install that lost it.
+# Drive it through the real runner: every other migration is pre-marked
+# complete in a scratch state dir so omarchy-migrate runs exactly this one.
+# As root, omarchy-apply-lock resets PATH to /usr/share/omarchy/bin, which the
+# RPM provides on a real install; point it at the repo for this section only.
+lock_pam=/etc/pam.d/omarchy-lock-password
+lock_pam_migration=1788918004.sh
+lock_pam_state=$(mktemp -d)
+lock_pam_share_linked=0
+if [[ ! -e /usr/share/omarchy ]]; then
+  ln -s "$REPO" /usr/share/omarchy
+  lock_pam_share_linked=1
+fi
+for migration in "$REPO"/migrations/*.sh; do
+  : >"$lock_pam_state/$(basename "$migration")"
+done
+rm -f "$lock_pam_state/$lock_pam_migration" "$lock_pam"
+[[ ! -e $lock_pam ]] || fail "$lock_pam starts absent"
+
+if OMARCHY_DISTRO=fedora OMARCHY_MIGRATION_STATE="$lock_pam_state" \
+  omarchy-migrate >/tmp/lock-pam-migrate.out 2>&1; then
+  pass "omarchy-migrate runs the lock PAM migration on Fedora"
+else
+  cat /tmp/lock-pam-migrate.out >&2
+  fail "omarchy-migrate runs the lock PAM migration on Fedora"
+fi
+assert_file_exists "the runner marks the lock PAM migration complete" "$lock_pam_state/$lock_pam_migration"
+assert_file_exists "the migration re-creates $lock_pam" "$lock_pam"
+if grep -Eq '^auth[[:space:]]+include[[:space:]]+system-auth$' "$lock_pam" &&
+  grep -Eq '^account[[:space:]]+include[[:space:]]+system-auth$' "$lock_pam"; then
+  pass "the re-created service includes Fedora's system-auth stack"
+else
+  cat "$lock_pam" >&2
+  fail "the re-created service includes Fedora's system-auth stack"
+fi
+assert_output_contains "the first run applied the lock configuration" \
+  "$(cat /tmp/lock-pam-migrate.out)" "Configuring lock screen password authentication"
+
+# Rerun with the marker cleared: the service exists now, so the migration must
+# exit before omarchy-apply-lock and leave the file untouched (same inode,
+# nanosecond mtime, and bytes).
+lock_pam_stat_before=$(stat -c '%i %y %s' "$lock_pam")
+lock_pam_sha_before=$(sha256sum "$lock_pam")
+rm -f "$lock_pam_state/$lock_pam_migration"
+if OMARCHY_DISTRO=fedora OMARCHY_MIGRATION_STATE="$lock_pam_state" \
+  omarchy-migrate >/tmp/lock-pam-migrate-rerun.out 2>&1; then
+  pass "the lock PAM migration reruns cleanly once the service exists"
+else
+  cat /tmp/lock-pam-migrate-rerun.out >&2
+  fail "the lock PAM migration reruns cleanly once the service exists"
+fi
+assert_equals "the rerun leaves the service untouched (inode, mtime, size)" \
+  "$(stat -c '%i %y %s' "$lock_pam")" "$lock_pam_stat_before"
+assert_equals "the rerun leaves identical bytes" "$(sha256sum "$lock_pam")" "$lock_pam_sha_before"
+assert_output_lacks "the rerun never re-applies the lock configuration" \
+  "$(cat /tmp/lock-pam-migrate-rerun.out)" "Configuring lock screen"
+
+rm -rf "$lock_pam_state"
+if (( lock_pam_share_linked )); then
+  rm -f /usr/share/omarchy
+fi
 
 echo "=== Real rpm/dnf package-helper path ==="
 dnf -y remove cowsay >/dev/null 2>&1 || true
