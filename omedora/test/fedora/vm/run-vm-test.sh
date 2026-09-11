@@ -4,7 +4,7 @@
 #
 # The highest-fidelity Omedora test tier: provisions a REAL Fedora Workstation
 # (GNOME + GDM) virtual machine under libvirt+KVM, installs Omedora the way a
-# user would (boot.sh -> COPR -> install.sh), boots the Omedora/Hyprland session
+# user would (boot.sh -> COPR -> omedora/install-4.sh), boots the Omedora/Hyprland session
 # from a real GDM seat (real DRM master, real systemd --user, real session bus),
 # and runs the SAME TAP assertion suite the L4-headless podman tier runs
 # (omedora/test/fedora/headless/{lib,tests}) — plus a real-framebuffer
@@ -299,12 +299,12 @@ provision() {
 }
 
 # ---------------------------------------------------------------------------
-# stage: install — run the Omedora bootstrap the user way (boot.sh -> install.sh)
+# stage: install — run the Omedora 4 bootstrap the user way (boot.sh -> omedora/install-4.sh)
 # ---------------------------------------------------------------------------
 do_install() {
   log "syncing this omedora checkout into the VM (so the in-VM install uses THIS code, not just a remote clone)"
-  # Pack the working tree (tracked files) and unpack at the path install.sh
-  # hardcodes (~/.local/share/omarchy). This makes the VM test THIS branch.
+  # Pack the working tree (tracked files) and unpack where boot.sh would clone
+  # it (~/.local/share/omarchy). This makes the VM test THIS branch.
   local tar="$RUN/omedora-src.tar.gz"
   git -C "$REPO" archive --format=tar.gz -o "$tar" HEAD || die "git archive failed"
   vmssh 'rm -rf ~/.local/share/omarchy && mkdir -p ~/.local/share/omarchy' || die "prep dest failed"
@@ -314,19 +314,19 @@ do_install() {
   local fastenv=""
   $fast && fastenv="OMEDORA_VM_FAST=1"
 
-  log "running install.sh in the VM (NONINTERACTIVE; ref=$ref; fast=$fast)"
-  # OMARCHY_NONINTERACTIVE: drive the fedora-plan coexistence gate's
-  # non-interactive branch (it warns + proceeds; backup-then-write is
-  # non-destructive). This is the unattended path. The interactive/expect path
-  # is exercised separately by run-vm-test.sh's --stage install with a PTY (TODO,
-  # see README "Interactive path").
-  # -tt PTY: install.sh aborts silently without a terminal (see vmssh_tty). The
+  log "running omedora/install-4.sh in the VM (plan autoconfirmed; ref=$ref; fast=$fast)"
+  # OMEDORA_PLAN_AUTOCONFIRM: print the coexistence plan and proceed without
+  # prompting (backup-then-write is non-destructive). This is the unattended
+  # path; the interactive/expect path is exercised separately by --stage install
+  # with a PTY (TODO, see README "Interactive path"). OMARCHY_NONINTERACTIVE is
+  # kept for the Arch-inherited leaves that still read it.
+  # -tt PTY: the bootstrap's sudo guard wants a terminal (see vmssh_tty). The
   # in-VM `tee` keeps the full transcript at /tmp/omedora-install.out so the rc
   # we read is the install's, not ssh's PTY-forwarding rc.
   set +e
   vmssh_tty "set -o pipefail; \
-    export OMARCHY_NONINTERACTIVE=1 OMEDORA_REF='$ref' $fastenv; \
-    bash ~/.local/share/omarchy/install.sh 2>&1 | tee /tmp/omedora-install.out; \
+    export OMARCHY_NONINTERACTIVE=1 OMEDORA_PLAN_AUTOCONFIRM=1 OMEDORA_REF='$ref' $fastenv; \
+    bash ~/.local/share/omarchy/omedora/install-4.sh 2>&1 | tee /tmp/omedora-install.out; \
     echo \"INSTALL_RC=\${PIPESTATUS[0]}\" | tee /tmp/omedora-install.rc"
   local rc=$?
   # Prefer the in-VM sentinel rc over ssh's (ssh -tt rc can reflect the PTY).
@@ -336,7 +336,7 @@ do_install() {
   # on purpose (stages capture $? and continue); a stray `set -e` would abort
   # the whole run on the first non-zero stage rc (e.g. a failing assert).
   set +o errexit 2>/dev/null || true
-  log "install.sh exit: $rc"
+  log "install-4.sh exit: $rc"
   return $rc
 }
 
@@ -471,7 +471,7 @@ main() {
 
   echo
   log "================= L4-VM SUMMARY ================="
-  log "install.sh exit ... $install_rc"
+  log "install-4.sh exit ... $install_rc"
   log "install asserts ... $assert_rc"
   log "session tests  ... $tests_rc"
   log "artifacts      ... $ARTIFACTS/"
