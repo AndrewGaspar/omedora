@@ -17,10 +17,13 @@
 # relocation is permitted but a NEW, undocumented deletion (e.g. someone quietly
 # dropping an upstream behavior) trips the audit.
 #
-# We deliberately keep ZERO shell/ patches: the one we briefly carried
-# (Background.qml's updatesEnabled guard, for Fedora's old quickshell) was
-# dropped once quickshell 0.3.0 was vendored — vendoring fixed the root cause,
-# so the file is byte-identical to upstream again and isn't in the audit set.
+# We keep ZERO shell/ PORT patches: the one we briefly carried (Background.qml's
+# updatesEnabled guard, for Fedora's old quickshell) was dropped once quickshell
+# 0.3.0 was vendored — vendoring fixed the root cause. What the stack does carry
+# is a small set of shell FEATURE patches (see CARRIED below): deliberate
+# behaviour changes pending upstreaming, not Fedora gating. They are exempt from
+# the additive-only rule but must be listed with a rationale so the divergence
+# stays documented; the audit still reports how many upstream lines each drops.
 #
 # Maintenance: when you add a NEW gated relocation that deletes an upstream line,
 # add the deleted line text to ALLOW["<path>"] below with a one-line note. When
@@ -144,6 +147,20 @@ ALLOW["default/omarchy/omarchy-menu.jsonc"]='  "install.aur": {"icon":"󰣇","la
 # Modified upstream files = files that differ from the pin AND exist on the pin
 # (so omedora-ADDED files like bin/omedora-* are out of scope — they have no
 # upstream to diverge from).
+# --- carried feature patches -------------------------------------------------
+# Files Omedora changes ON PURPOSE beyond the port: shell features developed here
+# and not (yet) merged upstream. Keyed by path; the value is the rationale that
+# shows up in the audit output. Unwind an entry when the feature lands upstream
+# (the next pin then carries it and the file drops out of the modified set —
+# the stale-entry guard below says so).
+declare -A CARRIED
+CARRIED["shell/plugins/bar/Bar.qml"]='bar keyboard navigation: a focus ring over the bar icons'
+CARRIED["shell/Ui/PanelKeyCatcher.qml"]='XF86Back handling: up one menu level, close at root'
+CARRIED["shell/plugins/menu/MenuModel.js"]='menu search tolerates dictated punctuation and filler words; XF86Back handling'
+CARRIED["shell/plugins/panels/bluetooth/Model.js"]='Bluetooth panel: rename a device, show its friendly name, match either name'
+CARRIED["shell/plugins/panels/bluetooth/Panel.qml"]='Bluetooth panel: rename a device, show its friendly name'
+CARRIED["test/shell.d/bluetooth-test.sh"]='tests for the Bluetooth rename / friendly-name feature'
+
 modified_upstream=()
 while IFS= read -r f; do
   [[ -n $f ]] || continue
@@ -172,6 +189,11 @@ allowed() {
 
 violations=0
 for f in "${modified_upstream[@]}"; do
+  if [[ -n ${CARRIED[$f]:-} ]]; then
+    n=$(deleted_lines "$f" | grep -c . || true)
+    pass "$f: carried feature patch, $n deleted upstream line(s) — ${CARRIED[$f]}"
+    continue
+  fi
   blob="${ALLOW[$f]:-}"
   file_bad=0
   bad_lines=()
@@ -207,6 +229,13 @@ for f in "${!ALLOW[@]}"; do
   for m in "${modified_upstream[@]}"; do [[ "$m" == "$f" ]] && found=1 && break; done
   if (( ! found )); then
     echo "# WARNING: allowlist has a stale entry (file no longer modified vs pin): $f" >&2
+  fi
+done
+for f in "${!CARRIED[@]}"; do
+  found=0
+  for m in "${modified_upstream[@]}"; do [[ "$m" == "$f" ]] && found=1 && break; done
+  if (( ! found )); then
+    echo "# WARNING: CARRIED has a stale entry (file no longer modified vs pin — feature upstreamed?): $f" >&2
   fi
 done
 
