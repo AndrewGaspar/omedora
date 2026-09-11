@@ -264,6 +264,10 @@ unset OMEDORA_PLAN_FORCE_NONINTERACTIVE OMEDORA_PLAN_AUTOCONFIRM
 assert_equals "P3: autoconfirmed disclosure run proceeds" "$PLAN_RC" "0"
 assert_output_contains "P3: dnf transaction disclosed" "$PLAN_OUT" "dnf install"
 assert_output_contains "P3: a real base package is in the transaction" "$PLAN_OUT" "btop"
+assert_output_contains "P3: docker's Fedora names are in the transaction on a clean machine" \
+  "$PLAN_OUT" "moby-engine"
+assert_output_lacks "P3: a clean machine has nothing to keep" \
+  "$PLAN_OUT" "kept (never replaced or removed)"
 assert_output_contains "P3: skip-mapped packages disclosed" "$PLAN_OUT" "ufw"
 assert_output_contains "P3: omedora COPR disclosed" "$PLAN_OUT" "omedora-4"
 assert_output_contains "P3: RPM Fusion disclosed" "$PLAN_OUT" "RPM Fusion"
@@ -279,6 +283,33 @@ assert_output_contains "P3: lock-screen PAM addition disclosed" \
 assert_output_contains "P3: never-touch list disclosed" "$PLAN_OUT" "NEVER touched"
 assert_output_contains "P3: git identity protection disclosed" \
   "$PLAN_OUT" "git/config: never touched"
+
+# The same disclosure on a machine that already runs Docker CE (issue #6):
+# fedora.toml's satisfied_by keeps it, and the plan says so up front instead
+# of dying later on moby-engine's Conflicts. rpm reports only docker-ce.
+P3D_BIN="$SCRATCH/P3-docker-bin"; mkdir -p "$P3D_BIN"
+printf '#!/bin/bash\n[[ $1 == "-q" && $2 == "docker-ce" ]]\n' >"$P3D_BIN/rpm"; chmod +x "$P3D_BIN/rpm"
+gate_home P3docker
+unset OMEDORA_PLAN_SKIP_PKGS
+export OMEDORA_PLAN_FORCE_NONINTERACTIVE=1 OMEDORA_PLAN_AUTOCONFIRM=1
+export OMEDORA_REPOQUERY_CMD="printf ''"
+_SAVED_PATH="$PATH"; export PATH="$P3D_BIN:$PATH"
+run_gate
+export PATH="$_SAVED_PATH"
+export OMEDORA_PLAN_SKIP_PKGS=1
+unset OMEDORA_PLAN_FORCE_NONINTERACTIVE OMEDORA_PLAN_AUTOCONFIRM OMEDORA_REPOQUERY_CMD
+assert_equals "P3-docker: disclosure run with Docker CE installed proceeds" "$PLAN_RC" "0"
+assert_output_contains "P3-docker: existing Docker CE is disclosed as kept" \
+  "$PLAN_OUT" "already installed here and kept (never replaced or removed)"
+assert_output_contains "P3-docker: the kept line names the provider and the skipped names" \
+  "$PLAN_OUT" "docker-ce: it satisfies 'docker', so moby-engine docker-cli will not be installed"
+# docker-ce implies docker-ce-cli on a real machine; the stub reports only
+# docker-ce, so buildx/compose stay in the transaction here — and moby-engine
+# and docker-cli must be out of it (only the kept line may mention them).
+dnf_only="$(printf '%s\n' "$PLAN_OUT" | grep -v 'will not be installed')"
+assert_output_lacks "P3-docker: moby-engine is out of the dnf transaction" "$dnf_only" "moby-engine"
+assert_output_lacks "P3-docker: docker-cli is out of the dnf transaction" "$dnf_only" "docker-cli"
+assert_output_contains "P3-docker: the rest of the base set still installs" "$PLAN_OUT" "btop"
 
 # ===========================================================================
 echo "# --- PART 4: proceed -> apply actually backs up ---"

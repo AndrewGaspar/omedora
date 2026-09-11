@@ -109,6 +109,34 @@ assert "no grok-bot RPM" in entry.get("reason", ""), "grok-bot skip needs a dura
 PY
 pass "Quattro's optional grok-bot menu package is explicitly skip-mapped"
 
+python3 - "$ROOT/install/packages/fedora.toml" <<'PY'
+import sys
+import tomllib
+
+with open(sys.argv[1], "rb") as file:
+  package_map = tomllib.load(file)
+
+# Issue #6: Fedora's moby-engine Conflicts with docker-ce/docker-ee and its
+# docker-cli with podman-docker; docker-buildx Requires docker-cli and
+# docker-compose Conflicts with docker-compose-plugin. An existing Docker
+# stack must satisfy all three base entries so the install keeps it.
+expected = {
+  "docker": (["moby-engine", "docker-cli"], {"docker-ce", "docker-ee", "podman-docker"}),
+  "docker-buildx": (["docker-buildx"], {"docker-buildx-plugin", "docker-ce-cli", "docker-ee-cli", "podman-docker"}),
+  "docker-compose": (["docker-compose"], {"docker-compose-plugin", "docker-ce-cli", "docker-ee-cli"}),
+}
+for package, (names, providers) in expected.items():
+  entry = package_map.get(package)
+  assert entry is not None, f"{package} is missing from the Fedora package map"
+  assert entry.get("source") == "dnf", f"{package} should resolve through dnf"
+  assert entry.get("names") == names, (
+    f"{package} should resolve to {names}, got {entry.get('names')}"
+  )
+  missing = providers - set(entry.get("satisfied_by", []))
+  assert not missing, f"{package} must be satisfied_by {sorted(missing)}"
+PY
+pass "Docker entries are satisfied by an existing Docker CE / podman-docker install (#6)"
+
 # --- Valid fixtures: one of each tier --------------------------------------
 
 valid=$(write_map valid '
