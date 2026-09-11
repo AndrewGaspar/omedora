@@ -64,6 +64,10 @@ class Entry:
     copr: str = ""
     app_id: str = ""
     reason: str = ""
+    # RPMs that, when installed, already satisfy this entry — another provider
+    # of the same software, or a package that Conflicts with `names` and must
+    # be kept (docker-ce for the moby-engine mapping). See packages.md §2.
+    satisfied_by: list[str] = field(default_factory=list)
 
     @classmethod
     def from_map(cls, package: str, raw: dict | None) -> "Entry":
@@ -76,7 +80,12 @@ class Entry:
             copr=str(raw.get("copr", "")),
             app_id=str(raw.get("app_id", "")),
             reason=str(raw.get("reason", "")),
+            satisfied_by=[str(n) for n in raw.get("satisfied_by", [])],
         )
+
+    def targets(self) -> list[str]:
+        """What `add` would install for this entry (RPM names or the app id)."""
+        return [self.app_id] if self.source == "flathub" else self.names
 
 
 def load_map(path: Path) -> dict[str, dict]:
@@ -149,16 +158,36 @@ def is_installed_flatpak(app_id: str) -> bool:
     return result.returncode == 0
 
 
-def is_entry_installed(entry: Entry) -> bool:
-    if entry.source == "skip":
-        # Skip entries are treated as "always installed" so they don't trip
-        # missing-checks. They're effectively no-ops.
-        return True
+def installed_provider(entry: Entry) -> str | None:
+    """The first installed `satisfied_by` RPM, or None.
+
+    Such a package is the user's own (their Docker CE, say). Omedora never
+    installs, removes, or replaces it: while it is present the entry simply
+    counts as installed.
+    """
+    for name in entry.satisfied_by:
+        if is_installed_rpm(name):
+            return name
+    return None
+
+
+def targets_installed(entry: Entry) -> bool:
+    """True when the entry's own install targets are all present."""
     if entry.source in ("dnf", "copr"):
         return all(is_installed_rpm(n) for n in entry.names) if entry.names else False
     if entry.source == "flathub":
         return is_installed_flatpak(entry.app_id)
     return False
+
+
+def is_entry_installed(entry: Entry) -> bool:
+    if entry.source == "skip":
+        # Skip entries are treated as "always installed" so they don't trip
+        # missing-checks. They're effectively no-ops.
+        return True
+    if installed_provider(entry) is not None:
+        return True
+    return targets_installed(entry)
 
 
 # ---------------------------------------------------------------------------
@@ -187,10 +216,15 @@ def cmd_add(entries: list[Entry], args: argparse.Namespace) -> int:
     coprs_to_enable: set[str] = set()
     flathub_ids: list[str] = []
     skipped: list[Entry] = []
+    satisfied: list[tuple[Entry, str]] = []
 
     for entry in entries:
         if entry.source == "skip":
             skipped.append(entry)
+            continue
+        provider = installed_provider(entry)
+        if provider is not None:
+            satisfied.append((entry, provider))
             continue
         if is_entry_installed(entry):
             continue
@@ -206,6 +240,14 @@ def cmd_add(entries: list[Entry], args: argparse.Namespace) -> int:
 
     for entry in skipped:
         warn(f"skipping '{entry.package}' on Fedora: {entry.reason or 'no reason given'}")
+
+    # One line per kept provider. omedora/install/plan.sh parses the
+    # "Keeping installed " prefix to disclose these at the plan gate.
+    for entry, provider in satisfied:
+        info(
+            f"Keeping installed {provider}: it satisfies '{entry.package}', "
+            f"so {' '.join(entry.targets())} will not be installed"
+        )
 
     # Enable COPRs first (idempotent).
     for copr in sorted(coprs_to_enable):
@@ -270,7 +312,9 @@ def cmd_drop(entries: list[Entry], args: argparse.Namespace) -> int:
     for entry in entries:
         if entry.source == "skip":
             continue
-        if not is_entry_installed(entry):
+        # Only the entry's own targets are ever removed. A satisfied_by
+        # provider is the user's package, never omedora's to drop.
+        if not targets_installed(entry):
             continue
         if entry.source in ("dnf", "copr"):
             dnf_names.extend(entry.names)
