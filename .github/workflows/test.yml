@@ -88,6 +88,9 @@ jobs:
       - name: Run migration-gating test
         run: bash test/migration-gating-test.sh
 
+      - name: Run lock-pam-migration test
+        run: bash test/lock-pam-migration-test.sh
+
       - name: Run voxtype-install test
         run: bash test/voxtype-install-test.sh
 
