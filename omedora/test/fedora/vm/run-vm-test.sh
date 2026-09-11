@@ -417,6 +417,7 @@ run_session_tests() {
   # run each test inside the user's graphical session (real XDG_RUNTIME_DIR/bus).
   vmssh 'rm -rf ~/vm-suite && mkdir -p ~/vm-suite/tests ~/vm-suite/fixtures' || die "mk suite dir failed"
   vmscp "$HEADLESS_DIR/lib.sh"          "$VM_USER@127.0.0.1:vm-suite/lib.sh"
+  vmscp "$REPO/test/helpers.sh"         "$VM_USER@127.0.0.1:vm-suite/helpers.sh"
   vmscp -r "$HEADLESS_DIR/tests/."      "$VM_USER@127.0.0.1:vm-suite/tests/"
   [[ -d "$HEADLESS_DIR/fixtures" ]] && vmscp -r "$HEADLESS_DIR/fixtures/." "$VM_USER@127.0.0.1:vm-suite/fixtures/"
   vmscp "$HERE/in-vm/run-suite-in-session.sh" "$VM_USER@127.0.0.1:vm-suite/run-suite-in-session.sh"
