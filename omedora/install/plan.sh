@@ -10,7 +10,9 @@
 #      Flathub user remote)
 #   2. the dnf/flatpak package transaction (omedora + omedora-settings, plus
 #      install/omarchy-base.packages resolved through bin/fedora/pkg.py in
-#      dry-run mode)
+#      dry-run mode; packages the user already has that satisfy a base entry,
+#      such as an existing Docker CE, are disclosed as kept — see
+#      `satisfied_by` in install/packages/fedora.toml)
 #   3. the per-file config classification omedora-adopt-user will apply over
 #      $HOME (via omedora-seed-config --plan against the CLONED repo's config/
 #      tree — at gate time omedora-settings isn't installed yet, so /etc/skel
@@ -74,6 +76,7 @@ fi
 plan_dnf_names=""
 plan_flatpak_ids=""
 plan_skips=""
+plan_kept=""
 if [[ -z ${OMEDORA_PLAN_SKIP_PKGS:-} ]]; then
   base_pkgs=()
   while IFS= read -r line; do
@@ -92,6 +95,10 @@ if [[ -z ${OMEDORA_PLAN_SKIP_PKGS:-} ]]; then
     sed -n 's/^Installing via flatpak: //p' | tr '\n' ' ' || true)"
   plan_skips="$(printf '%s\n' "$pkg_out" | grep "skipping '" |
     sed "s/omedora-pkg: skipping '\([^']*\)'.*/\1/" | tr '\n' ' ' || true)"
+  # One line per installed package that satisfies a base entry (pkg.py's
+  # "Keeping installed <rpm>: it satisfies '<pkg>', so <names> will not be
+  # installed"), e.g. a user's Docker CE standing in for moby-engine.
+  plan_kept="$(printf '%s\n' "$pkg_out" | sed -n 's/^Keeping installed //p' || true)"
 fi
 
 # --- 3. config plan: what adopt would back up / create (writes nothing) ------
@@ -147,6 +154,10 @@ omedora_plan_summary() {
       echo "      • flatpak install (--user): $plan_flatpak_ids"
     [[ -n ${plan_skips// /} ]] &&
       echo "      • skipped on Fedora (see install/packages/fedora.toml): $plan_skips"
+    if [[ -n $plan_kept ]]; then
+      echo "      • already installed here and kept (never replaced or removed):"
+      printf '%s\n' "$plan_kept" | sed 's/^/          /'
+    fi
   fi
   echo
   echo -e "\033[1m  Your configs (omedora-adopt-user, backup-then-write):\033[0m"
