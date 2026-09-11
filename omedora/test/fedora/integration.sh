@@ -89,6 +89,65 @@ fi
 omarchy-pkg-drop fd >/tmp/pkg-drop-translated.out 2>&1
 assert_dnf_not_installed "omarchy-pkg-drop removes translated fd-find" fd-find
 
+# sof-firmware has no Fedora package of that name; migrations/1784401744.sh
+# reaches it through omarchy-pkg-add on Intel audio hardware and used to abort
+# `omedora update` (issue #10). The map must translate it to alsa-sof-firmware
+# and treat an existing alsa-sof-firmware install as present.
+dnf -y remove alsa-sof-firmware >/dev/null 2>&1 || true
+assert_dnf_not_installed "alsa-sof-firmware starts absent" alsa-sof-firmware
+sof_dry_run=$(OMARCHY_PKG_DRY_RUN=1 omarchy-pkg-add sof-firmware 2>&1)
+assert_output_contains "sof-firmware dry-run resolves to alsa-sof-firmware" \
+  "$sof_dry_run" "dnf install -y --setopt=install_weak_deps=False alsa-sof-firmware"
+assert_output_lacks "sof-firmware dry-run never passes the Arch name to dnf" \
+  "$sof_dry_run" "install_weak_deps=False sof-firmware"
+if omarchy-pkg-missing sof-firmware; then
+  pass "translated sof-firmware starts missing when alsa-sof-firmware is absent"
+else
+  fail "translated sof-firmware starts missing when alsa-sof-firmware is absent"
+fi
+
+if dnf -y install --setopt=install_weak_deps=False alsa-sof-firmware >/tmp/sof-install.out 2>&1; then
+  assert_dnf_installed "real dnf installs alsa-sof-firmware" alsa-sof-firmware
+else
+  cat /tmp/sof-install.out >&2
+  fail "real dnf installs alsa-sof-firmware"
+fi
+if omarchy-pkg-missing sof-firmware; then
+  fail "translated sof-firmware is not missing once alsa-sof-firmware is installed"
+else
+  pass "translated sof-firmware is not missing once alsa-sof-firmware is installed"
+fi
+
+# Log every dnf invocation omarchy-pkg-add makes (sudo passthrough keeps PATH
+# so the logging shim is what `sudo dnf` reaches) and confirm no transaction.
+mkdir -p /tmp/sof-bin
+cat >/tmp/sof-bin/sudo <<'EOF'
+#!/bin/bash
+exec "$@"
+EOF
+cat >/tmp/sof-bin/dnf <<'EOF'
+#!/bin/bash
+printf '%s\n' "$*" >>/tmp/sof-dnf.log
+exec /usr/bin/dnf "$@"
+EOF
+chmod +x /tmp/sof-bin/sudo /tmp/sof-bin/dnf
+: >/tmp/sof-dnf.log
+if PATH="/tmp/sof-bin:$PATH" omarchy-pkg-add sof-firmware >/tmp/sof-add.out 2>&1; then
+  pass "omarchy-pkg-add sof-firmware succeeds when alsa-sof-firmware is installed"
+else
+  cat /tmp/sof-add.out >&2
+  fail "omarchy-pkg-add sof-firmware succeeds when alsa-sof-firmware is installed"
+fi
+if [[ -s /tmp/sof-dnf.log ]]; then
+  cat /tmp/sof-dnf.log >&2
+  fail "omarchy-pkg-add sof-firmware performs no dnf transaction when already installed"
+else
+  pass "omarchy-pkg-add sof-firmware performs no dnf transaction when already installed"
+fi
+
+dnf -y remove alsa-sof-firmware >/tmp/sof-remove.out 2>&1
+assert_dnf_not_installed "alsa-sof-firmware is removed again" alsa-sof-firmware
+
 skip_output=$(omarchy-pkg-add ufw grok-bot 2>&1)
 assert_output_contains "ufw is explicitly skipped" "$skip_output" "skipping 'ufw'"
 assert_output_contains "grok-bot is explicitly skipped" "$skip_output" "skipping 'grok-bot'"

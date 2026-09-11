@@ -50,6 +50,7 @@ expected = {
   "quickshell-git": ["quickshell"],
   "mise-bin": ["mise"],
   "qt6-imageformats": ["qt6-qtimageformats"],
+  "sof-firmware": ["alsa-sof-firmware"],
   "vulkan-intel": ["mesa-vulkan-drivers"],
   "vulkan-radeon": ["mesa-vulkan-drivers"],
 }
@@ -62,6 +63,37 @@ for package, names in expected.items():
   )
 PY
 pass "Quattro base additions have explicit Fedora dnf mappings"
+
+# migrations/1784401744.sh backfills hardware packages through omarchy-pkg-add.
+# Every name it can reach must resolve on Fedora as an explicit dnf mapping or
+# an explicit skip; an unmapped name falls through to the literal Arch name and
+# aborts `omedora update` (issue #10, sof-firmware).
+python3 - "$ROOT/install/packages/fedora.toml" "$ROOT/migrations/1784401744.sh" <<'PY'
+import re
+import sys
+import tomllib
+
+with open(sys.argv[1], "rb") as file:
+  package_map = tomllib.load(file)
+with open(sys.argv[2]) as file:
+  migration = file.read()
+
+hardware = re.findall(r"hardware_packages\+=\(([^)]+)\)", migration)
+assert hardware == ["sof-firmware", "vulkan-intel", "vulkan-radeon", "vulkan-asahi"], (
+  f"unexpected hardware package list in migration: {hardware}"
+)
+for package in hardware:
+  entry = package_map.get(package)
+  assert entry is not None, f"{package} is unmapped; dnf would try the literal Arch name"
+  source = entry.get("source")
+  if source == "skip":
+    assert entry.get("reason"), f"{package} skip needs a reason"
+  else:
+    assert source == "dnf", f"{package} should resolve through dnf or skip, got {source}"
+    assert entry.get("names"), f"{package} dnf mapping needs Fedora names"
+    assert package not in entry["names"], f"{package} maps to its own Arch name"
+PY
+pass "migration 1784401744 hardware packages all resolve on Fedora"
 
 python3 - "$ROOT/install/packages/fedora.toml" <<'PY'
 import sys
