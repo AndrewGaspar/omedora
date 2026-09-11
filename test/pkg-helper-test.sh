@@ -208,6 +208,45 @@ else
   fail "Fedora 45 applies since/until package-map bounds"
 fi
 
+# --- real map: sof-firmware translates to alsa-sof-firmware (issue #10) ---
+# migrations/1784401744.sh, install/hardware/intel/sof-firmware.sh and
+# bin/omarchy-upgrade-to-quattro all reach `omarchy-pkg-add sof-firmware`.
+# Fedora has no package by that name; the map must translate it so the
+# migration installs alsa-sof-firmware, and sees it as present once installed.
+
+REAL_MAP="$ROOT/install/packages/fedora.toml"
+
+set +e
+MOCK_RPM_INSTALLED="alsa-sof-firmware" OMARCHY_FEDORA_MAP="$REAL_MAP" \
+  "$ROOT/bin/omarchy-pkg-missing" sof-firmware >/dev/null 2>&1
+exit_code=$?
+set -e
+assert_equals "pkg-missing sof-firmware → exit 1 when alsa-sof-firmware is installed" "$exit_code" "1"
+
+reset_log
+MOCK_RPM_INSTALLED="alsa-sof-firmware" OMARCHY_FEDORA_MAP="$REAL_MAP" \
+  "$ROOT/bin/omarchy-pkg-add" sof-firmware >/dev/null 2>&1 || true
+if log_lacks "dnf install"; then
+  pass "pkg-add sof-firmware → no dnf install when alsa-sof-firmware is installed"
+else
+  cat "$MOCK_LOG" >&2
+  fail "pkg-add sof-firmware → unexpectedly tried to install"
+fi
+
+set +e
+OMARCHY_FEDORA_MAP="$REAL_MAP" "$ROOT/bin/omarchy-pkg-missing" sof-firmware >/dev/null 2>&1
+exit_code=$?
+set -e
+assert_equals "pkg-missing sof-firmware → exit 0 when alsa-sof-firmware is absent" "$exit_code" "0"
+
+reset_log
+output=$(OMARCHY_PKG_DRY_RUN=1 OMARCHY_FEDORA_MAP="$REAL_MAP" \
+  "$ROOT/bin/omarchy-pkg-add" sof-firmware 2>&1 || true)
+assert_output_contains "pkg-add sof-firmware dry-run installs alsa-sof-firmware" \
+  "$output" "sudo dnf install -y --setopt=install_weak_deps=False alsa-sof-firmware"
+assert_output_lacks "pkg-add sof-firmware dry-run never passes the Arch name to dnf" \
+  "$output" "install_weak_deps=False sof-firmware"
+
 # --- omarchy-pkg-drop: dnf remove for installed dnf package ---
 
 reset_log
