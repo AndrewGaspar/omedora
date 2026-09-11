@@ -44,7 +44,7 @@
 Name:           omedora-settings
 # Version is normally read from the repo's omedora/version file; hardcoded here
 # for now — a follow-up wires .copr/srpm.sh to substitute it at SRPM-gen time.
-Version:        0.2.0~beta.3
+Version:        0.2.0~beta.5
 Release:        1%{?dist}
 Summary:        Omedora pre-install settings: /etc/skel seeds, system defaults, fonts, branding
 
