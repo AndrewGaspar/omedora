@@ -18,7 +18,7 @@ Usage:
 
 Validates install/packages/fedora.toml against the schema documented in
 omedora/packages.md. Reports unknown source values, missing required keys
-per source, un-allowlisted COPRs, and invalid
+per source, un-allowlisted COPRs, malformed satisfied_by lists, and invalid
 since/until ranges.
 
 Honors:
@@ -116,6 +116,18 @@ for pkg, entry in data.items():
         if not isinstance(reason, str) or not reason:
             err(pkg, "source='skip' requires 'reason' string")
 
+    # satisfied_by: RPMs whose presence marks the entry as already satisfied
+    # (see omedora/packages.md §2). Shape only — the names are user packages
+    # from any repo, so there is nothing to resolve them against here.
+    satisfied_by = entry.get("satisfied_by")
+    if satisfied_by is not None:
+        if source == "skip":
+            err(pkg, "'satisfied_by' is meaningless with source='skip' (skip entries always count as installed)")
+        if not isinstance(satisfied_by, list) or not satisfied_by:
+            err(pkg, "'satisfied_by' must be a non-empty array of RPM names")
+        elif not all(isinstance(n, str) and n for n in satisfied_by):
+            err(pkg, "'satisfied_by' names must be non-empty strings")
+
     # since / until range validation (independent of source)
     since = entry.get("since")
     until = entry.get("until")
@@ -135,7 +147,7 @@ for pkg, entry in data.items():
             pass
 
     # Unknown keys (typo catcher)
-    known_keys = {"source", "names", "copr", "app_id", "reason", "since", "until"}
+    known_keys = {"source", "names", "copr", "app_id", "reason", "satisfied_by", "since", "until"}
     extra = set(entry.keys()) - known_keys
     for k in sorted(extra):
         warn(pkg, f"unknown key '{k}' (ignored)")

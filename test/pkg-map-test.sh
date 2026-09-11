@@ -115,6 +115,7 @@ valid=$(write_map valid '
 [dnf-pkg]
 source = "dnf"
 names = ["dnf-pkg-fedora"]
+satisfied_by = ["dnf-pkg-vendor", "dnf-pkg-shim"]
 
 [copr-pkg]
 source = "copr"
@@ -265,6 +266,54 @@ since = "future"
 
 output=$(run_validator "$non_numeric_bound" || true)
 assert_output_contains "a lone non-numeric since bound fails" "$output" "must be a numeric string"
+
+# --- satisfied_by must be a non-empty list of non-empty strings ------------
+
+satisfied_scalar=$(write_map satisfied-scalar '
+[pkg]
+source = "dnf"
+names = ["pkg"]
+satisfied_by = "pkg-vendor"
+')
+
+assert_exit_code "satisfied_by as a bare string exits 1" 1 \
+  env OMARCHY_FEDORA_MAP="$satisfied_scalar" "$VALIDATOR"
+output=$(run_validator "$satisfied_scalar" || true)
+assert_output_contains "satisfied_by as a bare string surfaces error" \
+  "$output" "'satisfied_by' must be a non-empty array"
+
+satisfied_empty=$(write_map satisfied-empty '
+[pkg]
+source = "dnf"
+names = ["pkg"]
+satisfied_by = []
+')
+
+output=$(run_validator "$satisfied_empty" || true)
+assert_output_contains "empty satisfied_by list fails" \
+  "$output" "'satisfied_by' must be a non-empty array"
+
+satisfied_blank=$(write_map satisfied-blank '
+[pkg]
+source = "dnf"
+names = ["pkg"]
+satisfied_by = ["pkg-vendor", ""]
+')
+
+output=$(run_validator "$satisfied_blank" || true)
+assert_output_contains "satisfied_by with an empty string fails" \
+  "$output" "'satisfied_by' names must be non-empty strings"
+
+satisfied_skip=$(write_map satisfied-skip '
+[pkg]
+source = "skip"
+reason = "fixture"
+satisfied_by = ["pkg-vendor"]
+')
+
+output=$(run_validator "$satisfied_skip" || true)
+assert_output_contains "satisfied_by on a skip entry fails" \
+  "$output" "meaningless with source='skip'"
 
 # --- unknown key warns but does not fail -----------------------------------
 

@@ -66,6 +66,7 @@ The map is one TOML table per Arch package. **Absence from the map ⇒ Fedora-ma
 | `copr` | string | `source = "copr"` | The third-party COPR identifier (`owner/repo`) to enable before install. Must be on the allowlist (see [§7](#7-review-checklist)). |
 | `app_id` | string | `source = "flathub"` | The Flathub app ID, e.g., `md.obsidian.Obsidian`. |
 | `reason` | string | `source = "skip"`; recommended elsewhere when the choice isn't obvious | One-line explanation. Lives in the file so reviewers and agents understand intent. For omedora-repo packages, the `reason` is where we note that the name resolves to one of our RPMs rather than a Fedora-shipped one. |
+| `satisfied_by` | array of string | optional; not with `source = "skip"` | RPM names that already cover this entry when installed — another provider of the same software, or a package that `Conflicts` with `names` and must be kept (e.g. `docker-ce` for `[docker]`'s `moby-engine`). If **any** is installed the entry counts as installed: `missing`/`present` report it present, `add` skips it with one line naming the installed package, `drop` never removes it, and the managed update omits `names`. Omedora never installs, removes, or replaces a `satisfied_by` package; the list is only consulted, never resolved against a repo. |
 | `since` | string | optional | Fedora version where this entry first applies (inclusive, e.g. `"44"`). Outside the range the table is an intentional no-op, not an absent mapping. |
 | `until` | string | optional | Fedora version where this entry stops applying (exclusive). Outside the range the table is an intentional no-op, not an unchanged-name fallback. |
 
@@ -189,6 +190,10 @@ for each package_name in args:
     treat the entry as an intentional no-op
     continue
 
+  if any rpm in entry.satisfied_by is installed:
+    log "Keeping installed <rpm>: it satisfies <package_name>, so <names> will not be installed"
+    continue
+
   case entry.source:
     dnf:
       # Resolves from Fedora main, RPM Fusion, OR the omedora repo —
@@ -218,6 +223,12 @@ Notes:
   version bounds only for conditional omission; it cannot express a different
   fallback mapping outside the range.
 - Resolution is identical whether a `dnf` name lives in Fedora main or the Omedora COPR. The Omedora COPR only has to be *enabled* for the second case to work — see [§4](#4-the-rpmcopr-tier-omedorapackagingcopr) and [§5](#5-local-repositories-in-tests).
+- A `satisfied_by` provider is detected with `rpm -q` on the live system, so the
+  same map yields a different transaction on a machine that already runs Docker
+  CE (or `podman-docker`) than on a clean one. The plan gate
+  (`omedora/install/plan.sh`) surfaces every kept provider before anything is
+  installed, and `bin/fedora/managed_packages.py` applies the same rule so
+  `omedora update` never pulls the conflicting `names` in later.
 
 ---
 
@@ -368,6 +379,7 @@ The shipped `omarchy dev validate-fedora-packages` command parses
 - Entries with `source = "dnf"` whose `names` field is empty.
 - Entries with `source = "flathub"` whose `app_id` is empty.
 - Entries with `source = "skip"` missing `reason`.
+- Entries whose `satisfied_by` is not a non-empty array of non-empty strings, or that pair it with `source = "skip"`.
 - Entries with `since`/`until` that don't form a valid range.
 
 The validator runs in L1 and CI as part of the rebase verification step (see
