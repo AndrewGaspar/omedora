@@ -118,6 +118,9 @@ jobs:
       - name: Run ttfx-spec static guard
         run: bash test/ttfx-spec-test.sh
 
+      - name: Run mise-spec static guard
+        run: bash test/mise-spec-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 
