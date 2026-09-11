@@ -102,7 +102,20 @@ names = ["libpq"]
 [docker]
 source = "dnf"
 names = ["moby-engine", "docker-cli"]
-reason = "Fedora ships moby-engine + docker-cli in main repos as the libre Docker stack. Docker CE from Docker's own repo is also an option but adds a third-party repo we don't need."
+satisfied_by = ["docker-ce", "docker-ee", "podman-docker"]
+reason = "Fedora ships moby-engine + docker-cli in main repos as the libre Docker stack. Docker CE from Docker's own repo is also an option but adds a third-party repo we don't need. moby-engine Conflicts with docker-ce/docker-ee and docker-cli Conflicts with podman-docker, so an existing Docker install satisfies this entry and is kept instead of aborting the dnf transaction (#6)."
+
+[docker-buildx]
+source = "dnf"
+names = ["docker-buildx"]
+satisfied_by = ["docker-buildx-plugin", "docker-ce-cli", "docker-ee-cli", "podman-docker"]
+reason = "Same name in Fedora main; the entry exists for satisfied_by. Fedora's docker-buildx Requires docker-cli (which Conflicts with docker-ce-cli, docker-ee-cli and podman-docker) and ships the same /usr/libexec/docker/cli-plugins/docker-buildx file as Docker CE's docker-buildx-plugin, so any existing Docker stack already covers it."
+
+[docker-compose]
+source = "dnf"
+names = ["docker-compose"]
+satisfied_by = ["docker-compose-plugin", "docker-ce-cli", "docker-ee-cli"]
+reason = "Same name in Fedora main; the entry exists for satisfied_by. Fedora's docker-compose Conflicts with Docker CE's docker-compose-plugin and Requires (docker-cli or podman-docker), and docker-cli Conflicts with docker-ce-cli/docker-ee-cli. It still installs beside podman-docker, which satisfies that Requires."
 
 [dotnet-runtime]
 source = "dnf"
