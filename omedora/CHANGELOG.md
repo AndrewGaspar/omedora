@@ -1,3 +1,20 @@
+## v0.2.0-beta.5 — 2026-09-11 (Omarchy 4.0.3)
+
+- test(vm): ship the TAP helpers with the suite and name the compositor RPM
+- test(vm): stop sudo -v from prompting the VM test user
+- test(fedora): bring the L3 update and L4 VM gates onto the Omarchy 4 line
+- mise.spec: update to 2026.9.5 so upgrade.auto_prune is a known setting
+- chore(release): prepare core specs at 0.2.0~beta.5
+- byte-identity: record the carried shell feature patches
+- hypxrland.spec: name hyprland-xr.lua, not .conf, in the package description
+- docker: keep an existing Docker CE / podman-docker install (#6)
+- pkg map: add satisfied_by so an installed provider counts as the entry
+- Surface a refused lock in omarchy-system-lock on Fedora
+- Add migration restoring the lock screen PAM service on Fedora
+- ttfx.spec: update to 0.3.2 (stop dumping core when the terminal goes away)
+- port(update): gate omarchy-update-pkg-prune on Fedora
+- Map sof-firmware to alsa-sof-firmware on Fedora
+
 ## v0.2.0-beta.4 — 2026-09-08 (Omarchy 4.0.3)
 
 - voxtype.spec: silence macro-expanded-in-comment warning (line 359)
