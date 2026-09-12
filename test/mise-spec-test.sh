@@ -45,6 +45,13 @@ for f in install/user/mise.sh migrations/1787215483.sh; do
   fi
 done
 
+# --- the payload RPM requires the same floor ---------------------------------
+# omedora.spec pulls the mise it needs in the same dnf transaction as the core
+# RPMs, so the floor lives in two places; keep them equal.
+OMEDORA_SPEC="$ROOT/omedora/packaging/copr/omedora.spec"
+req="$(grep -E '^Requires:\s+mise\s*>=' "$OMEDORA_SPEC" | head -1 | sed -E 's/.*>=\s*//')"
+assert_equals "omedora.spec Requires mise >= $MIN_VERSION" "$req" "$MIN_VERSION"
+
 # --- %changelog top entry matches Version-Release ----------------------------
 top="$(sed -n '/^%changelog/{n;p;q}' "$SPEC")"
 assert_output_contains "top %changelog entry is ${ver}-1" "$top" "- ${ver}-1"
