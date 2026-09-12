@@ -1,3 +1,8 @@
+## v0.2.0-beta.6 — 2026-09-11 (Omarchy 4.0.3)
+
+- chore(release): prepare core specs at 0.2.0~beta.6
+- omedora.spec: require the mise the payload's own scripts need
+
 ## v0.2.0-beta.5 — 2026-09-11 (Omarchy 4.0.3)
 
 - test(vm): ship the TAP helpers with the suite and name the compositor RPM
