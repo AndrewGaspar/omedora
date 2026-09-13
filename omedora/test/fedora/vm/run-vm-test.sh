@@ -332,12 +332,17 @@ do_install() {
   # path; the interactive/expect path is exercised separately by --stage install
   # with a PTY (TODO, see README "Interactive path"). OMARCHY_NONINTERACTIVE is
   # kept for the Arch-inherited leaves that still read it.
+  # OMEDORA_SETUP_FROM_REPO: install-4.sh's dev/test seam — run system setup and
+  # finalize from the synced checkout instead of the installed RPM payload, so a
+  # setup change can be exercised before the COPR is rebuilt. Forwarded from the
+  # host environment; empty (the default) keeps the RPM path.
   # -tt PTY: the bootstrap's sudo guard wants a terminal (see vmssh_tty). The
   # in-VM `tee` keeps the full transcript at /tmp/omedora-install.out so the rc
   # we read is the install's, not ssh's PTY-forwarding rc.
   set +e
   vmssh_tty "set -o pipefail; \
-    export OMARCHY_NONINTERACTIVE=1 OMEDORA_PLAN_AUTOCONFIRM=1 OMEDORA_REF='$ref' $fastenv; \
+    export OMARCHY_NONINTERACTIVE=1 OMEDORA_PLAN_AUTOCONFIRM=1 OMEDORA_REF='$ref' \
+      OMEDORA_SETUP_FROM_REPO='${OMEDORA_SETUP_FROM_REPO:-}' $fastenv; \
     bash ~/.local/share/omarchy/omedora/install-4.sh 2>&1 | tee /tmp/omedora-install.out; \
     echo \"INSTALL_RC=\${PIPESTATUS[0]}\" | tee /tmp/omedora-install.rc"
   local rc=$?
