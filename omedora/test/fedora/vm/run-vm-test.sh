@@ -70,6 +70,8 @@ VM_RAM_MB="${OMEDORA_VM_RAM_MB:-4096}"
 VM_VCPUS="${OMEDORA_VM_VCPUS:-4}"
 VM_DISK_GB="${OMEDORA_VM_DISK_GB:-24}"
 SSH_PORT="${OMEDORA_VM_SSH_PORT:-2222}"        # host-forwarded port (passt) -> VM:22
+VM_GRAPHICS="${OMEDORA_VM_GRAPHICS:-vnc,listen=127.0.0.1}"  # e.g. egl-headless,rendernode=/dev/dri/renderD128
+VM_VIDEO="${OMEDORA_VM_VIDEO:-virtio}"                       # e.g. model.type=virtio,model.acceleration.accel3d=yes
 SSH_KEY="$RUN/id_omedora_vmtest"
 OVERLAY="$IMAGES/${VM}-overlay.qcow2"
 SEED_ISO="$IMAGES/${VM}-seed.iso"
@@ -254,8 +256,8 @@ provision() {
     --disk "path=$SEED_ISO,device=cdrom" \
     --os-variant fedora-unknown \
     --network "$netopt" \
-    --graphics vnc,listen=127.0.0.1 \
-    --video virtio \
+    --graphics "$VM_GRAPHICS" \
+    --video "$VM_VIDEO" \
     "${qemu_cmdline_args[@]}" \
     --noautoconsole \
     || die "virt-install failed"

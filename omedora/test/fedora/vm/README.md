@@ -132,6 +132,17 @@ Two complementary approaches; we run **both**.
    `OMEDORA_VM_RES_ALIAS=<alias>` (find it in `virsh dumpxml <vm>` → `<video>
    <alias name='…'/>`).
 
+   **GPU acceleration.** By default the VM gets `--graphics vnc,listen=127.0.0.1
+   --video virtio` (software rendering; the VNC display is what `virsh
+   screenshot` scans out). `OMEDORA_VM_GRAPHICS` and `OMEDORA_VM_VIDEO` override
+   the two virt-install arguments verbatim, e.g.
+   `OMEDORA_VM_GRAPHICS=egl-headless,rendernode=/dev/dri/renderD128
+   OMEDORA_VM_VIDEO=model.type=virtio,model.acceleration.accel3d=yes` gives the
+   session real GL through virgl on a host render node the session user can open.
+   Caveat: `virsh screenshot` reports `no surface` on `egl-headless` (there is
+   no display to scan out), so the host-side framebuffer artifact is skipped
+   with a warning; the in-session grim captures still land in the artifacts.
+
 ## Install path exercised
 
 The orchestrator syncs **this checkout** into the VM at
