@@ -130,7 +130,9 @@ Two complementary approaches; we run **both**.
    libvirt-assigned video alias (not a stable `video0` — a wrong alias makes QEMU
    refuse to boot), so to use it you pass both `OMEDORA_VM_RES=1920x1080` and
    `OMEDORA_VM_RES_ALIAS=<alias>` (find it in `virsh dumpxml <vm>` → `<video>
-   <alias name='…'/>`).
+   <alias name='…'/>`). Once the VM renders at 1920×1080, add
+   `OMEDORA_VM_GEOMETRY_SKIP=0` so the runner stops exporting the SKIP and the
+   goldens produce real pass/fail in this tier.
 
    **GPU acceleration.** By default the VM gets `--graphics vnc,listen=127.0.0.1
    --video virtio` (software rendering; the VNC display is what `virsh

@@ -72,6 +72,7 @@ VM_DISK_GB="${OMEDORA_VM_DISK_GB:-24}"
 SSH_PORT="${OMEDORA_VM_SSH_PORT:-2222}"        # host-forwarded port (passt) -> VM:22
 VM_GRAPHICS="${OMEDORA_VM_GRAPHICS:-vnc,listen=127.0.0.1}"  # e.g. egl-headless,rendernode=/dev/dri/renderD128
 VM_VIDEO="${OMEDORA_VM_VIDEO:-virtio}"                       # e.g. model.type=virtio,model.acceleration.accel3d=yes
+VM_GEOMETRY_SKIP="${OMEDORA_VM_GEOMETRY_SKIP:-1}"            # 0 with OMEDORA_VM_RES=1920x1080: diff the goldens for real
 SSH_KEY="$RUN/id_omedora_vmtest"
 OVERLAY="$IMAGES/${VM}-overlay.qcow2"
 SEED_ISO="$IMAGES/${VM}-seed.iso"
@@ -429,7 +430,7 @@ run_session_tests() {
   # right env, and prints a TAP report. It copies per-test artifacts under
   # ~/vm-suite/artifacts which we pull back on the host.
   set +e
-  vmssh 'bash ~/vm-suite/run-suite-in-session.sh'
+  vmssh "SCREENSHOT_GEOMETRY_SKIP='$VM_GEOMETRY_SKIP' bash ~/vm-suite/run-suite-in-session.sh"
   local rc=$?
   # NOTE: do not re-enable errexit here — this script runs without `set -e`
   # on purpose (stages capture $? and continue); a stray `set -e` would abort
