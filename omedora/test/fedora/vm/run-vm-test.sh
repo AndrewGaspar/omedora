@@ -371,18 +371,26 @@ assert_install() {
 # ---------------------------------------------------------------------------
 start_session() {
   log "selecting omedora.desktop as the autologin session + (re)starting the graphical seat"
+  # Capture the boot id BEFORE scheduling the reboot: select-session.sh detaches
+  # the reboot by ~2s, so a bare "SSH works" probe can succeed on the OLD boot
+  # (and, on re-runs, the Hyprland socket of the OLD session already exists);
+  # the suite would then start right as the reboot lands (rc 255). Waiting for
+  # the boot id to CHANGE removes the race.
+  local boot_before
+  boot_before=$(vmssh 'cat /proc/sys/kernel/random/boot_id' 2>/dev/null)
   vmscp "$HERE/in-vm/select-session.sh" "$VM_USER@127.0.0.1:/tmp/select-session.sh" || die "scp select failed"
   vmssh 'bash /tmp/select-session.sh' || warn "select-session reported issues (continuing)"
 
   # select-session.sh reboots the VM (so GDM autologins into the omedora session
-  # on a fresh seat). SSH drops during the reboot; wait for it to come back, then
+  # on a fresh seat). SSH drops during the reboot; wait for the NEW boot, then
   # poll for the Hyprland IPC socket. The SSH login IS the omedora user (uid
   # 1000), so /run/user/1000/hypr is directly readable — no runuser (which is
   # root-only and was failing).
-  local i
-  log "waiting for SSH to recover after the session reboot..."
+  local i boot_now
+  log "waiting for SSH to recover after the session reboot (boot id change)..."
   for i in $(seq 1 30); do
-    vmssh true 2>/dev/null && break
+    boot_now=$(vmssh 'cat /proc/sys/kernel/random/boot_id' 2>/dev/null)
+    [[ -n "$boot_now" && "$boot_now" != "$boot_before" ]] && break
     sleep 5
   done
 
