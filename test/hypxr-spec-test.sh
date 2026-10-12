@@ -23,12 +23,12 @@ done
 
 grep -qE '^Version:[[:space:]]+0\.56\.2$' "$COPR/hyprland.spec" \
   && pass "stable Hyprland is 0.56.2" || fail "stable Hyprland is 0.56.2"
-grep -qE '^%global commit 67200a838356a206c4819595a2f733299ab4da63$' "$HYPXR" \
+grep -qE '^%global commit 1d704fc1b1b5d1cd3a0ce011e41f4d7b0e4622e2$' "$HYPXR" \
   && pass "HypXRland current branch tip is pinned" || fail "HypXRland current branch tip is pinned"
-grep -qE '^%global snapshot 20260821\.2$' "$HYPXR" \
-  && pass "HypXRland uses the second Aug 21 candidate revision" \
-  || fail "HypXRland uses the second Aug 21 candidate revision"
-grep -qF 'e93c5f7eb7b363d9744641e9368de7025700a9e1c5683392e79af7fc03c68954  hypxrland-67200a838356a206c4819595a2f733299ab4da63.tar.gz' \
+grep -qE '^%global snapshot 20261011\.1$' "$HYPXR" \
+  && pass "HypXRland uses the Oct 11 snapshot revision" \
+  || fail "HypXRland uses the Oct 11 snapshot revision"
+grep -qF '21af6e78032f84872072c2cbb57ddc34e8f8d4208db2be90beb6088ef4103d5e  hypxrland-1d704fc1b1b5d1cd3a0ce011e41f4d7b0e4622e2.tar.gz' \
   "$COPR/hypxrland.spec.sources" \
   && pass "HypXRland current archive checksum is pinned" \
   || fail "HypXRland current archive checksum is pinned"
