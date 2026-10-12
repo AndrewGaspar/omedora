@@ -22,8 +22,8 @@
 # 0.56.x requires 5.5.
 
 %global base_version 0.56.2
-%global snapshot 20260821.2
-%global commit 67200a838356a206c4819595a2f733299ab4da63
+%global snapshot 20261011.1
+%global commit 1d704fc1b1b5d1cd3a0ce011e41f4d7b0e4622e2
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 %global udis86_commit 5336633af70f3917760a6d441ff02d93477b0c86
 %global lua_version 5.5.0
@@ -226,6 +226,12 @@ XDG_RUNTIME_DIR="$runtime_dir" %{__cmake_builddir}/Hyprland --version |
 %{_bindir}/hypxrland-session
 
 %changelog
+* Mon Oct 12 2026 omedora <noreply@omedora> - 0.56.2^20261011.1.git1d704fc1b-1
+- Refresh to the current public hypxrland tip: monitor lease rules under Lua
+  configs, Xwayland restart after a crash, DRM-lease connector lifetime,
+  session-lock focus safety, and the OpenXR tranche-1 primitives. Submodule
+  pins (udis86, monado, hypxrpaper) are unchanged.
+
 * Fri Aug 21 2026 omedora <noreply@omedora> - 0.56.2^20260821.2.git67200a838-1
 - Refresh to the current public hypxrland tip, including cached GPU probing for
   hyprctl systeminfo so repeated queries do not wake a suspended discrete GPU.
