@@ -26,7 +26,7 @@
 # scalable icon + license).
 
 Name:           satty
-Version:        0.21.1
+Version:        0.22.0
 Release:        1%{?dist}
 Summary:        A screenshot annotation tool inspired by Swappy and Flameshot
 
@@ -126,6 +126,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/satty.desktop
 %{_datadir}/icons/hicolor/scalable/apps/satty.svg
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 0.22.0-1
+- Bump to upstream 0.22.0. Cargo vendor regenerated from the new Cargo.lock.
+
 * Tue Jun 16 2026 omedora <noreply@omedora> - 0.21.1-1
 - Bump to upstream 0.21.1. No spec change beyond Version/pin: 0.21.0 moved
   build.rs completion generation to OUT_DIR (a `ci-release` cargo feature
