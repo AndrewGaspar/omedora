@@ -14,7 +14,7 @@
 #
 # Asserts:
 #   - spec + .sources exist
-#   - Version is 0.3.2 and Release is 1%{?dist}; the top %changelog entry
+#   - Version is 0.5.0 and Release is 1%{?dist}; the top %changelog entry
 #     carries the same version-release
 #   - Source0 is the GitHub codeload tag tarball renamed to
 #     %{name}-%{version}.tar.gz (the exact form the .sources pin names)
@@ -44,7 +44,7 @@ name="$(grep -E '^Name:' "$SPEC" | head -1 | awk '{print $2}')"
 assert_equals "Name: ttfx" "$name" "ttfx"
 ver="$(grep -E '^Version:' "$SPEC" | head -1 | awk '{print $2}')"
 [[ -n $ver ]] || fail "spec declares Version:"
-assert_equals "Version: 0.3.2 (omedora#8: the terminal-went-away SIGABRT fix)" "$ver" "0.3.2"
+assert_equals "Version: 0.5.0 (at or above omedora#8's 0.3.2 SIGABRT fix)" "$ver" "0.5.0"
 rel="$(grep -E '^Release:' "$SPEC" | head -1 | awk '{print $2}')"
 assert_equals "Release: 1%{?dist}" "$rel" '1%{?dist}'
 top_changelog="$(sed -n '/^%changelog/,$p' "$SPEC" | grep -E '^\* ' | head -1)"
