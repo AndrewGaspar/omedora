@@ -22,8 +22,8 @@
 # 0.56.x requires 5.5.
 
 %global base_version 0.56.2
-%global snapshot 20261011.1
-%global commit 1d704fc1b1b5d1cd3a0ce011e41f4d7b0e4622e2
+%global snapshot 20261016.1
+%global commit 9097b3c02bc996d8aa4ac348700727877ac4aa39
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 %global udis86_commit 5336633af70f3917760a6d441ff02d93477b0c86
 %global lua_version 5.5.0
@@ -226,6 +226,12 @@ XDG_RUNTIME_DIR="$runtime_dir" %{__cmake_builddir}/Hyprland --version |
 %{_bindir}/hypxrland-session
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 0.56.2^20261016.1.git9097b3c02-1
+- Refresh to the current public hypxrland tip: per-HMD xr_defaults and
+  profiles with auto-named create, don/doff intent with settle/hide/fade,
+  re-seat height fixes, sRGB swapchain output, and the matching Monado
+  submodule bump. Other submodule pins are unchanged.
+
 * Mon Oct 12 2026 omedora <noreply@omedora> - 0.56.2^20261011.1.git1d704fc1b-1
 - Refresh to the current public hypxrland tip: monitor lease rules under Lua
   configs, Xwayland restart after a crash, DRM-lease connector lifetime,

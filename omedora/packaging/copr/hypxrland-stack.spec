@@ -2,7 +2,7 @@
 
 Name:           hypxrland-stack
 Version:        1.1.0
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Complete HypXRland runtime stack for Fedora
 
 License:        MIT
@@ -11,7 +11,7 @@ Source0:        hypxrland-stack.README
 
 BuildArch:      noarch
 
-Requires:       hypxrland >= 0.56.2^20261011.1.git1d704fc1b-1
+Requires:       hypxrland >= 0.56.2^20261016.1.git9097b3c02-1
 Requires:       hypxrcompose >= 0^20260820.1.gitf75ccd4ec-1
 Requires:       hypxrhud >= 0^20260817.1.gitf96d0e794-1
 Requires:       hypxrpaper >= 0^20260704.1.git5cae848cd-1
@@ -19,7 +19,7 @@ Requires:       hypxrva >= 0^20260803.1.gitbba2c5f8b-1
 Requires:       hypxrvoice >= 0^20260812.1.git7ce7d33b2-1
 Requires:       hypxrvoice-model-base-en >= 1.0.0-1
 Requires:       wivrn-hypxr >= 26.6.2^20260820.1.git3729c7b31-1
-Suggests:       monado-xreal >= 25.1.0^20260719.1.git3752d437c-2
+Suggests:       monado-xreal >= 25.1.0^20261016.1.git6e23edfb3-1
 
 %description
 Dependency-only package for the Fedora HypXRland runtime: the parallel
@@ -42,6 +42,10 @@ install -Dpm0644 %{SOURCE0} \
 %doc %{_pkgdocdir}/README
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 1.1.0-3
+- Raise the hypxrland minimum to the Oct 16 snapshot and the monado-xreal
+  suggestion to the matching SLAM-capable snapshot.
+
 * Mon Oct 12 2026 omedora <noreply@omedora> - 1.1.0-2
 - Raise the hypxrland minimum to the Oct 11 snapshot so the stack cannot be
   satisfied by the August compositor.
