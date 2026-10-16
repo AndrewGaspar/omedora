@@ -3,7 +3,7 @@
 %global debug_package %{nil}
 
 Name:           omacalc
-Version:        0.2.2
+Version:        0.3.1
 Release:        1%{?dist}
 Summary:        Dead-simple Qt Quick calculator
 
@@ -59,6 +59,9 @@ popd
 %{_datadir}/icons/hicolor/scalable/apps/omacalc.svg
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 0.3.1-1
+- Bump to upstream 0.3.1.
+
 * Wed Aug 12 2026 omedora <noreply@omedora> - 0.2.2-1
 - Package the Quattro calculator from its immutable upstream release.
 - Ship the desktop entry and icon used by Omarchy's Arch package.
