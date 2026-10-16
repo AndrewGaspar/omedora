@@ -4,7 +4,7 @@
 # hyprland.desktop`); vendoring the Hyprland stack (task #66) means owning uwsm
 # too, so it's built from omedora's own COPR. All BuildRequires are in Fedora main.
 Name:           uwsm
-Version:        0.26.5
+Version:        0.27.1
 Release:        1%{?dist}
 Summary:        Universal Wayland Session Manager
 
@@ -104,6 +104,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/*.desktop
 %{_userunitdir}/wayland-*.target
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 0.27.1-1
+- Bump to upstream 0.27.1.
+
 * Tue Jun 16 2026 Andrew Gaspar <andrew.gaspar@outlook.com> - 0.26.5-1
 - Bump to upstream 0.26.5 (main.py-only change; %%files unchanged).
 
