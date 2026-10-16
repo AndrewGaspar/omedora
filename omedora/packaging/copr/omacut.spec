@@ -18,7 +18,7 @@
 %global debug_package %{nil}
 
 Name:           omacut
-Version:        0.1.2
+Version:        0.7.2
 Release:        1%{?dist}
 Summary:        Dead-simple video length trimmer
 
@@ -92,6 +92,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/omacut.desktop
 %{_datadir}/applications/omacut.desktop
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 0.7.2-1
+- Bump to upstream 0.7.2.
+
 * Fri Jul 03 2026 omedora <noreply@omedora> - 0.1.2-1
 - Initial from-source (qmake6/Qt6) build of omacut, the quattro-line video-trim
   tool (github.com/omacom-io/omacut, MIT).
