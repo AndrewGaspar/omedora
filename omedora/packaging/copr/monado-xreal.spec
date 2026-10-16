@@ -1,12 +1,12 @@
 # monado-xreal.spec — private XREAL Air runtime for HypXRland.
 
-%global snapshot 20260719.1
-%global commit 3752d437c5c0b24df659ac749629ac8ead7e1bae
+%global snapshot 20261016.1
+%global commit 6e23edfb3132ebec89fcd1d791651871675f655f
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 
 Name:           monado-xreal
 Version:        25.1.0^%{snapshot}.git%{shortcommit}
-Release:        2%{?dist}
+Release:        1%{?dist}
 Summary:        HypXRland Monado runtime for XREAL Air displays
 
 License:        BSL-1.0 AND Apache-2.0 AND BSD-3-Clause AND MIT
@@ -18,6 +18,7 @@ Source2:        openxr_monado-xreal.json
 ExclusiveArch:  x86_64
 
 BuildRequires:  cmake
+BuildRequires:  cmake(OpenCV)
 BuildRequires:  cjson-devel
 BuildRequires:  eigen3-devel
 BuildRequires:  gcc
@@ -54,6 +55,11 @@ This package builds the HypXRland-pinned Monado fork as an XREAL Air runtime:
 the XREAL HID driver, real Vulkan compositor, and Wayland window/direct
 backends. Its service, libraries, IPC socket, and manifest have private names
 so it can be installed alongside the WiVRn runtime.
+
+Tracking is 3DoF by default. The build includes the opt-in 6DoF SLAM path
+(t_slam/VIT, against OpenCV): set XREAL_AIR_SLAM=1 and point
+VIT_SYSTEM_LIBRARY_PATH at a user-built Basalt library to enable it, as
+documented in HypXRland's XREAL setup. No Basalt library is shipped.
 
 The service binary deliberately has no file capabilities. A file capability
 puts the Vulkan loader into secure-execution mode and prevents the per-machine
@@ -101,13 +107,13 @@ export CXXFLAGS="%{build_cxxflags} -include cstdint"
   -DXRT_FEATURE_RENDERDOC=OFF \
   -DXRT_FEATURE_SERVICE=ON \
   -DXRT_FEATURE_SERVICE_SYSTEMD=OFF \
-  -DXRT_FEATURE_SLAM=OFF \
+  -DXRT_FEATURE_SLAM=ON \
   -DXRT_FEATURE_STEAMVR_PLUGIN=OFF \
   -DXRT_FEATURE_WINDOW_PEEK=OFF \
   -DXRT_HAVE_DBUS=OFF \
   -DXRT_HAVE_HIDAPI=ON \
   -DXRT_HAVE_LIBUDEV=ON \
-  -DXRT_HAVE_OPENCV=OFF \
+  -DXRT_HAVE_OPENCV=ON \
   -DXRT_HAVE_SYSTEM_CJSON=ON \
   -DXRT_HAVE_SYSTEMD=OFF \
   -DXRT_HAVE_WAYLAND=ON \
@@ -147,6 +153,8 @@ grep -q '^XRT_BUILD_DRIVER_XREAL_AIR:BOOL=ON$' \
   %{__cmake_builddir}/CMakeCache.txt
 grep -q '^XRT_HAVE_WAYLAND:BOOL=ON$' \
   %{__cmake_builddir}/CMakeCache.txt
+grep -q '^XRT_FEATURE_SLAM:BOOL=ON$' \
+  %{__cmake_builddir}/CMakeCache.txt
 grep -F '%{_libdir}/monado-xreal/libopenxr_monado_xreal.so' %{SOURCE2}
 ! getcap %{buildroot}%{_libexecdir}/monado-xreal/monado-service | grep -q .
 
@@ -168,6 +176,14 @@ grep -F '%{_libdir}/monado-xreal/libopenxr_monado_xreal.so' %{SOURCE2}
 %{_datadir}/openxr/1/openxr_monado-xreal.json
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 25.1.0^20261016.1.git6e23edfb3-1
+- Refresh to the current HypXRland-pinned Monado tip: XREAL SLAM robustness
+  (wear hold, divergence restarts, pose guard), per-serial gyro-bias
+  persistence, Air 2 Ultra SLAM camera capture, and presence starting worn.
+- Build with XRT_FEATURE_SLAM and OpenCV so the opt-in 6DoF path
+  (XREAL_AIR_SLAM=1 with a user-built Basalt via VIT_SYSTEM_LIBRARY_PATH) is
+  available; the default remains 3DoF and no Basalt library is shipped.
+
 * Wed Aug 12 2026 omedora <noreply@omedora> - 25.1.0^20260719.1.git3752d437c-2
 - Require Fedora's current xr-hardware udev rules for all supported XREAL Air
   product IDs, including Air Ultra.
