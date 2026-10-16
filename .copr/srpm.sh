@@ -181,7 +181,8 @@ grep -iE '^Source[0-9]*:' "$spec_dir/$spec_base" | sed -E 's/^[^:]+:[[:space:]]*
       ( cd "$crate_top/vendor/libghostty-vt" && \
         ZIG_GLOBAL_CACHE_DIR="$crate_top/zig-cache" "$zig_top/zig" build \
           -Demit-lib-vt -Doptimize=ReleaseFast -Dsimd=true \
-          -Dtarget=x86_64-linux-gnu -Dversion-string=0.8.0 \
+          -Dtarget=x86_64-linux-gnu \
+          -Dversion-string="$(cat VERSION)" \
           -Demit-xcframework=false )
       find "$crate_top/zig-cache" -mindepth 1 -maxdepth 1 ! -name p \
         -exec rm -rf -- {} +

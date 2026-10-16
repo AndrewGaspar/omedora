@@ -1,22 +1,19 @@
-# herdr.spec — Omarchy's pinned terminal workspace manager fork.
+# herdr.spec — terminal workspace manager (the release Omarchy ships).
 #
-# COPR-only toolchain exception: upstream requires exact Zig 0.15.2, while
-# Fedora 44 has moved on. The checksum-pinned official binary is used only as
-# a build tool and is not shipped; a future zig015 compatibility RPM can
-# replace it.
+# COPR-only toolchain exception: upstream requires exact Zig 0.16.0. The
+# checksum-pinned official binary is used only as a build tool and is not
+# shipped; a future zig016 compatibility RPM can replace it.
 
-%global commit 0766aa57ee0ceb4410ae064e94c0f0557853eee7
-%global shortcommit %(c=%{commit}; echo ${c:0:7})
-%global zig_version 0.15.2
+%global zig_version 0.16.0
 
 Name:           herdr
-Version:        0.8.0^13.git%{shortcommit}
+Version:        0.9.1
 Release:        1%{?dist}
 Summary:        Terminal workspace manager for coding agents
 
 License:        Apache-2.0 AND MIT AND BSD-3-Clause AND Unicode-3.0 AND 0BSD AND (0BSD OR Apache-2.0) AND (0BSD OR MIT OR Apache-2.0) AND (Apache-2.0 OR BSL-1.0) AND (Apache-2.0 OR MIT) AND (Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT) AND (BSD-2-Clause OR Apache-2.0) AND (MIT OR Apache-2.0) AND (MIT OR Zlib OR Apache-2.0) AND (Unlicense OR MIT) AND Zlib AND (Zlib OR Apache-2.0 OR MIT)
-URL:            https://github.com/omacom-io/herdr
-Source0:        https://codeload.github.com/omacom-io/herdr/tar.gz/%{commit}#/%{name}-%{version}.tar.gz
+URL:            https://github.com/herdrdev/herdr
+Source0:        https://codeload.github.com/herdrdev/herdr/tar.gz/refs/tags/v%{version}#/%{name}-%{version}.tar.gz
 Source1:        %{name}-%{version}-vendor.tar.zst
 Source2:        https://ziglang.org/download/%{zig_version}/zig-x86_64-linux-%{zig_version}.tar.xz
 Source3:        %{name}-%{version}-zig-cache.tar.zst
@@ -41,14 +38,15 @@ Conflicts:      omarchy-herdr
 
 %description
 Herdr is a persistent terminal workspace manager for supervising multiple
-coding-agent sessions. This package follows Omarchy's pinned fork and embeds
-its vendored terminal engine using the exact Zig toolchain required upstream.
+coding-agent sessions. This package builds the upstream herdrdev release
+Omarchy ships and embeds its vendored terminal engine using the exact Zig
+toolchain required upstream.
 
 %prep
-%autosetup -n %{name}-%{commit} -p1
-%setup -q -T -D -a 1 -n %{name}-%{commit}
-%setup -q -T -D -a 2 -n %{name}-%{commit}
-%setup -q -T -D -a 3 -n %{name}-%{commit}
+%autosetup -p1
+%setup -q -T -D -a 1
+%setup -q -T -D -a 2
+%setup -q -T -D -a 3
 rm -f rust-toolchain.toml
 %cargo_prep -v cargo-vendor
 
@@ -67,14 +65,16 @@ install -D -m 0644 vendor/libghostty-vt/LICENSE \
   %{buildroot}%{_licensedir}/%{name}/LICENSE.libghostty-vt
 install -D -m 0644 vendor/portable-pty/LICENSE.md \
   %{buildroot}%{_licensedir}/%{name}/LICENSE.portable-pty
-install -m 0644 \
-  zig-cache/p/uucode-0.2.0-*/LICENSE.md \
-  %{buildroot}%{_licensedir}/%{name}/LICENSE.uucode-0.2.0
-install -m 0644 \
-  zig-cache/p/N-V-__8AAGmZh*/LICENSE \
-  %{buildroot}%{_licensedir}/%{name}/LICENSE.highway-Apache-2.0
-install -m 0644 \
-  zig-cache/p/N-V-__8AAGmZh*/LICENSE-BSD3 \
+# Zig 0.16's global cache keeps packages as tarballs under p/ (no extracted
+# trees), so pull the license files straight out of the sealed archives.
+tar -xzOf zig-cache/p/uucode-0.2.0-*.tar.gz --wildcards '*/LICENSE.md' \
+  > %{buildroot}%{_licensedir}/%{name}/LICENSE.uucode-0.2.0
+tar -xzOf zig-cache/p/N-V-__8AAGmZh*.tar.gz --wildcards '*/LICENSE' \
+  > %{buildroot}%{_licensedir}/%{name}/LICENSE.highway-Apache-2.0
+tar -xzOf zig-cache/p/N-V-__8AAGmZh*.tar.gz --wildcards '*/LICENSE-BSD3' \
+  > %{buildroot}%{_licensedir}/%{name}/LICENSE.highway-BSD-3-Clause
+chmod 0644 %{buildroot}%{_licensedir}/%{name}/LICENSE.uucode-0.2.0 \
+  %{buildroot}%{_licensedir}/%{name}/LICENSE.highway-Apache-2.0 \
   %{buildroot}%{_licensedir}/%{name}/LICENSE.highway-BSD-3-Clause
 install -m 0644 %{SOURCE4} %{SOURCE5} %{buildroot}%{_licensedir}/%{name}/
 install -m 0644 %{SOURCE6} %{SOURCE7} %{SOURCE8} %{buildroot}%{_licensedir}/%{name}/
@@ -102,6 +102,13 @@ export ZIG_GLOBAL_CACHE_DIR="$PWD/zig-cache"
 %{_bindir}/herdr
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 0.9.1-1
+- Move from the omacom-io fork snapshot to the upstream herdrdev/herdr
+  0.9.1 release Omarchy ships. The vendored libghostty-vt now requires
+  exact Zig 0.16.0; update the checksum-pinned build tool. Cargo and Zig
+  caches are regenerated; uucode/simdutf license pins are unchanged
+  (simdutf 9.0.0 is the previously pinned commit).
+
 * Wed Aug 12 2026 omedora <noreply@omedora> - 0.8.0^13.git0766aa5-1
 - Package the exact Omarchy beta fork and commit from source.
 - Build offline with vendored Cargo dependencies, Ghostty terminal sources,

@@ -233,7 +233,8 @@ EOF
           ( cd "$topdir/vendor/libghostty-vt" && \
             ZIG_GLOBAL_CACHE_DIR="$topdir/zig-cache" "$zigdir/zig" build \
               -Demit-lib-vt -Doptimize=ReleaseFast -Dsimd=true \
-              -Dtarget=x86_64-linux-gnu -Dversion-string=0.8.0 \
+              -Dtarget=x86_64-linux-gnu \
+              -Dversion-string="$(cat VERSION)" \
               -Demit-xcframework=false )
           find "$topdir/zig-cache" -mindepth 1 -maxdepth 1 ! -name p \
             -exec rm -rf -- {} +
