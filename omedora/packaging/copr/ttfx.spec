@@ -1,7 +1,7 @@
 # ttfx.spec — Quattro's terminal text-effects engine for Fedora.
 
 Name:           ttfx
-Version:        0.3.2
+Version:        0.5.0
 Release:        1%{?dist}
 Summary:        Terminal text effects as a native Rust binary
 
@@ -56,6 +56,9 @@ target/release/ttfx --print-completion zsh \
 %{_datadir}/zsh/site-functions/_ttfx
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 0.5.0-1
+- Bump to upstream 0.5.0. Cargo vendor regenerated from the new Cargo.lock.
+
 * Fri Sep 11 2026 omedora <noreply@omedora> - 0.3.2-1
 - Update to 0.3.2: stop dumping core when the terminal goes away (upstream
   omacom-io/ttfx#18), fixing the SIGABRT on the idle-lock screensaver path.
