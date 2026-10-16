@@ -14,7 +14,7 @@
 # %setup -c -T -a 0 creates one and unpacks into it.
 
 Name:           usage
-Version:        3.5.0
+Version:        7.0.1
 Release:        1%{?dist}
 Summary:        Spec for defining CLIs, with autocompletion and more (mise companion)
 
@@ -54,6 +54,9 @@ install -D -m 0644 usage.1 %{buildroot}%{_mandir}/man1/usage.1
 %{_mandir}/man1/usage.1*
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 7.0.1-1
+- Bump to upstream 7.0.1, alongside mise 2026.10.11.
+
 * Tue Jun 16 2026 omedora <noreply@omedora> - 3.5.0-1
 - Bump to upstream 3.5.0.
 
