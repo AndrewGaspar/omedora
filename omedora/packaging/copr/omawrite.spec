@@ -26,7 +26,7 @@
 %global debug_package %{nil}
 
 Name:           omawrite
-Version:        0.1.1
+Version:        0.7.0
 Release:        1%{?dist}
 Summary:        Dead-simple Markdown writing app
 
@@ -93,6 +93,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/omawrite.desktop
 %{_datadir}/applications/omawrite.desktop
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 0.7.0-1
+- Bump to upstream 0.7.0.
+
 * Fri Jul 03 2026 omedora <noreply@omedora> - 0.1.1-1
 - Initial from-source (qmake6/Qt6) build of omawrite, the quattro-line Markdown
   writing app bound to SUPER+SHIFT+W (github.com/omacom-io/omawrite, MIT).
