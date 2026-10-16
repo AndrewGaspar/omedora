@@ -224,7 +224,7 @@ reason = "Native Rust terminal-effects engine used directly by Quattro's screens
 [herdr]
 source = "dnf"
 names = ["herdr"]
-reason = "Terminal workspace manager built from Omarchy's pinned omacom-io/herdr fork. Not in Fedora main/RPM Fusion; built from source by omedora/packaging/copr/herdr.spec and served from the omedora repo alongside tmux."
+reason = "Terminal workspace manager built from the upstream herdrdev/herdr release Omarchy ships. Not in Fedora main/RPM Fusion; built from source by omedora/packaging/copr/herdr.spec and served from the omedora repo alongside tmux."
 
 [hyprland-preview-share-picker]
 source = "dnf"
@@ -359,12 +359,12 @@ reason = "GPU-accelerated screen recorder (NVENC/VAAPI/Vulkan) that omarchy's sc
 [quickshell]
 source = "dnf"
 names = ["quickshell"]
-reason = "QtQuick desktop-shell toolkit used by the Omarchy 4 desktop. Fedora 44's stalled Feb-2026 snapshot and upstream 0.3.0 both predate the synchronous `quickshell kill` behavior required by Quattro's shell restart path. Vendored at Omarchy 4.0.0's exact 28771c7 snapshot and served from the Omedora repo."
+reason = "QtQuick desktop-shell toolkit used by the Omarchy 4 desktop. Fedora 44's stalled Feb-2026 snapshot predates the synchronous `quickshell kill` behavior required by Quattro's shell restart path. Vendored at the upstream 0.3.2 release (which contains that fix, and is what Omarchy ships) and served from the Omedora repo."
 
 [quickshell-git]
 source = "dnf"
 names = ["quickshell"]
-reason = "Arch rolling-package name for Quickshell. Omedora maps it to the vendored RPM at Omarchy 4.0.0's exact 28771c7 snapshot; the Fedora-gated migration skips Arch's package-replacement transaction."
+reason = "Arch rolling-package name for Quickshell. Omedora maps it to the vendored 0.3.2 RPM; the Fedora-gated migration skips Arch's package-replacement transaction."
 
 # --- Flathub (proprietary or unpackaged GUI apps) ------------------------
 
