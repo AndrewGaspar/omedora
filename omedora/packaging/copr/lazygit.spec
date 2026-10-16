@@ -13,7 +13,7 @@
 # refine to for a public COPR; binary-repackage is the fastest correct thing.
 
 Name:           lazygit
-Version:        0.62.2
+Version:        0.66.2
 Release:        1%{?dist}
 Summary:        Simple terminal UI for git commands
 
@@ -57,6 +57,9 @@ install -D -m 0755 lazygit %{buildroot}%{_bindir}/lazygit
 %{_bindir}/lazygit
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 0.66.2-1
+- Bump to upstream 0.66.2.
+
 * Thu Jun 04 2026 omedora <noreply@omedora> - 0.62.2-1
 - Bump to upstream 0.62.2.
 
