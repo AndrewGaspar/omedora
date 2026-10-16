@@ -2,15 +2,16 @@
 #
 # WHY VENDORED: Fedora 44 ships only a STALLED Feb-2026 git snapshot
 # (0.2.1^git20260209.dacfa9d — identical across stable/updates/testing/rawhide).
-# That snapshot predates both upstream's 0.3.0 release (2026-05-04) and the exact
-# post-release snapshot pinned by Omarchy 4 beta. Quattro's shell restart command
-# requires the snapshot's synchronous `quickshell kill`; 0.3.0 returns before the
-# old shell exits and can race the replacement instance.
+# That snapshot predates upstream's 0.3.x releases. Quattro's shell restart
+# command requires synchronous `quickshell kill` (IpcClient::kill waits for
+# disconnect); 0.3.0 returned before the old shell exited, but the 0.3.2
+# release — the version Omarchy's own quickshell package ships — contains the
+# fix, so we now track the release instead of the 28771c7 snapshot.
 #
 # Recipe ADAPTED from Fedora's own quickshell.spec (Neal Gompa / Jan Grulich,
-# the authoritative BuildRequires + cmake-flags reference), advanced to Omarchy
-# beta's exact 28771c7 snapshot, with these deviations:
-#   * Source: pinned GitHub-mirror commit tarball (byte-stable archive), the
+# the authoritative BuildRequires + cmake-flags reference), advanced to the
+# upstream 0.3.2 release, with these deviations:
+#   * Source: pinned GitHub-mirror tag tarball (byte-stable archive), the
 #     omedora convention; sha256 in quickshell.spec.sources.
 #   * -DCRASH_HANDLER=OFF     — the crash handler needs cpptrace, which is NOT in
 #                              Fedora 44 (no cpptrace / cmake(cpptrace) provider).
@@ -33,18 +34,18 @@
 # Qt6 base already provides. All features stay enabled (upstream default); omarchy
 # -4 expects the full toolkit.
 
-%global commit 28771c7c74b42e20afca0b1b63980cb46515537c
+%global tag_commit 4f508be500dea6e5732cc3d50382a0048b17e7b1
 
 Name:               quickshell
-Version:            0.3.0^20.git28771c7
+Version:            0.3.2
 Release:            1%{?dist}
 Summary:            Flexible QtQuick based desktop shell toolkit
 # Code is LGPL, Hyprland protocols are BSD-3-Clause, wlr protocols are HPND-sell-variant
 License:            LGPL-3.0-only AND BSD-3-Clause AND HPND-sell-variant
 URL:                https://quickshell.org/
-# Pinned Omarchy 4 beta snapshot from the GitHub mirror. Unpacks to
-# quickshell-%%{commit}/.
-Source0:            https://codeload.github.com/quickshell-mirror/quickshell/tar.gz/%{commit}#/%{name}-%{version}.tar.gz
+# Upstream 0.3.2 release from the GitHub mirror (the version Omarchy's
+# quickshell package ships). Unpacks to quickshell-%{version}/.
+Source0:            https://codeload.github.com/quickshell-mirror/quickshell/tar.gz/refs/tags/v%{version}#/%{name}-%{version}.tar.gz
 
 # https://fedoraproject.org/wiki/Changes/EncourageI686LeafRemoval
 ExcludeArch:        %{ix86}
@@ -105,7 +106,7 @@ It can be used alongside a Wayland compositor to build a complete desktop
 environment.
 
 %prep
-%autosetup -n %{name}-%{commit} -p1
+%autosetup -p1
 
 %conf
 %cmake  -GNinja \
@@ -114,7 +115,7 @@ environment.
         -DDISTRIBUTOR="omedora COPR (agaspar/omedora-4)" \
         -DDISTRIBUTOR_DEBUGINFO_AVAILABLE=YES \
         -DINSTALL_QML_PREFIX=%{_lib}/qt6/qml \
-        -DGIT_REVISION=%{commit} \
+        -DGIT_REVISION=%{tag_commit} \
         -DCRASH_HANDLER=OFF \
         %{nil}
 
@@ -137,6 +138,12 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/*.desktop
 %{_qt6_qmldir}/Quickshell/
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 0.3.2-1
+- Move from Omarchy 4.0.0's 28771c7 snapshot to the upstream 0.3.2 release
+  (the version omarchy-pkgs ships). 0.3.2 contains the synchronous
+  `quickshell kill` behavior the snapshot was pinned for (IpcClient::kill
+  waits for the IPC socket to disconnect before returning).
+
 * Wed Aug 12 2026 omedora <noreply@omedora> - 0.3.0^20.git28771c7-1
 - Match Omarchy 4 beta's exact post-0.3.0 snapshot.
 - Include synchronous quickshell kill and IpcHandler lifetime fixes required by

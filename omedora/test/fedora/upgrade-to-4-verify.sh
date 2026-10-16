@@ -174,9 +174,9 @@ dnf repoquery --installed --qf '%{from_repo}' quickshell 2>/dev/null \
   && ok "FROM: Quickshell came from Fedora" \
   || nok "FROM: Quickshell came from Fedora" \
     "repo: $(dnf repoquery --installed --qf '%{from_repo}' quickshell 2>/dev/null || true)"
-[[ $(rpm -q --qf '%{VERSION}' quickshell 2>/dev/null) != "0.3.0^20.git28771c7" ]] \
-  && ok "FROM: Quickshell predates the Quattro beta snapshot" \
-  || nok "FROM: Quickshell predates the Quattro beta snapshot" \
+[[ $(rpm -q --qf '%{VERSION}' quickshell 2>/dev/null) != "0.3.2" ]] \
+  && ok "FROM: Quickshell predates the vendored 0.3.2 release" \
+  || nok "FROM: Quickshell predates the vendored 0.3.2 release" \
     "version: $(rpm -q --qf '%{VERSION}' quickshell 2>/dev/null || true)"
 for package in "${xr_o3_packages[@]}" monado-xreal; do
   check "FROM: XR package installed: $package" rpm -q "$package"
@@ -225,9 +225,9 @@ for p in walker elephant swayosd hypridle hyprlock hyprshot gazelle-tui \
 done
 check "kept: hyprland-no-session still installed" rpm -q hyprland-no-session
 check "kept: uwsm still installed" rpm -q uwsm
-[[ $(rpm -q --qf '%{VERSION}' quickshell 2>/dev/null) == "0.3.0^20.git28771c7" ]] \
-  && ok "Quickshell matches the Quattro beta snapshot" \
-  || nok "Quickshell matches the Quattro beta snapshot" \
+[[ $(rpm -q --qf '%{VERSION}' quickshell 2>/dev/null) == "0.3.2" ]] \
+  && ok "Quickshell matches the vendored 0.3.2 release" \
+  || nok "Quickshell matches the vendored 0.3.2 release" \
     "version: $(rpm -q --qf '%{VERSION}' quickshell 2>/dev/null || true)"
 check "new base dep installed: foot" rpm -q foot
 for package in dotnet-runtime-10.0 vips-tools omacalc ttfx herdr; do
