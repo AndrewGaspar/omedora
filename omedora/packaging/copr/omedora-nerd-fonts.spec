@@ -9,7 +9,7 @@
 # noarch: fonts are just data files, identical on every CPU architecture.
 
 Name:           omedora-nerd-fonts
-Version:        3.4.0
+Version:        3.5.1
 Release:        1%{?dist}
 Summary:        CascadiaCode + JetBrainsMono Nerd Fonts for omedora
 
@@ -55,5 +55,8 @@ find cascadia jetbrains \( -name '*.ttf' -o -name '*.otf' \) \
 %{_datadir}/fonts/omedora-nerd-fonts/*
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 3.5.1-1
+- Bump to upstream Nerd Fonts 3.5.1 (CascadiaCode + JetBrainsMono).
+
 * Fri May 29 2026 omedora <noreply@omedora> - 3.4.0-1
 - Package CascadiaCode + JetBrainsMono Nerd Fonts (ryanoasis v3.4.0).
