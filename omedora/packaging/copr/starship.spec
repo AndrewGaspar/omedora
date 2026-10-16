@@ -13,7 +13,7 @@
 # as walker.spec).
 
 Name:           starship
-Version:        1.25.1
+Version:        1.26.0
 Release:        1%{?dist}
 Summary:        Minimal, blazing-fast, cross-shell prompt
 
@@ -51,5 +51,8 @@ install -D -m 0755 starship %{buildroot}%{_bindir}/starship
 %{_bindir}/starship
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 1.26.0-1
+- Bump to upstream 1.26.0.
+
 * Sat May 30 2026 omedora <noreply@omedora> - 1.25.1-1
 - Initial binary-repackage of upstream starship release.
