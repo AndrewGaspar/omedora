@@ -35,7 +35,7 @@
 # install those artifacts alongside the binary.
 
 Name:           tensaku
-Version:        0.26.6
+Version:        0.29.0
 Release:        1%{?dist}
 Summary:        Modern screenshot annotation tool for Wayland
 
@@ -89,6 +89,8 @@ BuildRequires:  fontconfig-devel
 # The wayland-client / smithay-client-toolkit crates link libwayland-client for
 # Tensaku's scrolling-screenshot capture.
 BuildRequires:  wayland-devel
+# 0.29.0 links -lxkbcommon directly (keyboard handling in the capture path).
+BuildRequires:  pkgconfig(xkbcommon)
 # desktop-file-utils validates the installed .desktop file.
 BuildRequires:  desktop-file-utils
 
@@ -168,6 +170,10 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/dev.tensaku.Tensaku.d
 %{_datadir}/zsh/site-functions/_tensaku
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 0.29.0-1
+- Bump to upstream 0.29.0. Cargo vendor regenerated from the new Cargo.lock.
+- Add pkgconfig(xkbcommon): 0.29.0 links -lxkbcommon.
+
 * Fri Jul 03 2026 omedora <noreply@omedora> - 0.26.6-1
 - Initial from-source (cargo) build of Tensaku (Rust/GTK4 + relm4, a Satty
   fork; the quattro line's screenshot/clipboard annotation editor).
