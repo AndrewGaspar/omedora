@@ -33,7 +33,7 @@
 # it.
 
 Name:           gpu-screen-recorder
-Version:        5.14.1
+Version:        6.1.4
 Release:        1%{?dist}
 Summary:        GPU-accelerated screen/replay recorder (NVENC/VAAPI/Vulkan)
 
@@ -135,6 +135,7 @@ setcap cap_sys_admin+ep %{_bindir}/gsr-kms-server || :
 %license LICENSE
 %doc README.md
 %{_bindir}/gpu-screen-recorder
+%{_bindir}/gsr-cli
 %{_bindir}/gsr-kms-server
 # Plugin dev header + capture helper scripts installed by upstream meson.
 %{_includedir}/gsr/plugin.h
@@ -143,9 +144,14 @@ setcap cap_sys_admin+ep %{_bindir}/gsr-kms-server || :
 %{_userunitdir}/gpu-screen-recorder.service
 %{_prefix}/lib/modprobe.d/gsr-nvidia.conf
 %{_mandir}/man1/gpu-screen-recorder.1*
+%{_mandir}/man1/gsr-cli.1*
 %{_mandir}/man1/gsr-kms-server.1*
 
 %changelog
+* Fri Oct 16 2026 omedora <noreply@omedora> - 6.1.4-1
+- Bump to upstream 6.1.4 (matching Arch extra).
+- Ship the new gsr-cli binary and man page.
+
 * Fri Jul 03 2026 omedora <noreply@omedora> - 5.14.1-1
 - Initial from-source (Meson) build of gpu-screen-recorder
   (git.dec05eba.com/gpu-screen-recorder, GPL-3.0-only), the GPU-accelerated
