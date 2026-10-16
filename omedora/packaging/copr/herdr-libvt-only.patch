@@ -1,6 +1,6 @@
 --- a/vendor/libghostty-vt/build.zig
 +++ b/vendor/libghostty-vt/build.zig
-@@ -56,6 +56,51 @@ pub fn build(b: *std.Build) !void {
+@@ -57,6 +57,51 @@
          &deps,
      );
  
@@ -54,23 +54,30 @@
      const run_step = b.step("run", "Run the app");
 --- a/vendor/libghostty-vt/src/build/SharedDeps.zig
 +++ b/vendor/libghostty-vt/src/build/SharedDeps.zig
-@@ -17,6 +17,6 @@ help_strings: HelpStrings,
+@@ -17,7 +17,7 @@
+ help_strings: HelpStrings,
  metallib: ?*MetallibStep,
  unicode_tables: UnicodeTables,
 -framedata: GhosttyFrameData,
 +framedata: ?GhosttyFrameData,
  uucode_tables: std.Build.LazyPath,
  
- /// Used to keep track of a list of file sources.
-@@ -35,7 +35,7 @@ pub fn init(b: *std.Build, cfg: *const Config) !SharedDeps {
+ /// Singleton uucode module, instantiated once in `init` and reused
+@@ -86,7 +86,7 @@
          .config = cfg,
          .help_strings = try .init(b, cfg),
          .unicode_tables = try .init(b, uucode_tables),
 -        .framedata = try .init(b),
 +        .framedata = if (cfg.emit_lib_vt) null else try .init(b),
          .uucode_tables = uucode_tables,
+         .uucode_mod = uucode_mod,
  
-         // Setup by retarget
-@@ -613 +613 @@
+@@ -701,7 +701,7 @@
+ 
+     self.help_strings.addImport(step);
+     self.unicode_tables.addImport(step);
 -    self.framedata.addImport(step);
 +    self.framedata.?.addImport(step);
+ 
+     return static_libs;
+ }
