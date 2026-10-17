@@ -35,7 +35,11 @@ export XDG_CURRENT_DESKTOP="Hyprland"
 # real regression. Downgrade those to TAP SKIPs in the VM tier — the session's
 # actual rendering is proven by the host-side `virsh screenshot` + the
 # layer/process assertions in 00/10/20. (Off in the podman tier; see lib.sh.)
-export SCREENSHOT_GEOMETRY_SKIP=1
+# The orchestrator forwards OMEDORA_VM_GEOMETRY_SKIP here; 0 (paired with
+# OMEDORA_VM_RES=1920x1080) turns the goldens back into real pass/fail. lib.sh
+# only checks set-vs-unset, so 0 has to mean unset, not an exported "0".
+export SCREENSHOT_GEOMETRY_SKIP="${SCREENSHOT_GEOMETRY_SKIP:-1}"
+[[ "$SCREENSHOT_GEOMETRY_SKIP" == "0" ]] && unset SCREENSHOT_GEOMETRY_SKIP
 
 rm -rf "$ART"; mkdir -p "$ART"
 
