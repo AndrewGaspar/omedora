@@ -1,3 +1,7 @@
+# Fedora: linux-omarchy and Limine boot-image management are Arch-only.
+# Fedora keeps its distribution kernel and bootloader. Skip on Omedora.
+[[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]] && exit 0
+
 echo "Install the Omarchy kernel and make it the first Limine boot entry"
 
 # linux-omarchy is an x86_64 kernel. T2 Macs must keep their specialized kernel,

@@ -1,3 +1,7 @@
+# Fedora: pacman.conf repository ordering is Arch-only (dnf repo priority is
+# managed by the COPR repo file). Skip on Omedora.
+[[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]] && exit 0
+
 echo "Prioritize the Omarchy package repository over Arch repositories"
 
 # Move the existing section rather than replacing pacman.conf so channel URLs,
