@@ -387,7 +387,7 @@ reset_log
 # fail (we didn't actually install jq), but we only care that pacman -S
 # was attempted — tolerate the non-zero exit with || true.
 OMARCHY_DISTRO=arch "$ROOT/bin/omarchy-pkg-add" jq >/dev/null 2>&1 || true
-if log_contains "pacman -S --noconfirm --needed jq"; then
+if log_contains "pacman -S --noconfirm --needed -- jq"; then
   pass "OMARCHY_DISTRO=arch dispatches to pacman (Arch path preserved)"
 else
   cat "$MOCK_LOG" >&2
