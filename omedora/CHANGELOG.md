@@ -1,3 +1,33 @@
+## v0.2.0-beta.7 — 2026-10-18 (Omarchy 4.0.5)
+
+- upgrade-to-4: retire the Omarchy 4.0.5 fastfetch default
+- test(pkg-helper): follow upstream's pacman argv hardening
+- chore(release): prepare core specs at 0.2.0~beta.7
+- chore(rebase): re-pin Omedora 4 onto Omarchy v4.0.5
+- packages(fedora): skip-map linux-firmware-cirrus-dx13260
+- rebase(4.0.5): Fedora-gate the Arch-only upstream migrations
+- test(byte-identity): refresh allowlisted relocations for the 4.0.5 pin
+- docs: refresh quickshell and herdr package-map reasons
+- omedora-nerd-fonts.spec: update to 3.5.1
+- uwsm.spec: update to 0.27.1
+- starship.spec: update to 1.26.0
+- lazygit.spec: update to 0.66.2
+- usage.spec: update to 7.0.1
+- mise.spec: update to 2026.10.11
+- omawrite.spec: update to 0.7.0
+- omacut.spec: update to 0.7.2
+- omacalc.spec: update to 0.3.1
+- gpu-screen-recorder.spec: update to 6.1.4
+- satty.spec: update to 0.22.0
+- tensaku.spec: update to 0.29.0
+- ttfx.spec: update to 0.5.0
+- herdr.spec: update to upstream herdrdev/herdr 0.9.1
+- quickshell.spec: update to the 0.3.2 release
+- hypxrland+monado-xreal: update to the Oct 16 snapshots
+- hypxrland.spec: update to the Oct 11 hypxrland snapshot
+- test(fedora): run the session build/run containers unconfined by SELinux
+- test(fedora): run the headless session container unconfined by SELinux
+
 ## v0.2.0-beta.6 — 2026-09-11 (Omarchy 4.0.3)
 
 - chore(release): prepare core specs at 0.2.0~beta.6
