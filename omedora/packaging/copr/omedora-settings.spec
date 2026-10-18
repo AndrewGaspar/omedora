@@ -44,7 +44,7 @@
 Name:           omedora-settings
 # Version is normally read from the repo's omedora/version file; hardcoded here
 # for now — a follow-up wires .copr/srpm.sh to substitute it at SRPM-gen time.
-Version:        0.2.0~beta.6
+Version:        0.2.0~beta.7
 Release:        1%{?dist}
 Summary:        Omedora pre-install settings: /etc/skel seeds, system defaults, fonts, branding
 
@@ -387,6 +387,9 @@ desktop-file-validate %{buildroot}%{_datadir}/wayland-sessions/omedora.desktop
 %config(noreplace) %{_sysconfdir}/systemd/user.conf.d/20-omarchy-nofile.conf
 
 %changelog
+* Sun Oct 18 2026 omedora <noreply@omedora> - 0.2.0~beta.7-1
+- Refresh the packaged defaults for the official Omarchy 4.0.5 release.
+
 * Thu Aug 20 2026 omedora <noreply@omedora> - 0.2.0~beta.2-1
 - Refresh the packaged defaults for the official Omarchy 4.0.0 release.
 - Include Quattro's crash-watch user unit in the package manifest.

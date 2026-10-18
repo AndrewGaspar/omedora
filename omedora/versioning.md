@@ -4,7 +4,7 @@ Omedora 4 has three separate identities. They must not be conflated.
 
 | Identity | Source | Current value | Purpose |
 | --- | --- | --- | --- |
-| Omedora release | `omedora/version` | `0.2.0-beta.6` | Public version and release tag |
+| Omedora release | `omedora/version` | `0.2.0-beta.7` | Public version and release tag |
 | Reported Omarchy base | `omedora/base-version` | `4.0.5` | User-facing upstream compatibility label |
 | Immutable git base | `omedora-base-20261018-omarchy4-94a8fbc2` | `94a8fbc2d67eec5673c7f16b8c5e8a9c8452ffdc` | Rebase and byte-identity audit anchor |
 
@@ -18,7 +18,7 @@ pin. It still provides the major used by `bin/omedora-copr` to select
 On Fedora, `omarchy-version` reports:
 
 ```text
-Omedora 0.2.0-beta.6 (rebased on Omarchy 4.0.3)
+Omedora 0.2.0-beta.7 (rebased on Omarchy 4.0.5)
 ```
 
 On Arch, upstream package-version behavior remains unchanged.
@@ -32,7 +32,7 @@ prereleases replace SemVer's hyphen with `~`, so `0.2.0-beta.2` becomes
 Component RPMs use their component's upstream version, not the Omedora release.
 A Quattro source rebase alone does not justify rebuilding unchanged component
 packages. This rebase changes both core payloads, so both core specs are prepared
-at `0.2.0~beta.6`.
+at `0.2.0~beta.7`.
 
 ## Release tags
 
