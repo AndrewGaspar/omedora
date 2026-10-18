@@ -440,6 +440,10 @@ reason = "Arch build group; Fedora uses 'dnf group install development-tools' wh
 source = "skip"
 reason = "Surface-specific Marvell firmware; users on Surface devices install via Fedora's own channels."
 
+[linux-firmware-cirrus-dx13260]
+source = "skip"
+reason = "Arch-only Dell XPS 13 (DX13260) speaker-amp firmware split package; Fedora ships Cirrus firmware inside linux-firmware. Skip so the hardware script and migrations/1791265613.sh do not abort on an unmapped dnf transaction; DX13260 users on Fedora rely on linux-firmware coverage."
+
 [intel-ipu7-camera]
 source = "skip"
 reason = "Intel IPU7 camera kernel module; users opt into akmod-ipu7 separately. Out of omedora scope."
