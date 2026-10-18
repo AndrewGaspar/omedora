@@ -79,7 +79,7 @@ Read more at [omarchy.org](https://omarchy.org).
 ## License
 Omarchy is released under the [MIT License](https://opensource.org/licenses/MIT).'
 
-ALLOW["bin/omarchy-provision-user"]='env -u BROWSER xdg-settings set default-web-browser chromium.desktop
+ALLOW["bin/omarchy-provision-user"]='env -u BROWSER XDG_CURRENT_DESKTOP= xdg-settings set default-web-browser chromium.desktop
 xdg-mime default HEY.desktop x-scheme-handler/mailto'
 
 # omarchy-system-lock: the upstream lock call moved verbatim into the Arch arm
@@ -107,7 +107,7 @@ ALLOW["migrations/1787815267.sh"]='  sudo systemctl daemon-reload
 ALLOW["bin/omarchy-update"]='if [[ -z ${OMARCHY_UPDATE_LOGGED:-} ]]; then
 trap '"'"'echo ""; echo -e "\033[0;31mSomething went wrong during the update!\n\nPlease review the output above carefully, correct the error, and retry the update.\n\nIf you need assistance, get help from the community at https://omarchy.org/discord\033[0m"'"'"' ERR'
 
-ALLOW["bin/omarchy-update-confirm"]='  "What'"'"'s new: https://github.com/basecamp/omarchy/releases/latest"'
+ALLOW["bin/omarchy-update-confirm"]='  "What'"'"'s new: https://github.com/omacom/omarchy/releases/latest"'
 
 ALLOW["bin/omarchy-update-restart"]='  if [[ -f $kernel ]] && pacman -Qo "$kernel" &>/dev/null; then'
 
@@ -128,7 +128,8 @@ ALLOW["etc/fastfetch/config.jsonc"]='      "text": "version=$(omarchy-version) &
 # deletions, not omedora ones. Unwind this entry when the pin rotates past
 # e8939ed9 (the deletions become part of the pin baseline and stop showing here).
 ALLOW["bin/omarchy-launch-webapp"]='# omarchy:args=<url>
-exec setsid uwsm-app -- $(sed -n '"'"'s/^Exec=\([^ ]*\).*/\1/p'"'"' {~/.local,~/.nix-profile,/usr}/share/applications/$browser 2>/dev/null | head -1) --app="$1" "${@:2}"'
+if ! omarchy-cmd-browser-handoff "$browser_exec" --app="$1" "${@:2}"; then
+  exec setsid uwsm-app -- $browser_exec --app="$1" "${@:2}"'
 
 
 
