@@ -11,9 +11,9 @@ a git checkout.
 | Ref | Purpose |
 | --- | --- |
 | `omarchy` remote | `omacom/omarchy` upstream |
-| upstream `v4.0.3` | Official release at `0534987009061cbe2dacdde4ad564092ab698d12` |
+| upstream `v4.0.5` | Official release at `94a8fbc2d67eec5673c7f16b8c5e8a9c8452ffdc` |
 | `origin/omedora-4` | Omedora patch stack |
-| `omedora-base-20260908-omarchy4-05349870` | Immutable pin for this rebase |
+| `omedora-base-20261018-omarchy4-94a8fbc2` | Immutable pin for this rebase |
 
 The pin label is recorded at the top of [`architecture.md`](architecture.md).
 `test/byte-identity-test.sh` reads it there. During delegated review, before the
@@ -25,7 +25,7 @@ Never rebase a maintainer worktree in place. Fetch the selected upstream object
 without creating a local upstream release tag, then create an isolated branch:
 
 ```bash
-git fetch --no-tags omarchy 0534987009061cbe2dacdde4ad564092ab698d12
+git fetch --no-tags omarchy 94a8fbc2d67eec5673c7f16b8c5e8a9c8452ffdc
 git worktree add -b agent/quattro-rebase \
   /home/ajg/code/omedora-quattro-rebase origin/omedora-4
 ```
@@ -34,8 +34,8 @@ Replay only Omedora commits above the previous immutable base:
 
 ```bash
 git rebase --onto \
-  0534987009061cbe2dacdde4ad564092ab698d12 \
-  f0020448ca87329199de7cb12f2015ebc4a3e5e7
+  94a8fbc2d67eec5673c7f16b8c5e8a9c8452ffdc \
+  0534987009061cbe2dacdde4ad564092ab698d12
 ```
 
 Using explicit `--onto <new-base> <old-base>` is mandatory. Upstream branches
@@ -73,14 +73,14 @@ Fedora migration pipeline, so it is patched in place and tested.
 Prepare the label from the rebase date and upstream SHA:
 
 ```bash
-NEWPIN=omedora-base-20260908-omarchy4-05349870
+NEWPIN=omedora-base-20261018-omarchy4-94a8fbc2
 ```
 
 After parent review, create the annotated tag at the upstream commit:
 
 ```bash
-git tag -a "$NEWPIN" 0534987009061cbe2dacdde4ad564092ab698d12 \
-  -m "Omedora base pin: Omarchy v4.0.3 @ 05349870"
+git tag -a "$NEWPIN" 94a8fbc2d67eec5673c7f16b8c5e8a9c8452ffdc \
+  -m "Omedora base pin: Omarchy v4.0.5 @ 94a8fbc2"
 ```
 
 Do not create or push the tag from delegated implementation work. Existing pin
@@ -91,7 +91,7 @@ tags are immutable and are never moved or deleted.
 Run before and after authored fixes:
 
 ```bash
-OMEDORA_BASE_TAG=0534987009061cbe2dacdde4ad564092ab698d12 \
+OMEDORA_BASE_TAG=94a8fbc2d67eec5673c7f16b8c5e8a9c8452ffdc \
   bash test/byte-identity-test.sh
 ```
 
@@ -127,7 +127,7 @@ docker run --rm -v "$PWD:/repo" -w /repo archlinux:latest bash -c '
 Run the fresh-install/update/upgrade gates and both nested-session and VM visual
 gates described in [`testing.md`](testing.md). Report unavailable tiers as
 unavailable. A candidate is not release-ready until new core RPMs exist for L3
-and the official 4.0.3 visual changes have been reviewed at L4.
+and the official 4.0.5 visual changes have been reviewed at L4.
 
 ## 7. Package impact
 
@@ -142,7 +142,7 @@ Determine rebuilds from payload changes, not from the rebase itself:
 - HypXR is a separate package stream. Do not fold another agent's HypXR refresh
   into a Quattro rebase commit.
 
-For the official 4.0.3 rebase, rebuild `omedora` and `omedora-settings`; no
+For the official 4.0.5 rebase, rebuild `omedora` and `omedora-settings`; no
 rebase-driven HypXR ABI rebuild is required.
 
 ## 8. Promotion
