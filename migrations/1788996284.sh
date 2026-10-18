@@ -1,3 +1,10 @@
+# Fedora: the packaged provider source lives under /usr/share/omarchy-nvim,
+# which doesn't exist on Omedora (not RPM-packaged; bootstrapped by
+# install/user/nvim-fedora.sh), and the version check below uses pacman.
+# Skip on Omedora like migrations/1781587663.sh — the Fedora nvim bootstrap
+# owns the provider contents.
+[[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]] && exit 0
+
 echo "Repair remote Neovim clipboard yanks and paste"
 
 nvim_provider="$HOME/.config/nvim/lua/config/remote_clipboard.lua"
