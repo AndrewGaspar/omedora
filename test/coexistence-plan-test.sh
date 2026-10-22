@@ -54,6 +54,9 @@ export OMARCHY_DISTRO=fedora
 export OMARCHY_PATH="$ROOT"
 export OMARCHY_INSTALL="$ROOT/install"
 export OMEDORA_REPO_ROOT="$ROOT"
+# plan.sh's release-support gate probes the live COPR API; answer "supported"
+# offline (test/install-release-gate-test.sh covers the gate itself).
+export OMEDORA_COPR_CMD="true"
 
 PLAN="$ROOT/omedora/install/plan.sh"
 

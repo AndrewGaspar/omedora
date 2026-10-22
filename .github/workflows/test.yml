@@ -58,6 +58,9 @@ jobs:
       - name: Run coexistence plan-gate test
         run: bash test/coexistence-plan-test.sh
 
+      - name: Run install release-gate test
+        run: bash test/install-release-gate-test.sh
+
       - name: Run coexistence test
         run: bash test/coexistence-test.sh
 
