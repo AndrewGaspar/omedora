@@ -29,12 +29,14 @@
 #   omedora/test/fedora/replace-foreign-test.sh
 #   omedora/test/fedora/replace-foreign-test.sh --keep   # leave the container up
 #
-# Host is Arch — uses a throwaway podman fedora:44 container (no systemd/DRM
-# needed; this is pure package management).
+# Host is Arch — uses a throwaway podman fedora:<N> container (no systemd/DRM
+# needed; this is pure package management). OMEDORA_FEDORA_RELEASE=<N> picks the
+# release (default 44; see lib/release.sh).
 
 set -uo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
+. "$REPO/omedora/test/fedora/lib/release.sh"
 # A neutral example foreign Hyprland COPR (any non-omedora source works here).
 FOREIGN_COPR="${REPLACE_FOREIGN_COPR:-solopasha/hyprland}"
 OMEDORA_COPR="${REPLACE_OMEDORA_COPR:-$(OMARCHY_PATH="$REPO" "$REPO/bin/omedora-copr")}"
@@ -75,9 +77,9 @@ in_ctr() { podman exec \
   -e PATH=/repo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
   -e OMEDORA_DNF_CMD=dnf "$CTR" bash -c "$1"; }
 
-log "Starting fedora:44 container '$CTR'..."
+log "Starting fedora:$OMEDORA_FEDORA_RELEASE container '$CTR'..."
 podman rm -f "$CTR" >/dev/null 2>&1 || true
-podman run -d --name "$CTR" -v "$REPO:/repo:ro" registry.fedoraproject.org/fedora:44 sleep infinity >/dev/null
+podman run -d --name "$CTR" -v "$REPO:/repo:ro" "$OMEDORA_FEDORA_IMAGE" sleep infinity >/dev/null
 
 log "Enabling COPRs + installing the FOREIGN Hyprland (from $FOREIGN_COPR)..."
 in_ctr '
