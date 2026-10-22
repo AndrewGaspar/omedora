@@ -1,15 +1,18 @@
 #!/bin/bash
 
-# Install the freshly built Quattro XR stack on Fedora 44 with a full-ffmpeg
+# Install the freshly built Quattro XR stack on Fedora with a full-ffmpeg
 # package identity that conflicts with ffmpeg-free but owns both capabilities.
+# OMEDORA_FEDORA_RELEASE=<N> (default 44) selects the release and the matching
+# build-repo.sh output (repo/ on 44, repo-f<N>/ otherwise; see lib/release.sh).
 
 set -euo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
+. "$REPO/omedora/test/fedora/lib/release.sh"
 COPR_DIR="$REPO/omedora/packaging/copr"
-RPM_REPO="$COPR_DIR/repo"
-WORK="$COPR_DIR/output/hypxr-transaction-test"
-IMAGE="${OMEDORA_RPMBUILD_IMAGE:-registry.fedoraproject.org/fedora:44}"
+RPM_REPO="$COPR_DIR/repo$OMEDORA_RELEASE_SUFFIX"
+WORK="$COPR_DIR/output$OMEDORA_RELEASE_SUFFIX/hypxr-transaction-test"
+IMAGE="${OMEDORA_RPMBUILD_IMAGE:-$OMEDORA_FEDORA_IMAGE}"
 
 [[ -f $RPM_REPO/repodata/repomd.xml ]] || {
   echo "missing local repository metadata: $RPM_REPO/repodata/repomd.xml" >&2
@@ -69,8 +72,9 @@ REPO
 
     rpm -q ffmpeg
     ! rpm -q ffmpeg-free
-    test "$(rpm -qf /usr/bin/ffmpeg)" = "ffmpeg-8.0-1.fc44.noarch"
-    test "$(rpm -qf /usr/bin/ffprobe)" = "ffmpeg-8.0-1.fc44.noarch"
+    fixture_nevra="ffmpeg-8.0-1$(rpm --eval "%{?dist}").noarch"
+    test "$(rpm -qf /usr/bin/ffmpeg)" = "$fixture_nevra"
+    test "$(rpm -qf /usr/bin/ffprobe)" = "$fixture_nevra"
     rpm -q hyprland-no-session hypxrland-omedora hypxrland-stack hypxrland \
       hypxrland-legacy-config hypxrcompose hypxrhud hypxrpaper hypxrva \
       hypxrvoice hypxrvoice-model-base-en wivrn-hypxr omedora-settings
@@ -105,5 +109,5 @@ REPO
     test -f /usr/share/doc/wivrn-hypxr/wivrn-hypxr-fedora.md
     echo "Fedora XR documentation manifests: passed"
     ! rpm -qa | grep -E "omedora-3|hyprland-omedora"
-    echo "Fedora 44 Quattro XR transaction with full-ffmpeg fixture: passed"
+    echo "Fedora $(rpm -E %fedora) Quattro XR transaction with full-ffmpeg fixture: passed"
   '

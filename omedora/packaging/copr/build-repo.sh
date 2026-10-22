@@ -9,6 +9,12 @@
 #
 # Output: packaging/copr/repo/ (a ready-to-serve dnf repo; gitignored).
 #
+# Fedora release: OMEDORA_FEDORA_RELEASE (default 44) selects the build
+# container and a per-release output: Fedora 44 keeps the historical output/ +
+# repo/ dirs, every other release uses output-f<N>/ + repo-f<N>/, so fc44 and
+# fc45 RPMs (and their build stamps) never mix. See
+# omedora/test/fedora/lib/release.sh.
+#
 # Rust vendor tarballs: the from-source Rust specs (swayosd/satty/bluetui) are
 # NOT committed with their cargo-vendor tarball. build-local.sh generates each
 # deterministically at SRPM-gen time from the upstream release tarball's
@@ -19,8 +25,11 @@
 set -euo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
+. "$REPO/omedora/test/fedora/lib/release.sh"
 COPR_DIR="$REPO/omedora/packaging/copr"
-IMAGE="${OMEDORA_RPMBUILD_IMAGE:-registry.fedoraproject.org/fedora:44}"
+IMAGE="${OMEDORA_RPMBUILD_IMAGE:-$OMEDORA_FEDORA_IMAGE}"
+OUT_NAME="output$OMEDORA_RELEASE_SUFFIX"
+LOCAL_REPO_NAME="repo$OMEDORA_RELEASE_SUFFIX"
 
 # Omarchy 4 spec set. The 3.8.2-era specs retired here (deleted from this
 # branch; omedora-3 keeps them): walker, elephant, swayosd, bluetui,
@@ -114,7 +123,7 @@ SPECS=(
 #   build-repo.sh                 # build dirty specs, then assemble the repo
 #   build-repo.sh --force         # rebuild all specs
 #   build-repo.sh walker.spec     # build just walker.spec if dirty (--force to force)
-# Stamps live in output/.stamps/ (gitignored with the rest of output/). The
+# Stamps live in output[-f<N>]/.stamps/ (gitignored with the rest of output/). The
 # first run after adopting this rebuilds everything once to establish stamps.
 force=false
 requested=()
@@ -127,7 +136,7 @@ for arg in "$@"; do
   esac
 done
 
-STAMP_DIR="$COPR_DIR/output/.stamps"
+STAMP_DIR="$COPR_DIR/$OUT_NAME/.stamps"
 BUILDER="$COPR_DIR/build-local.sh"
 mkdir -p "$STAMP_DIR"
 
@@ -150,16 +159,18 @@ done
 
 # Seed the local repo with everything already built, so the FIRST spec in a
 # partial/incremental run can still resolve siblings from a previous full run.
-# build-local.sh enables /copr/repo inside its build container; we keep it
+# build-local.sh enables /copr/repo[-f<N>] inside its build container; we keep it
 # populated + indexed here so each spec sees the ones before it (intra-stack
 # BuildRequires across the Hyprland stack).
 seed_and_index_repo() {
-  podman run --rm -v "$COPR_DIR:/copr:z" "$IMAGE" bash -euo pipefail -c '
+  podman run --rm -v "$COPR_DIR:/copr:z" \
+    -e OUT="/copr/$OUT_NAME" -e LREPO="/copr/$LOCAL_REPO_NAME" \
+    "$IMAGE" bash -euo pipefail -c '
     dnf install -y --setopt=install_weak_deps=False createrepo_c >/dev/null
-    mkdir -p /copr/repo
+    mkdir -p "$LREPO"
     # Binary RPMs only (skip the .src.rpm — not needed to install from).
-    cp -u /copr/output/*.x86_64.rpm /copr/output/*.noarch.rpm /copr/repo/ 2>/dev/null || true
-    createrepo_c --quiet --update /copr/repo
+    cp -u "$OUT"/*.x86_64.rpm "$OUT"/*.noarch.rpm "$LREPO/" 2>/dev/null || true
+    createrepo_c --quiet --update "$LREPO"
   '
 }
 
@@ -167,7 +178,7 @@ if (( ${#to_build[@]} )); then
   echo "==> Building ${#to_build[@]} spec(s): ${to_build[*]}"
   # Make sure any pre-existing output is indexed before the first build, so a
   # partial run resolves siblings built in an earlier invocation.
-  if compgen -G "$COPR_DIR/output/"*.rpm >/dev/null 2>&1; then
+  if compgen -G "$COPR_DIR/$OUT_NAME/"*.rpm >/dev/null 2>&1; then
     echo "==> Indexing pre-existing RPMs into local repo"
     seed_and_index_repo
   fi
@@ -187,15 +198,17 @@ echo ""
 echo "==> Assembling/refreshing local repo (createrepo_c)"
 # Final pass: rebuild the repo cleanly from output/ so it contains EXACTLY the
 # current artifacts (drops anything stale if output/ was pruned), then index.
-podman run --rm -v "$COPR_DIR:/copr:z" "$IMAGE" bash -euo pipefail -c '
+podman run --rm -v "$COPR_DIR:/copr:z" \
+  -e OUT="/copr/$OUT_NAME" -e LREPO="/copr/$LOCAL_REPO_NAME" \
+  "$IMAGE" bash -euo pipefail -c '
   dnf install -y --setopt=install_weak_deps=False createrepo_c >/dev/null
-  rm -rf /copr/repo
-  mkdir -p /copr/repo
+  rm -rf "$LREPO"
+  mkdir -p "$LREPO"
   # Binary RPMs only (skip the .src.rpm — not needed to install from).
-  cp /copr/output/*.x86_64.rpm /copr/output/*.noarch.rpm /copr/repo/ 2>/dev/null || true
-  createrepo_c --quiet /copr/repo
+  cp "$OUT"/*.x86_64.rpm "$OUT"/*.noarch.rpm "$LREPO/" 2>/dev/null || true
+  createrepo_c --quiet "$LREPO"
   echo "repo contents:"
-  ls -1 /copr/repo/*.rpm | sed "s#.*/#  #"
+  ls -1 "$LREPO"/*.rpm | sed "s#.*/#  #"
 '
 echo ""
-echo "Local repo ready: $COPR_DIR/repo/  (baseurl file:///opt/omedora-repo in-container)"
+echo "Local repo ready: $COPR_DIR/$LOCAL_REPO_NAME/  (baseurl file:///opt/omedora-repo in-container)"
