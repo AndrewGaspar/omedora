@@ -13,7 +13,7 @@
 # This is what closes #86: the launch-gate item only ever proven in podman.
 #
 # DESIGN (see omedora/test/fedora/vm/README.md for the full rationale):
-#   * Provisioning  : Fedora 44 Cloud Base qcow2 + cloud-init (NoCloud cidata
+#   * Provisioning  : Fedora Cloud Base qcow2 + cloud-init (NoCloud cidata
 #                     ISO built with xorriso). cloud-init lays the real
 #                     Workstation comps group on top -> faithful coexistence
 #                     base. Fully unattended/scriptable.
@@ -36,6 +36,9 @@
 #   omedora/test/fedora/vm/run-vm-test.sh --stage <name>  # resume at a stage (provision|install|session|tests)
 #   omedora/test/fedora/vm/run-vm-test.sh --ref <gitref>  # OMEDORA_REF channel/branch/tag (default: this branch)
 #   omedora/test/fedora/vm/run-vm-test.sh --cleanup       # destroy+undefine any omedora-vmtest-* and exit
+#   OMEDORA_FEDORA_RELEASE=45 omedora/test/fedora/vm/run-vm-test.sh
+#                                            # provision Fedora 45 instead of 44 (VM
+#                                            #   omedora-vmtest-f45, SSH port 2223; see base-image.sh)
 #
 # Requirements (host): virt-install, virsh, qemu-system-x86_64, xorriso, qemu-img,
 #   ssh, /dev/kvm, passt. All present on the Arch dev host; none need sudo for
@@ -60,20 +63,22 @@ IMAGES="$WORK/images"
 RUN="$WORK/run"
 mkdir -p "$IMAGES" "$RUN"
 
-BASE_IMG_NAME="Fedora-Cloud-Base-Generic-44-1.7.x86_64.qcow2"
-BASE_IMG="$IMAGES/$BASE_IMG_NAME"
-BASE_IMG_URL="https://download.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/$BASE_IMG_NAME"
+# Fedora release (OMEDORA_FEDORA_RELEASE, default 44) -> Cloud Base qcow2:
+# pinned GA table, cache, or newest nightly. BASE_IMG/BASE_IMG_NAME/BASE_IMG_URL
+# are resolved in preflight (see base-image.sh for overrides).
+. "$REPO/omedora/test/fedora/lib/release.sh"
+. "$HERE/base-image.sh"
 
-VM="${OMEDORA_VM_NAME:-omedora-vmtest}"        # libvirt domain name (omedora-vmtest-*)
+VM="${OMEDORA_VM_NAME:-omedora-vmtest$OMEDORA_RELEASE_SUFFIX}"        # libvirt domain name (omedora-vmtest-*)
 VM_USER="${OMEDORA_VM_USER:-omedora}"
 VM_RAM_MB="${OMEDORA_VM_RAM_MB:-4096}"
 VM_VCPUS="${OMEDORA_VM_VCPUS:-4}"
 VM_DISK_GB="${OMEDORA_VM_DISK_GB:-24}"
-SSH_PORT="${OMEDORA_VM_SSH_PORT:-2222}"        # host-forwarded port (passt) -> VM:22
+SSH_PORT="${OMEDORA_VM_SSH_PORT:-$(( 2222 + OMEDORA_FEDORA_RELEASE - 44 ))}"  # host-forwarded port (passt) -> VM:22; 2222 on F44
 SSH_KEY="$RUN/id_omedora_vmtest"
 OVERLAY="$IMAGES/${VM}-overlay.qcow2"
 SEED_ISO="$IMAGES/${VM}-seed.iso"
-ARTIFACTS="$HERE/artifacts"
+ARTIFACTS="$HERE/artifacts$OMEDORA_RELEASE_SUFFIX"
 
 # OMEDORA_REF channel/branch/tag the in-VM install uses. Default: the branch this
 # checkout is on, so a dev iterating on a branch tests THAT code.
@@ -162,11 +167,8 @@ preflight() {
   [[ -e /dev/kvm ]] || die "/dev/kvm not present — KVM acceleration required"
   command -v passt >/dev/null || warn "passt not found — qemu:///session user networking may fail"
 
-  if [[ ! -f "$BASE_IMG" ]]; then
-    log "base image not cached; downloading Fedora 44 Cloud Base (~560MB)..."
-    curl -fSL -o "$BASE_IMG.part" "$BASE_IMG_URL" || die "base image download failed"
-    mv "$BASE_IMG.part" "$BASE_IMG"
-  fi
+  resolve_base_image || die "cannot resolve a Fedora $OMEDORA_FEDORA_RELEASE Cloud Base image"
+  ensure_base_image log || die "base image download failed"
   log "base image: $(qemu-img info "$BASE_IMG" 2>/dev/null | grep 'virtual size' | sed 's/^/  /')"
 
   if [[ ! -f "$SSH_KEY" ]]; then
