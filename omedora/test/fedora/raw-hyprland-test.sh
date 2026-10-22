@@ -2,7 +2,7 @@
 #
 # L4 test: the VANILLA / "piggyback" Hyprland path.
 #
-# Proves that on a PLAIN Fedora 44 with NO omedora install and NO omedora
+# Proves that on a PLAIN Fedora (44 by default) with NO omedora install and NO omedora
 # config, the natural/discoverable full `hyprland` package (from the COPR
 # agaspar/omedora-3) pulls the binaries package `hyprland-no-session` and
 # boots a DEFAULT Hyprland session using Hyprland's BUILT-IN config — no uwsm,
@@ -17,7 +17,7 @@
 #      omedora — Hyprland's compiled-in defaults are enough.
 #
 # How it nests (mirrors omedora/test/fedora/omedora-session/session-launch-headless.sh):
-#   A throwaway podman fedora:44 systemd container stands up its OWN headless
+#   A throwaway podman fedora:<N> systemd container stands up its OWN headless
 #   Wayland host (labwc, wlroots headless backend) and nests RAW Hyprland into
 #   labwc's socket via Aquamarine's "wayland" (nested) backend. Unlike the
 #   omedora launcher this path deliberately does NOT use uwsm and does NOT seed
@@ -40,17 +40,19 @@
 #
 # Requirements: podman with --systemd support and a DRM render node
 # (--device /dev/dri). For GPU-less CI: `sudo modprobe vkms`, then
-# OMEDORA_RENDER_NODE=/dev/dri/renderD<n>. Host is Arch — uses podman fedora:44.
+# OMEDORA_RENDER_NODE=/dev/dri/renderD<n>. Host is Arch — uses podman fedora:<N>,
+# where OMEDORA_FEDORA_RELEASE=<N> (default 44; see lib/release.sh).
 
 set -uo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
 HELPERS="$REPO/test/helpers.sh"
+. "$REPO/omedora/test/fedora/lib/release.sh"
 # shellcheck source=/dev/null
 . "$HELPERS"
 
 COPR_PROJECT="${RAW_HYPR_COPR:-$(OMARCHY_PATH="$REPO" "$REPO/bin/omedora-copr")}"
-IMAGE="${RAW_HYPR_IMAGE:-omedora-test:fedora44-raw-hyprland}"
+IMAGE="${RAW_HYPR_IMAGE:-$OMEDORA_TEST_TAG-raw-hyprland}"
 CTR="${RAW_HYPR_CTR:-omedora-raw-hyprland-$$}"
 RES="${OMEDORA_HEADLESS_RES:-1920x1080}"
 NODE="${OMEDORA_RENDER_NODE:-}"
@@ -71,17 +73,18 @@ done
 
 log() { printf '\033[1;34m[raw-hypr]\033[0m %s\n' "$*"; }
 
-# --- build a VANILLA Fedora 44 image (no omedora) ----------------------------
+# --- build a VANILLA Fedora image (no omedora) --------------------------------
 # A real PID-1 systemd container so we get logind + per-user `systemd --user`
 # (labwc runs as a transient user unit, exactly like the omedora headless
 # launcher). The ONLY desktop bits baked in are labwc (the nesting host) — NO
 # Hyprland, NO omedora: hyprland is installed live inside the container so the
 # COPR resolution is part of the test.
 build_image() {
-  log "Building vanilla Fedora 44 image '$IMAGE' (labwc host, no omedora)..."
+  log "Building vanilla Fedora $OMEDORA_FEDORA_RELEASE image '$IMAGE' (labwc host, no omedora)..."
   local ctx; ctx=$(mktemp -d "$TMPDIR/raw-hypr-ctx.XXXXXX")
   cat >"$ctx/Dockerfile" <<'DOCKERFILE'
-FROM registry.fedoraproject.org/fedora:44
+ARG FEDORA_RELEASE=44
+FROM registry.fedoraproject.org/fedora:${FEDORA_RELEASE}
 
 # PID-1 systemd + logind + a system bus, plus dnf copr support and the small set
 # of tools the test drives (jq/python for hyprctl JSON, procps for pgrep).
@@ -124,7 +127,7 @@ RUN install -d -m 0755 /var/lib/systemd/linger && touch /var/lib/systemd/linger/
 STOPSIGNAL SIGRTMIN+3
 CMD ["/sbin/init"]
 DOCKERFILE
-  podman build -t "$IMAGE" "$ctx"
+  podman build -t "$IMAGE" --build-arg "FEDORA_RELEASE=$OMEDORA_FEDORA_RELEASE" "$ctx"
   local rc=$?
   rm -rf "$ctx"
   return $rc

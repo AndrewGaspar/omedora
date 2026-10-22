@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Real dnf5 regression coverage for exact core candidate selection and
-# provenance repair. Run as root inside the Fedora 44 L2 image.
+# provenance repair. Run as root inside the Fedora L2 image.
 
 set -euo pipefail
 
