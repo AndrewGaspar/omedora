@@ -280,10 +280,10 @@ installed with the relevant RPM and summarized by `hypxrland-stack`'s README.
 
 | Script | What it does |
 | --- | --- |
-| `build-local.sh <name.spec>` | Builds **one** spec via `rpmbuild -ba` inside a throwaway `registry.fedoraproject.org/fedora:44` container (our dev host is Arch and has no `rpmbuild`). Installs `rpm-build`/`rpmdevtools`, runs `dnf builddep` for the spec's `BuildRequires`, `spectool -g`'s the sources, builds. Artifacts (the `.rpm` + `.src.rpm`) land in `omedora/packaging/copr/output/`. |
+| `build-local.sh <name.spec>` | Builds **one** spec via `rpmbuild -ba` inside a throwaway `registry.fedoraproject.org/fedora:<N>` container (our dev host is Arch and has no `rpmbuild`), where `OMEDORA_FEDORA_RELEASE=<N>` defaults to 44. Installs `rpm-build`/`rpmdevtools`, runs `dnf builddep` for the spec's `BuildRequires`, `spectool -g`'s the sources, builds. Artifacts (the `.rpm` + `.src.rpm`) land in `omedora/packaging/copr/output/` (Fedora 44) or `output-f<N>/` (other releases). |
 | `build-repo.sh` | Builds the canonical spec set in dependency order by looping `build-local.sh`, adding each result to an incremental local dnf repo so later builds can consume sibling RPMs. The Omedora 4 set includes the Hyprland/HypXRland waves and Quattro additions such as omacalc, ttfx, and herdr. |
 
-`output/` and `repo/` are **gitignored** (`omedora/packaging/copr/.gitignore`) — they're build products, rebuilt on demand. Only the specs and scripts are tracked.
+`output/` and `repo/` (Fedora 44) and their per-release `output-f<N>/` / `repo-f<N>/` siblings are **gitignored** (`omedora/packaging/copr/.gitignore`) — they're build products, rebuilt on demand, and fc44/fc45 RPMs never share one. Only the specs and scripts are tracked.
 
 ### Hermetic vendored build
 
@@ -301,10 +301,10 @@ The local repo from [`build-repo.sh`](#build-scripts) is a test fixture: a direc
 
 `omedora/test/fedora/build-session.sh` does this in two steps:
 
-1. **Build the repo** (step 0): if `omedora/packaging/copr/repo/repodata/repomd.xml` is missing (or `--rebuild`), it runs `build-repo.sh` first.
+1. **Build the repo** (step 0): if `omedora/packaging/copr/repo/repodata/repomd.xml` (`repo-f<N>/` for `OMEDORA_FEDORA_RELEASE` ≠ 44) is missing or older than a spec (or `--rebuild-repo`), it runs `build-repo.sh` first.
 2. **Inject it** (step 2.5), after the base image is booted but before `install.sh` runs:
    ```bash
-   podman cp "$COPR_DIR/repo" "$BUILD_CTR:/opt/omedora-repo"
+   podman cp "$LOCAL_REPO_DIR" "$BUILD_CTR:/opt/omedora-repo"
    podman exec "$BUILD_CTR" bash -c \
      'printf "[omedora-local]\nname=Omedora local packages\nbaseurl=file:///opt/omedora-repo\nenabled=1\ngpgcheck=0\n" >/etc/yum.repos.d/omedora-local.repo'
    ```
@@ -331,7 +331,7 @@ Every map entry change goes in a PR with the rationale in the commit body. Agent
 
 To take a package from `source = "skip"` (or a missing entry) to an installed omedora-repo RPM:
 
-1. **Write the spec.** Add `omedora/packaging/copr/<name>.spec`, picking the right [flavor](#spec-conventions) (binary-repackage / from-source meson-cargo / Python pyproject). Lead with a comment explaining the choice. Iterate with `omedora/packaging/copr/build-local.sh <name>.spec` until it builds clean in the `fedora:44` container.
+1. **Write the spec.** Add `omedora/packaging/copr/<name>.spec`, picking the right [flavor](#spec-conventions) (binary-repackage / from-source meson-cargo / Python pyproject). Lead with a comment explaining the choice. Iterate with `omedora/packaging/copr/build-local.sh <name>.spec` until it builds clean in the Fedora container of each supported release (`OMEDORA_FEDORA_RELEASE=44` and `=45`).
 2. **Add it to `build-repo.sh`.** Append the spec filename to the `SPECS=(...)` array so local test repositories include it; add the same spec to the live COPR build set.
 3. **Flip the `fedora.toml` entry.** Set `source = "dnf"` and `names = [...]` to the RPM `Name:` field(s). Note in `reason` that the name resolves to an omedora-repo RPM, not a Fedora-shipped one.
 4. **Rebuild + test.** `omedora/test/fedora/build-session.sh --rebuild` rebuilds the repo, injects it, and runs `install.sh` — the most faithful end-to-end check that dnf resolves the new package and its deps.
@@ -343,7 +343,7 @@ To take a package from `source = "skip"` (or a missing entry) to an installed om
 Before merging a new map entry — agents and humans both run through this:
 
 - [ ] **Tier choice justified.** Why this tier and not an earlier one? Note in `reason` or commit body.
-- [ ] **For `source = "dnf"` (Fedora main / RPM Fusion):** Verify `dnf info <name>` succeeds on a clean Fedora 44 VM/container. Note the package version.
+- [ ] **For `source = "dnf"` (Fedora main / RPM Fusion):** Verify `dnf info <name>` succeeds on a clean VM/container of each supported Fedora release (44 and 45). Note the package versions.
 - [ ] **For `source = "dnf"` (omedora repo):** A spec exists in `omedora/packaging/copr/`, it's listed in `build-repo.sh`'s `SPECS`, the RPM `Name:` matches the entry's `names`, and `build-local.sh <spec>` builds clean. The `reason` notes it's an omedora-repo RPM.
 - [ ] **For `source = "copr"`:** The third-party COPR must already be on the allowlist below. Adding a *new* COPR requires:
     - Documented maintainer (single individual or org).
@@ -353,7 +353,7 @@ Before merging a new map entry — agents and humans both run through this:
 - [ ] **For `source = "flathub"`:** App ID matches a maintained Flathub listing. Verify it's not a community-mirror of a proprietary app with stale builds.
 - [ ] **For `source = "skip"`:** Reason is clear and durable (won't be obsoleted next Fedora release).
 - [ ] **Patch-stack map updated.** If this is the first entry of its kind, the new file may need adding to `architecture.md`'s patch-stack map.
-- [ ] **Tested.** Ran `omedora update` (or a fresh install) end-to-end on a Fedora 44 VM after the change.
+- [ ] **Tested.** Ran `omedora update` (or a fresh install) end-to-end on a VM of each supported Fedora release after the change.
 
 ### COPR allowlist
 

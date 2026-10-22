@@ -8,9 +8,53 @@ lower layer never implies a higher one passed.
 | Layer | Environment | Scope |
 | --- | --- | --- |
 | L1 | Any Linux development host | Shell units, static package/spec checks, migration gates, CLI metadata, and byte identity |
-| L2 | Fedora 44 and Arch containers | Real distro tooling, Fedora integration, and upstream Arch regression |
+| L2 | Fedora (44, 45) and Arch containers | Real distro tooling, Fedora integration, and upstream Arch regression |
 | L3 | Fedora container or clean Fedora system | Fresh package/install and release-upgrade flows |
 | L4 | Nested full session and Fedora Workstation VM | Compositor, Quickshell, portals, GDM, SELinux, hardware, and visual goldens |
+
+### Fedora release selection
+
+Omedora supports Fedora 44 and Fedora 45. Every Fedora runner (L2, L3, L4, VM,
+and `packaging/copr/build-{local,repo}.sh`) honors one knob,
+`OMEDORA_FEDORA_RELEASE` (default `44`), resolved by
+`omedora/test/fedora/lib/release.sh`:
+
+```bash
+OMEDORA_FEDORA_RELEASE=45 omedora/test/fedora/run-integration.sh
+```
+
+| Resource | Fedora 44 (default) | Fedora N ≠ 44 |
+| --- | --- | --- |
+| Base image | `registry.fedoraproject.org/fedora:44` | `…/fedora:N` (Dockerfile `FEDORA_RELEASE` build arg) |
+| L2/L3 image | `omedora-test:fedora44` | `omedora-test:fedoraN` |
+| L4 images | `omedora-test:fedora44-session-4*` | `omedora-test:fedoraN-session-4*` |
+| dnf cache volumes | `omedora-dnf-cache`, `omedora-rpmbuild-dnf-cache` | the same with `-fN` |
+| Local RPM build | `packaging/copr/output/`, `packaging/copr/repo/` | `output-fN/`, `repo-fN/` |
+| VM base image | pinned `Fedora-Cloud-Base-Generic-44-1.7` | pinned GA if listed, else cached, else newest nightly |
+| VM domain / SSH port | `omedora-vmtest` / 2222 | `omedora-vmtest-fN` / 2222+N−44 |
+
+Fedora 44 keeps the names the harness used before the knob existed, so cached
+images, volumes and local repos stay valid. fc44 and fc45 RPMs never share a
+local repo. Explicit overrides (`OMEDORA_TEST_IMAGE`, `OMEDORA_SYSTEMD_*`,
+`OMEDORA_RPMBUILD_IMAGE`, `OMEDORA_VM_BASE_URL`, …) still win. The VM image
+lookup is documented in `omedora/test/fedora/vm/base-image.sh`; add each
+release's GA image to its pin table once it is published.
+
+Release gates run on both supported releases:
+
+| Gate | Fedora 44 | Fedora 45 |
+| --- | --- | --- |
+| L2 `run-integration.sh` | required | required |
+| L3 fresh install (`run-smoke.sh`, `update-verify.sh`) | required | required |
+| L4 `build-session.sh` + `headless/run-tests.sh` (standard and `--workstation`) | required | required |
+| VM `run-vm-test.sh` | required | required |
+| F44 → F45 upgrade, container and VM | — | required (planned) |
+
+The planned upgrade gate installs Omedora on Fedora 44, upgrades the system in
+place to Fedora 45 (`dnf system-upgrade`), and proves that Omedora's packages
+move to the fc45 COPR builds and that the session still boots, both in a
+container and in the VM tier. Until those runners land, record the upgrade
+gate as not run.
 
 ## 2. L1 gate
 
@@ -61,7 +105,8 @@ separately rather than substituting it for the deterministic L1 list.
 omedora/test/fedora/run-integration.sh
 ```
 
-The runner builds `omedora-test:fedora44` from the checked-in Dockerfile and runs
+The runner builds `omedora-test:fedora44` (`omedora-test:fedora45` with
+`OMEDORA_FEDORA_RELEASE=45`) from the checked-in Dockerfile and runs
 `omedora/test/fedora/integration.sh` with the repository mounted at `/repo`.
 This validates package-map behavior and Fedora-specific setup with real dnf/rpm
 tools. Use `--rebuild` after changing the test image.
@@ -100,7 +145,8 @@ omedora/test/fedora/upgrade-to-4-verify.sh
 
 Some scripts are designed to run inside a prepared Fedora test image rather
 than directly on the host. Read each header and use the documented runner. A
-release requires a clean Fedora 44 fresh install, two consecutive scoped update
+release requires a clean fresh install on each supported Fedora release (see
+the matrix in §1), two consecutive scoped update
 runs, an upgrade from the previous published Omedora build, and the beta.1
 bootstrap gate when releasing beta.2. The beta.1 gate must prove that the scoped
 `omedora`/`omedora-settings` transaction lands new code before `omedora update`
@@ -139,7 +185,8 @@ change, and accept a new golden only after human visual review. The official
 omedora/test/fedora/vm/run-vm-test.sh
 ```
 
-The rootless libvirt/KVM pipeline provisions Fedora 44 Workstation, installs
+The rootless libvirt/KVM pipeline provisions Fedora Workstation
+(`OMEDORA_FEDORA_RELEASE`, default 44), installs
 from the live COPR, starts the packaged Omedora session through GDM, checks RPM
 provenance, runs session assertions, and captures the real framebuffer. It is a
 pre-release gate, not a per-PR CI job.
@@ -174,6 +221,6 @@ A parent reviewer should receive exact results for:
 1. Every L1 test, including the count passed/failed.
 2. Fedora map validation, `test/cli`, and `commands --check`.
 3. Byte identity against the exact official base commit.
-4. Fedora and Arch L2 commands actually run.
+4. Fedora and Arch L2 commands actually run, per Fedora release.
 5. L3/L4 commands actually run, or explicit blockers when they were not.
 6. Any containers created and confirmation that they were removed.
