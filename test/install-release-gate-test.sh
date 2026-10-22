@@ -102,6 +102,11 @@ assert_output_contains "sourcing the gate under set -e continues (override)" \
 
 echo "# --- the gate runs first in plan.sh ---"
 
+# plan.sh's foreign-repo check runs omarchy-doctor, which would query the real
+# rpmdb through the failing dnf stub below; on an installed Omedora system that
+# reads as foreign Hyprland and aborts the plan. Report a clean system.
+export OMEDORA_REPOQUERY_CMD="printf ''"
+
 STUB_PATH="$SCRATCH/shim"
 mkdir -p "$STUB_PATH"
 for tool in dnf rpm flatpak sudo; do
