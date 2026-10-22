@@ -2,7 +2,8 @@
 #
 # Host-side runner for the L4-nested Omedora v4 session — systemd edition.
 #
-# Boots the committed v4 session image (omedora-test:fedora44-session-4)
+# Boots the committed v4 session image (omedora-test:fedora44-session-4; with
+# OMEDORA_FEDORA_RELEASE=<N>, omedora-test:fedora<N>-session-4 — see lib/release.sh)
 # under podman with real PID-1 systemd, waits for systemd-logind + the omedora
 # user manager, then logs in as omedora via `machinectl shell` and launches the
 # session: Hyprland 0.55 with the Lua config, whose autostart starts the
@@ -46,6 +47,7 @@
 set -euo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
+. "$REPO/omedora/test/fedora/lib/release.sh"
 # SESSION_IMAGE / RUN_CTR are resolved after arg parsing so --workstation can pick
 # the "-workstation" image lineage + a distinct container name.
 LAUNCH_DIR_IN_IMAGE=/home/omedora/.local/share/omarchy/omedora/test/fedora/omedora-session
@@ -74,8 +76,8 @@ done
 # apply). An explicit OMEDORA_SYSTEMD_SESSION_IMAGE / OMEDORA_SESSION_CTR still wins.
 variant=""; $workstation && variant="-workstation"
 local_variant=""; $local_repo && local_variant="-local"
-SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session-4${variant}${local_variant}}"
-RUN_CTR="${OMEDORA_SESSION_CTR:-omedora-session-4${variant}${local_variant}}"
+SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-$OMEDORA_TEST_TAG-session-4${variant}${local_variant}}"
+RUN_CTR="${OMEDORA_SESSION_CTR:-omedora-session-4$OMEDORA_RELEASE_SUFFIX${variant}${local_variant}}"
 
 # --- preconditions -----------------------------------------------------------
 if ! $headless; then

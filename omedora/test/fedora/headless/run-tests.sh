@@ -22,6 +22,9 @@
 #   omedora/test/fedora/headless/run-tests.sh --workstation   # run the suite on a Fedora
 #                                            #   Workstation base (00-50 + the SKIP-gated
 #                                            #   90-workstation coexistence test)
+#   OMEDORA_FEDORA_RELEASE=45 omedora/test/fedora/headless/run-tests.sh
+#                                            # run against the Fedora 45 session image
+#                                            #   (default 44; see ../lib/release.sh)
 #
 # Requirements: podman with --systemd support and a DRM render node
 # (--device /dev/dri). On GPU-less CI: `sudo modprobe vkms`, then
@@ -30,8 +33,10 @@
 set -euo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../../.." && pwd)
+. "$REPO/omedora/test/fedora/lib/release.sh"
 HEADLESS_DIR="$REPO/omedora/test/fedora/headless"
-ARTIFACTS_DIR="$HEADLESS_DIR/artifacts"
+# Per-release so concurrent Fedora 44 / 45 runs never clobber each other.
+ARTIFACTS_DIR="$HEADLESS_DIR/artifacts$OMEDORA_RELEASE_SUFFIX"
 # SESSION_IMAGE / CTR are resolved after arg parsing so --workstation can select
 # the "-workstation" image lineage + a distinct (ws-) container name, letting a
 # Workstation run and a standard run run concurrently.
@@ -62,7 +67,7 @@ done
 # Workstation run gets a "ws-" container prefix so it never collides with a
 # concurrent standard run. Explicit OMEDORA_* env still wins.
 variant=""; ctr_variant=""; $workstation && { variant="-workstation"; ctr_variant="ws-"; }
-SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session-4${variant}}"
+SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-$OMEDORA_TEST_TAG-session-4${variant}}"
 CTR="${OMEDORA_HTEST_CTR:-omedora-htest-${ctr_variant}$$}"
 
 log() { printf '\033[1;34m[htest]\033[0m %s\n' "$*"; }

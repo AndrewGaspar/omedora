@@ -14,9 +14,12 @@
 # live logind session, and commits the result. See omedora/testing.md §6.
 #
 # Built and run entirely under podman (--systemd=always); independent of the
-# docker-based L1/L2/L3 images. Build product: omedora-test:fedora44-session-4-base.
+# docker-based L1/L2/L3 images. Build product: omedora-test:fedora<N>-session-4-base,
+# where FEDORA_RELEASE (default 44) is passed by build-session.sh from
+# OMEDORA_FEDORA_RELEASE (see omedora/test/fedora/lib/release.sh).
 
-FROM registry.fedoraproject.org/fedora:44
+ARG FEDORA_RELEASE=44
+FROM registry.fedoraproject.org/fedora:${FEDORA_RELEASE}
 
 # --- install toolchain + systemd + session prerequisites ---------------------
 #   systemd / systemd-container → PID-1 init + `machinectl shell` login
@@ -25,7 +28,7 @@ FROM registry.fedoraproject.org/fedora:44
 #     needs (gum for the plan gate, python3 for bin/fedora/pkg.py, flatpak for
 #     the Flathub payload, dnf-plugins-core for `dnf copr enable`)
 #   util-linux-script           → some omarchy helpers probe for `script`
-# NOTE: Fedora 44's dnf is dnf5, which caches packages under /var/cache/libdnf5
+# NOTE: Fedora 44+'s dnf is dnf5, which caches packages under /var/cache/libdnf5
 # (not the dnf4 /var/cache/dnf). The BuildKit cache mount + keepcache=True only
 # persist downloads if they target the dnf5 path. build-session.sh mounts its
 # named cache volume at the same /var/cache/libdnf5 path for the same reason.

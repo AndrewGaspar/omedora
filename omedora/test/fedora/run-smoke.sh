@@ -6,11 +6,13 @@
 # Usage:
 #   omedora/test/fedora/run-smoke.sh
 #   omedora/test/fedora/run-smoke.sh --rebuild
+#   OMEDORA_FEDORA_RELEASE=45 omedora/test/fedora/run-smoke.sh   # default 44
 
 set -euo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
-IMAGE="${OMEDORA_TEST_IMAGE:-omedora-test:fedora44}"
+. "$REPO/omedora/test/fedora/lib/release.sh"
+IMAGE="${OMEDORA_TEST_IMAGE:-$OMEDORA_TEST_TAG}"
 
 rebuild=false
 for arg in "$@"; do
@@ -29,7 +31,8 @@ done
 
 if $rebuild || ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   echo "Building $IMAGE..."
-  docker build -t "$IMAGE" -f "$REPO/omedora/test/fedora/Dockerfile" "$REPO/omedora/test/fedora/"
+  docker build -t "$IMAGE" --build-arg "FEDORA_RELEASE=$OMEDORA_FEDORA_RELEASE" \
+    -f "$REPO/omedora/test/fedora/Dockerfile" "$REPO/omedora/test/fedora/"
 fi
 
 exec docker run --rm \

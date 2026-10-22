@@ -3,8 +3,13 @@
 # Build the L4-nested Omedora v4 session image by running the v4 bootstrap
 # (omedora/install-4.sh's steps) inside a LIVE systemd+logind session, then
 # committing the result. This is the "boot Fedora, log in, run the installer"
-# path — the most faithful way to reproduce a bare-metal Fedora 44 omedora
+# path — the most faithful way to reproduce a bare-metal Fedora omedora
 # install in a container.
+#
+# Fedora release: OMEDORA_FEDORA_RELEASE (default 44) selects the base Fedora
+# image and the image lineage — omedora-test:fedora<N>-session-4* — plus a
+# per-release dnf cache volume and local repo dir (see lib/release.sh). The
+# names below are the Fedora 44 defaults.
 #
 # Why not a Dockerfile RUN? A `podman build` step has no PID-1 systemd, so
 # `systemctl --user`, the session D-Bus, and `flatpak install --user` don't
@@ -31,7 +36,7 @@
 # Package source: by default the install resolves omedora's packages from the
 # LIVE omedora COPR (bin/omedora-copr → agaspar/omedora-4 on this line) — the
 # real from-COPR install path a user gets. --local-repo instead injects the
-# locally-built RPM repo (omedora/packaging/copr/repo, built by build-repo.sh
+# locally-built RPM repo (omedora/packaging/copr/repo[-f<N>], built by build-repo.sh
 # from THIS checkout) as /etc/yum.repos.d/omedora-local.repo; the bootstrap's
 # repos.sh then skips the COPR enable and dnf resolves the omedora packages
 # from the local overlay — hermetic, and the way to test unpublished payload
@@ -68,22 +73,27 @@
 set -euo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
+. "$REPO/omedora/test/fedora/lib/release.sh"
 # Image/container names are resolved AFTER arg parsing so --workstation /
 # --local-repo can apply their infixes (see the resolution block below).
 # DNF_CACHE_VOL is shared by every variant on purpose — they pull mostly the
-# same RPMs, so they warm each other's cache.
-DNF_CACHE_VOL="${OMEDORA_DNF_CACHE_VOL:-omedora-dnf-cache}"
-# Fedora 44 ships dnf5, whose package cache lives under /var/cache/libdnf5 (NOT
+# same RPMs, so they warm each other's cache. Releases get separate volumes
+# (omedora-dnf-cache on 44, omedora-dnf-cache-f<N> otherwise) so one release's
+# metadata and RPMs never shadow another's.
+DNF_CACHE_VOL="${OMEDORA_DNF_CACHE_VOL:-omedora-dnf-cache$OMEDORA_RELEASE_SUFFIX}"
+# Fedora 44+ ships dnf5, whose package cache lives under /var/cache/libdnf5 (NOT
 # the dnf4 path /var/cache/dnf). Mount the persistent volume at the dnf5 path
 # so keepcache=True actually persists the RPMs across builds.
 DNF_CACHE_DIR="/var/cache/libdnf5"
-HOST_LOG="${OMEDORA_SYSTEMD_BUILD_LOG:-/tmp/omedora-session-build.log}"
+HOST_LOG="${OMEDORA_SYSTEMD_BUILD_LOG:-/tmp/omedora-session-build$OMEDORA_RELEASE_SUFFIX.log}"
 DOCKERFILE_BASE="$REPO/omedora/test/fedora/omedora-session/Dockerfile.base"
 DOCKERFILE_WORKSTATION="$REPO/omedora/test/fedora/omedora-session/Dockerfile.workstation"
 # The standard base image name is fixed (it's what the Workstation tier FROMs);
 # --workstation does NOT rename it.
-STD_BASE_IMAGE="omedora-test:fedora44-session-4-base"
+STD_BASE_IMAGE="$OMEDORA_TEST_TAG-session-4-base"
 COPR_DIR="$REPO/omedora/packaging/copr"
+# build-repo.sh's per-release output repo (repo/ on 44, repo-f<N>/ otherwise).
+LOCAL_REPO_DIR="$COPR_DIR/repo$OMEDORA_RELEASE_SUFFIX"
 SESSION_DIR="$REPO/omedora/test/fedora/omedora-session"
 STAGED_IN_IMAGE=/home/omedora/.local/share/omarchy/omedora/test/fedora/omedora-session/staged-install-4.sh
 # SELinux-enforcing hosts (default Fedora): the build container runs systemd and
@@ -130,13 +140,13 @@ fi
 # repo-agnostic base. Explicit OMEDORA_SYSTEMD_* env overrides still win.
 variant=""; $workstation && variant="-workstation"
 local_variant=""; $local_repo && local_variant="-local"
-BASE_IMAGE="${OMEDORA_SYSTEMD_BASE_IMAGE:-omedora-test:fedora44-session-4${variant}-base}"
-SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-omedora-test:fedora44-session-4${variant}${local_variant}}"
+BASE_IMAGE="${OMEDORA_SYSTEMD_BASE_IMAGE:-$OMEDORA_TEST_TAG-session-4${variant}-base}"
+SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-$OMEDORA_TEST_TAG-session-4${variant}${local_variant}}"
 # Intermediate "packages installed" image; derived from SESSION_IMAGE's name so a
 # custom OMEDORA_SYSTEMD_SESSION_IMAGE gets a matching pkgs image, but can be
 # overridden directly.
 PKGS_IMAGE="${OMEDORA_SYSTEMD_PKGS_IMAGE:-${SESSION_IMAGE%%:*}:${SESSION_IMAGE##*:}-pkgs}"
-BUILD_CTR="${OMEDORA_BUILD_CTR:-omedora-session-4${variant}${local_variant}-build}"
+BUILD_CTR="${OMEDORA_BUILD_CTR:-omedora-session-4$OMEDORA_RELEASE_SUFFIX${variant}${local_variant}-build}"
 
 log() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 
@@ -166,7 +176,7 @@ wait_for_systemd() {
 inject_local_repo() {
   local ctr="$1"
   log "Injecting local omedora RPM repo (repos.sh will skip the COPR enable)"
-  podman cp "$COPR_DIR/repo" "$ctr:/opt/omedora-repo"
+  podman cp "$LOCAL_REPO_DIR" "$ctr:/opt/omedora-repo"
   podman exec "$ctr" bash -c \
     'printf "[omedora-local]\nname=Omedora local packages\nbaseurl=file:///opt/omedora-repo\nenabled=1\ngpgcheck=0\n" >/etc/yum.repos.d/omedora-local.repo'
 }
@@ -216,7 +226,7 @@ commit_systemd() {
 # rebuild it only when one of those is newer than the built repomd.xml. Force
 # with --rebuild-repo (or run build-repo.sh yourself).
 repo_is_stale() {
-  local repomd="$COPR_DIR/repo/repodata/repomd.xml" f
+  local repomd="$LOCAL_REPO_DIR/repodata/repomd.xml" f
   [[ -f "$repomd" ]] || return 0   # missing → stale
   for f in "$COPR_DIR"/*.spec "$COPR_DIR/build-repo.sh" "$COPR_DIR/build-local.sh"; do
     [[ -e "$f" && "$f" -nt "$repomd" ]] && return 0
@@ -275,7 +285,8 @@ if $workstation; then
   # The Workstation tier FROMs the standard base, so that must exist first.
   if $rebuild || ! podman image exists "$STD_BASE_IMAGE"; then
     log "Building standard base image $STD_BASE_IMAGE (Workstation tier builds FROM it)"
-    podman build -t "$STD_BASE_IMAGE" -f "$DOCKERFILE_BASE" "$REPO"
+    podman build -t "$STD_BASE_IMAGE" --build-arg "FEDORA_RELEASE=$OMEDORA_FEDORA_RELEASE" \
+      -f "$DOCKERFILE_BASE" "$REPO"
   else
     log "Standard base image $STD_BASE_IMAGE already present (use --rebuild to force)"
   fi
@@ -289,7 +300,8 @@ if $workstation; then
 else
   if $rebuild || ! podman image exists "$BASE_IMAGE"; then
     log "Building base image $BASE_IMAGE"
-    podman build -t "$BASE_IMAGE" -f "$DOCKERFILE_BASE" "$REPO"
+    podman build -t "$BASE_IMAGE" --build-arg "FEDORA_RELEASE=$OMEDORA_FEDORA_RELEASE" \
+      -f "$DOCKERFILE_BASE" "$REPO"
   else
     log "Base image $BASE_IMAGE already present (use --rebuild to force)"
   fi
