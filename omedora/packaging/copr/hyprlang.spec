@@ -20,7 +20,7 @@ ExcludeArch:    %{ix86}
 
 BuildRequires:  cmake
 BuildRequires:  gcc-c++
-BuildRequires:  pkgconfig(hyprutils)
+BuildRequires:  pkgconfig(hyprutils) >= 0.14.0
 
 %description
 %{summary}.
