@@ -16,6 +16,9 @@
 #   copr-submit.sh all           # register, then build
 #   copr-submit.sh build walker.spec swayosd.spec   # just these (still ordered)
 #
+#   # Backfill a newly enabled chroot without rebuilding the others:
+#   CHROOTS=fedora-45-x86_64 copr-submit.sh build
+#
 #   # The Omarchy-4 line, later:
 #   PROJECT=omedora-4 BRANCH=4-omedora copr-submit.sh all
 #
@@ -79,10 +82,13 @@ register_one() {
 
 # Build one package and BLOCK until it reaches a terminal state, so the next
 # (dependent) spec sees this one's RPMs in the project repo.
+# CHROOTS (space-separated) limits builds to those chroots; unset builds every
+# chroot enabled on the project, which is what a normal push wants.
 build_one() {
-  local name="${1%.spec}"
-  echo "==> building $name ($PROJECT) ..."
-  copr-cli build-package "$PROJECT" --name "$name"
+  local name="${1%.spec}" chroot chroot_args=()
+  for chroot in ${CHROOTS:-}; do chroot_args+=(-r "$chroot"); done
+  echo "==> building $name ($PROJECT${CHROOTS:+, $CHROOTS}) ..."
+  copr-cli build-package "$PROJECT" --name "$name" "${chroot_args[@]}"
 }
 
 cmd="${1:-all}"; shift || true
