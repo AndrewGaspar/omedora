@@ -155,7 +155,9 @@ release skips the COPR (`skip_if_unavailable`) and then either fails on
 dependency problems or, with `--allowerasing`, removes the Omedora session
 (`hyprland-no-session`, `omedora`, `aquamarine`, ...) and downgrades the
 vendored Hyprland stack and Quickshell to Fedora's older same-name packages.
-`omedora-upgrade-fedora` refuses to start until that can't happen:
+A raw upgrade like that, including GNOME Software's, is also stopped by the
+dnf release-change guard described below; `omedora-upgrade-fedora` is the
+supported path and refuses to start until that can't happen:
 
 1. **Preflight** (read-only; `--check` stops here). The target must be newer
    than the running release and `omedora-copr --chroot-available <target>`
