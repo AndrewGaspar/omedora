@@ -231,6 +231,45 @@ Before announcing support for a new release:
   reported before continuing.
 - Restart/reboot remains an explicit user decision.
 
+## dnf release-change guard
+
+A raw `sudo dnf system-upgrade download --releasever=N`, `dnf --releasever=N
+distro-sync`, or a GNOME Software upgrade bypasses `omedora-upgrade-fedora`.
+When the COPR has no `fedora-N` chroot, dnf5 skips the repo
+(`skip_if_unavailable`), and the transaction then fails or, with
+`--allowerasing`, removes Hyprland and downgrades quickshell and the hypr
+libraries to Fedora's older copies. That leaves a broken desktop.
+
+`omedora-settings` ships a libdnf5 actions-plugin hook,
+`/etc/dnf/libdnf5-plugins/actions.d/omedora-release-guard.actions`, which runs
+`/usr/libexec/omedora/omedora-release-guard` on `goal_resolved`. The package
+requires `libdnf5-plugin-actions` because Fedora does not install it by
+default. The hook runs in every libdnf5 front end: the `dnf` CLI,
+`dnf5daemon-server` (GNOME Software on Fedora 44/45), and PackageKit's dnf5
+backend. Rules:
+
+- Same-release transactions are never blocked. The guard compares dnf's
+  `releasever` with `/etc/os-release`.
+- A release-changing transaction is stopped if it would remove, downgrade, or
+  hand to another vendor any package whose vendor is
+  `Fedora Copr - user <owner>`. The guard also stops it if the COPR repo loaded
+  nothing and `omedora-copr --chroot-available N` exits 1. This catches a
+  partially built new chroot as well as a missing one.
+- The guard fails open. It allows the transaction, with a warning, on probe
+  exit 2, a timeout, a missing `omedora-copr`, a plugin error, or a guard
+  crash (the action keeps `raise_error=0`).
+- The offline reboot phase (`dnf5 offline _execute`) is always allowed and
+  makes no network call. That phase replays a stored transaction with
+  `cacheonly=all`, no repositories, and the old `releasever`.
+- `enabled=host-only` keeps the hook out of `--installroot` operations.
+- Bypass: `sudo OMEDORA_ALLOW_RELEASE_UPGRADE=1 dnf ...`. dnf's
+  `--disable-plugin=actions` also bypasses it.
+
+Each resolved goal costs about 35 ms. The guard queries the network only for a
+release change whose COPR repo loaded nothing. Its verdicts are logged to
+`/var/log/dnf5.log` (`omedora-release-guard:`). `test/dnf-release-guard-test.sh`
+covers the decision logic and the json protocol.
+
 ## Tests
 
 `test/update-flow-test.sh` uses fixture base/map files and mocked rpm/dnf tools to
