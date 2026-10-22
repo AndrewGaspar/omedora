@@ -70,6 +70,9 @@ jobs:
       - name: Run update-flow test
         run: bash test/update-flow-test.sh
 
+      - name: Run update unsupported-release test
+        run: bash test/update-unsupported-release-test.sh
+
       - name: Run powerprofilesctl shim test
         run: bash test/powerprofilesctl-shim-test.sh
 
