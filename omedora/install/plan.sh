@@ -5,6 +5,9 @@
 # reworked for the Omarchy 4 package-backed flow (no install.sh upstream; the
 # omedora/omedora-settings RPMs own the payload).
 #
+# FIRST, release.sh refuses a Fedora release the Omedora COPR doesn't build
+# for (exit 1, nothing changed).
+#
 # WHAT IT AGGREGATES (writing NOTHING — pure dry run):
 #   1. repos that will be enabled (omedora COPR, RPM Fusion free+nonfree,
 #      Flathub user remote)
@@ -51,6 +54,10 @@
 # that shell. Do not add set -e/+e (it leaks).
 
 OMEDORA_REPO_ROOT="${OMEDORA_REPO_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)}"
+
+# --- 0. release support ------------------------------------------------------
+# Refuse an unsupported Fedora release before computing (or changing) anything.
+source "$OMEDORA_REPO_ROOT/omedora/install/release.sh"
 
 plan_src="${OMEDORA_PLAN_SOURCE:-$OMEDORA_REPO_ROOT/config}"
 plan_dest="${OMEDORA_PLAN_DEST:-$HOME/.config}"

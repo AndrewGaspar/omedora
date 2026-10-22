@@ -12,7 +12,8 @@
 # change, backup-then-write for user configs, only-if-unset for defaults.
 #
 # Sequence (each step an omedora-owned script in omedora/install/):
-#   1. plan.sh      aggregate + disclose EVERYTHING, Proceed/Abort gate
+#   1. plan.sh      refuse an unsupported Fedora release (release.sh), then
+#                   aggregate + disclose EVERYTHING, Proceed/Abort gate
 #   2. snapshot.sh  opt-in pre-install btrfs snapshot
 #   3. repos.sh     omedora COPR + RPM Fusion + Flathub (+ consented foreign swap)
 #   4. packages.sh  dnf install omedora, then the mapped omarchy-base set
