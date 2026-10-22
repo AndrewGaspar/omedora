@@ -16,7 +16,10 @@
 #   copr-submit.sh all           # register, then build
 #   copr-submit.sh build walker.spec swayosd.spec   # just these (still ordered)
 #
-#   # Backfill a newly enabled chroot without rebuilding the others:
+#   # Backfill a newly enabled chroot without rebuilding the others. Register
+#   # first: CI pins each package to the SHA of the push that last built it,
+#   # and a rewritten branch leaves those SHAs unreadable on GitHub.
+#   BRANCH=$(git rev-parse origin/omedora-4) copr-submit.sh register
 #   CHROOTS=fedora-45-x86_64 copr-submit.sh build
 #
 #   # The Omarchy-4 line, later:
