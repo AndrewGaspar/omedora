@@ -120,7 +120,7 @@ These are scope violations. If you find yourself wanting to do any of them, **st
 - **Initramfs configuration** (dracut.conf.d, mkinitcpio.conf — neither, on Fedora).
 - **Display manager replacement** (don't install SDDM, don't disable GDM, don't change autologin).
 - **Kernel modules or DKMS drivers** (NVIDIA, T2, Surface, anything that needs an `akmod-*`).
-- **Whole-system upgrades.** `omedora update` does **not** run `dnf upgrade` of everything — only the omedora-managed package set.
+- **Whole-system upgrades.** `omedora update` does **not** run `dnf upgrade` of everything — only the omedora-managed package set. The one exception is `omedora-upgrade-fedora`, the explicit, user-invoked Fedora release upgrade, which refuses to run until the Omedora COPR builds for the target release (see [`update-and-upgrade.md`](update-and-upgrade.md#fedora-release-upgrades)).
 
 If a task seems to require one of these, the right move is almost always to leave it to the user / their Fedora install. If you genuinely think we need it, escalate — don't quietly add it.
 

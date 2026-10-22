@@ -126,27 +126,105 @@ COPR repo ID from `bin/omedora-copr` and writes the state files consumed by the
 Quickshell update indicator. Pending kernel or unrelated Fedora updates do not
 light the Omedora indicator.
 
-## Fedora major upgrades
+## Fedora release upgrades
 
-Omedora does not initiate `dnf system-upgrade`. The user upgrades Fedora through
-Fedora's supported tooling. Before supporting a new Fedora release, maintainers
-must:
+Omedora supports the two newest Fedora releases: the current one and the one
+before it (today **Fedora 44 and 45**). A release is supported exactly when the
+version-scoped COPR has a chroot for it; check with:
 
-1. Build all required Omedora RPMs for that release.
+```bash
+omedora-copr --chroot-available        # the running release
+omedora-copr --chroot-available 46     # any release; exit 0 = supported
+```
+
+Exit 0 means the COPR builds for that release, 1 means it does not (the
+supported releases are printed), and 2 means the check itself failed.
+
+### Upgrading Fedora
+
+Use `omedora-upgrade-fedora` instead of calling `dnf system-upgrade` yourself:
+
+```bash
+omedora-upgrade-fedora --check           # read-only preflight for the next release
+omedora-upgrade-fedora                   # upgrade to the next release
+omedora-upgrade-fedora --releasever 45   # an explicit target
+```
+
+A plain `dnf system-upgrade` while the COPR has no builds for the target
+release skips the COPR (`skip_if_unavailable`) and then either fails on
+dependency problems or, with `--allowerasing`, removes the Omedora session
+(`hyprland-no-session`, `omedora`, `aquamarine`, ...) and downgrades the
+vendored Hyprland stack and Quickshell to Fedora's older same-name packages.
+`omedora-upgrade-fedora` refuses to start until that can't happen:
+
+1. **Preflight** (read-only; `--check` stops here). The target must be newer
+   than the running release and `omedora-copr --chroot-available <target>`
+   must answer 0; if the API can't be reached, it refuses rather than guess.
+   Then it runs `dnf --releasever=<target> distro-sync --refresh --assumeno
+   --allowerasing` as a dry run (dnf5's `system-upgrade` has no dry run) and
+   refuses if the transaction would remove or downgrade any package installed
+   from the Omedora COPR. Removing other packages is refused too, unless you pass
+   `--allowerasing`. Omedora packages that the dry run leaves alone have no build
+   for the target yet; they are listed as a warning.
+2. **Snapshot.** On a btrfs root it offers an `omedora-snapshot` of `/`
+   (`--yes` takes it, `--no-snapshot` skips it).
+3. **Upgrade.** `dnf upgrade --refresh` on the running release (Fedora's first
+   documented step), then `dnf system-upgrade download --releasever=<target>`,
+   then it asks before `dnf offline reboot`. `--allowerasing` is passed to the
+   download only when you passed it.
+
+After the upgrade reboots into the new release, log in and run `omarchy update`.
+The updater ends with `omedora-upgrade-fedora --post-check`, which warns about
+Omedora packages still carrying the old release's dist tag (for example `.fc44`
+on Fedora 45). Those packages had no rebuild yet. Once the COPR has the
+rebuilds, run `sudo dnf upgrade --refresh <names>` to install them.
+
+### Snapshots don't cover /boot
+
+`omedora-snapshot` snapshots the root subvolume only. `/boot` is a separate
+partition, so after you roll `/` back across a release upgrade
+(`omedora snapshot rollback <name> --apply`), `/boot` still holds the new
+release's kernels and boot entries. The default entry then boots a kernel whose
+modules are gone from `/lib/modules`. The package database rolled back with `/`,
+so dnf doesn't know about those kernels either. To recover:
+
+1. In the boot menu, pick an entry for an old-release kernel (for example
+   `6.x.y-z.fc44`).
+2. Once booted, remove each new-release kernel's boot entry, kernel, and
+   initramfs from `/boot`:
+
+   ```bash
+   ls /boot/loader/entries/                        # find the .fc45 versions
+   sudo kernel-install remove 6.x.y-z.fc45.x86_64
+   ```
+
+The boot menu then defaults to the newest old-release kernel again.
+
+### If you upgraded too early
+
+If Fedora was upgraded before Omedora supported the new release, `omarchy
+update` stops before changing anything. It says that Omedora doesn't support
+Fedora N yet, instead of showing dnf's `Chroot not found` error. Either roll back
+to a pre-upgrade snapshot or wait for the builds and run `omarchy update` again.
+
+### Maintainer checklist for a new Fedora release
+
+The chroot policy is in [`versioning.md`](versioning.md#fedora-releases-and-copr-chroots).
+Before announcing support for a new release:
+
+1. Enable its chroot and backfill every RPM in dependency order.
 2. Validate every base-map target against its repositories.
 3. Run the Fedora integration, fresh-install, upgrade, and session gates.
 4. Review package moves, replacements, and SELinux behavior.
-
-If the Omedora COPR does not have builds for the new Fedora release, users should
-remain on the supported Fedora version. The update command must fail loudly
-rather than replacing managed packages from an unreviewed source.
 
 ## Failure behavior
 
 - A dnf transaction failure aborts the update and is safe to retry after the
   repository or dependency issue is corrected.
 - Missing managed candidates, an unavailable Omedora COPR, or ambiguous core
-  candidate data aborts before package installation. Core EVR/provenance
+  candidate data aborts before package installation. When the COPR can't be
+  enabled because it has no chroot for the running Fedora release, the error
+  says that instead of passing on dnf's `Chroot not found`. Core EVR/provenance
   mismatch after reconciliation or after the broad pass aborts immediately.
 - A failed migration does not receive a completion marker and retries later.
 - A missing snapshot implementation is tolerated; other snapshot failures are
@@ -159,6 +237,10 @@ rather than replacing managed packages from an unreviewed source.
 prove the transaction includes core, mapped base, newly added base, Fedora
 baseline, and installed optional RPMs while excluding an installed unrelated
 RPM. It also verifies the Arch update arms emit no dnf calls.
+`test/update-unsupported-release-test.sh` covers the unsupported-release message
+and the post-update rebuild warning. `test/upgrade-fedora-test.sh` covers the
+`omedora-upgrade-fedora` preflight decisions and upgrade order.
+`test/copr-chroot-probe-test.sh` covers the chroot probe contract.
 
 Real package-manager behavior belongs in Fedora L2/L3 and the pre-release upgrade
 gate described in [`testing.md`](testing.md).
