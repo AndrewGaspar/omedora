@@ -61,6 +61,46 @@ resolve_copr() {
   fi
 }
 
+# Enable the version-scoped COPR. When that fails, explain the one failure we
+# can diagnose — the running Fedora release has no chroot in the COPR (e.g.
+# after a Fedora upgrade Omedora doesn't support yet) — instead of dnf's
+# "Chroot not found" error. Either way nothing has been changed yet.
+enable_copr() {
+  local output="$work_dir/copr-enable" probe_rc=0 probe_err release
+
+  if "${dnf_cmd[@]}" copr enable -y "$copr_project" >"$output" 2>&1; then
+    cat "$output"
+    return 0
+  fi
+
+  # Only the project omedora-copr derives can be probed; an override can't.
+  if [[ -z ${OMEDORA_COPR_PROJECT:-} ]]; then
+    probe_err=$(omedora-copr --chroot-available 2>&1 >/dev/null) || probe_rc=$?
+  else
+    probe_rc=2
+  fi
+
+  if (( probe_rc == 1 )); then
+    release=$( . "${OMEDORA_OS_RELEASE:-/etc/os-release}" 2>/dev/null && printf '%s' "${VERSION_ID:-}" ) || true
+    release=${release:-this release}
+    cat >&2 <<EOF
+Omedora doesn't support Fedora $release yet: $copr_project has no packages built for it.
+  $probe_err
+Nothing was changed; no package was installed, upgraded or removed.
+  - If you upgraded to Fedora $release before Omedora supported it, your Omedora
+    packages are still the previous release's builds. Run 'omarchy update' again
+    once Omedora supports Fedora $release, or roll back to a pre-upgrade snapshot
+    ('omedora snapshot list').
+  - Check support any time with: omedora-copr --chroot-available
+  - Upgrade Fedora with 'omedora-upgrade-fedora', which waits for Omedora's builds.
+EOF
+  else
+    cat "$output" >&2
+    echo "Could not enable the Omedora repository $copr_project; no package transaction was attempted." >&2
+  fi
+  return 1
+}
+
 select_core_candidates() {
   local output="$work_dir/core-candidates-$resolve_count"
   local name evr nevra repo extra package count
@@ -208,7 +248,7 @@ run_update_pass() {
 
   resolve_copr
   echo "Ensuring version-scoped Omedora repository is enabled: $copr_project"
-  "${dnf_cmd[@]}" copr enable -y "$copr_project"
+  enable_copr
 
   if $has_omedora; then
     reconcile_core
@@ -240,3 +280,7 @@ if [[ ${packages[*]} != "${refreshed_packages[*]}" ]]; then
   (( ${#refreshed_packages[@]} > 0 )) || exit 0
   run_update_pass "${refreshed_packages[@]}"
 fi
+
+# After a Fedora release upgrade, Omedora packages still carrying the old
+# release's dist tag point at a missing rebuild. Warn only; never fail here.
+OMEDORA_COPR_REPO_ID="$copr_repo_id" omedora-upgrade-fedora --post-check || true
