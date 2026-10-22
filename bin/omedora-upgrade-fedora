@@ -311,7 +311,8 @@ if (( snapshot )) && [[ "$(findmnt -no FSTYPE / 2>/dev/null || true)" == "btrfs"
 fi
 echo "  Note: a snapshot covers / only, not /boot. After rolling back across this"
 echo "  upgrade, /boot still holds the Fedora $target kernels: pick a Fedora $current"
-echo "  kernel in the boot menu, then remove the newer kernel packages."
+echo "  kernel in the boot menu, then remove each .fc$target kernel's boot entry with"
+echo "  'sudo kernel-install remove <version>'."
 
 # --- upgrade -------------------------------------------------------------------------
 
