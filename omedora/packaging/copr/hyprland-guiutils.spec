@@ -23,8 +23,8 @@ ExcludeArch:    %{ix86}
 BuildRequires:  cmake
 BuildRequires:  gcc-c++
 BuildRequires:  ninja-build
-BuildRequires:  pkgconfig(hyprlang)
-BuildRequires:  pkgconfig(hyprutils)
+BuildRequires:  pkgconfig(hyprlang) >= 0.6.8
+BuildRequires:  pkgconfig(hyprutils) >= 0.14.0
 BuildRequires:  pkgconfig(hyprtoolkit)
 BuildRequires:  pkgconfig(pango)
 BuildRequires:  pkgconfig(cairo)

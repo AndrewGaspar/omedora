@@ -121,6 +121,9 @@ jobs:
       - name: Run mise-spec static guard
         run: bash test/mise-spec-test.sh
 
+      - name: Run hypr BuildRequires floor guard
+        run: bash test/hypr-buildrequires-floor-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 
