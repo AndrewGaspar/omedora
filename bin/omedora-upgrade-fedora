@@ -1,0 +1,336 @@
+#!/bin/bash
+
+# omarchy:summary=Upgrade Fedora to the next release once Omedora supports it, refusing upgrades that would break Omedora.
+# omarchy:args=[--releasever N] [--check] [--yes] [--allowerasing] [--no-snapshot] | --post-check
+# omarchy:examples=omedora-upgrade-fedora --check | omedora-upgrade-fedora --releasever 45 | omedora-upgrade-fedora --post-check
+# omarchy:requires-sudo=true
+
+# In-place Fedora release upgrade (Fedora N -> N+1) for an Omedora system.
+#
+# A plain `dnf system-upgrade` while the Omedora COPR has no builds for the
+# target release silently skips the COPR (skip_if_unavailable) and then
+# REMOVES the Omedora session (hyprland-no-session, the omedora metapackage,
+# aquamarine, ...) or DOWNGRADES the vendored Hyprland stack to Fedora's stale
+# same-name packages. This command refuses to start until that can't happen:
+#
+#   1. preflight (read-only; `--check` stops here and reports):
+#        - Fedora only, target > running release
+#        - `omedora-copr --chroot-available TARGET` must answer 0 (fails
+#          closed: "couldn't check" is a refusal too)
+#        - dry run `dnf --releasever=TARGET distro-sync --refresh --assumeno
+#          --allowerasing` (dnf5 system-upgrade has no dry run; distro-sync
+#          against the target repos is the same resolution). --allowerasing
+#          only so the dry run shows the WHOLE transaction instead of a
+#          solver error; refuse if it would remove or downgrade any package
+#          installed from the Omedora repos (the COPR's repo id, or the test
+#          harness's omedora-local). Removals of other packages are refused
+#          too unless you pass --allowerasing yourself.
+#        - Omedora packages the dry run leaves untouched have no build for
+#          the target yet; they are listed as a warning.
+#   2. offer a btrfs snapshot of / (omedora-snapshot) — /boot is NOT covered
+#   3. `dnf upgrade --refresh` on the running release (Fedora's documented
+#      first step), `dnf system-upgrade download --releasever=TARGET`
+#      (--allowerasing only when you passed it), then ask before
+#      `dnf offline reboot`.
+#
+# --post-check (also run by `omarchy update` after its transaction): warn
+# about packages installed from the Omedora repos whose release still carries
+# an older Fedora dist tag (e.g. .fc44 on Fedora 45) — a missing rebuild.
+# Exit 1 when any are found, 0 otherwise; never changes anything.
+#
+# Test seams:
+#   OMEDORA_OS_RELEASE        os-release file (default /etc/os-release)
+#   OMEDORA_DNF_CMD           dnf for the dry run and every change (default "sudo dnf")
+#   OMEDORA_DNF_QUERY_CMD     dnf for read-only rpmdb queries (default "dnf")
+#   OMEDORA_COPR_CMD          the omedora-copr probe (default omedora-copr)
+#   OMEDORA_COPR_REPO_ID      Omedora repo id override (default omedora-copr --repo-id)
+#   OMEDORA_SNAPSHOT_CMD      snapshot tool (default omedora-snapshot)
+#   OMEDORA_UPGRADE_PROMPT_STDIN=1  read prompts from stdin, never /dev/tty
+
+set -euo pipefail
+
+usage() {
+  cat <<'USAGE'
+Usage: omedora-upgrade-fedora [--releasever N] [--check] [--yes] [--allowerasing] [--no-snapshot]
+       omedora-upgrade-fedora --post-check
+
+Upgrade Fedora in place to release N (default: the next release), but only
+once Omedora builds for it and the upgrade would keep every Omedora package.
+
+Options:
+  --releasever N   Target Fedora release (default: running release + 1)
+  --check          Run the read-only preflight, report, and stop
+  -y, --yes        Do not prompt (takes the snapshot when / is btrfs)
+  --allowerasing   Let the upgrade remove non-Omedora packages that block it
+                   (Omedora packages are never allowed to be removed)
+  --no-snapshot    Do not offer or take a btrfs snapshot
+  --post-check     After an upgrade: list Omedora packages still carrying an
+                   older Fedora dist tag (missing rebuilds)
+  -h, --help       Show this help
+USAGE
+}
+
+log()  { printf '\033[32m==>\033[0m %s\n' "$*"; }
+warn() { printf '\033[33mWarning:\033[0m %s\n' "$*" >&2; }
+fail() { printf '\033[31mError:\033[0m %s\n' "$*" >&2; exit 1; }
+indent() { sed 's/^/    /' >&2; }
+
+read -r -a dnf_cmd <<<"${OMEDORA_DNF_CMD:-sudo dnf}"
+read -r -a query_cmd <<<"${OMEDORA_DNF_QUERY_CMD:-dnf}"
+read -r -a copr_cmd <<<"${OMEDORA_COPR_CMD:-omedora-copr}"
+read -r -a snapshot_cmd <<<"${OMEDORA_SNAPSHOT_CMD:-omedora-snapshot}"
+os_release="${OMEDORA_OS_RELEASE:-/etc/os-release}"
+
+target=""
+check_only=0
+yes=0
+allowerasing=0
+snapshot=1
+post_check=0
+
+while (($#)); do
+  case "$1" in
+    --releasever)
+      [[ -n ${2:-} ]] || fail "--releasever needs a release number"
+      target=$2
+      shift 2
+      ;;
+    --releasever=*) target=${1#*=}; shift ;;
+    --check) check_only=1; shift ;;
+    -y|--yes) yes=1; shift ;;
+    --allowerasing) allowerasing=1; shift ;;
+    --no-snapshot) snapshot=0; shift ;;
+    --post-check) post_check=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) usage >&2; fail "Unknown option: $1" ;;
+  esac
+done
+
+# --- shared helpers -------------------------------------------------------------
+
+# The running Fedora release, or empty when this isn't Fedora.
+current_release() {
+  ( . "$os_release" 2>/dev/null && [[ ${ID:-} == "fedora" ]] && printf '%s' "${VERSION_ID:-}" ) || true
+}
+
+# Repo ids whose packages are Omedora's: the version-scoped COPR, plus the
+# local overlay the test harness injects in its place.
+our_repo_ids() {
+  local copr_id=${OMEDORA_COPR_REPO_ID:-}
+  if [[ -z $copr_id ]]; then
+    copr_id=$("${copr_cmd[@]}" --repo-id) || return 1
+  fi
+  printf '%s omedora-local\n' "$copr_id"
+}
+
+# "name evr repo" for every installed package from our repos ($1).
+installed_from_ours() {
+  local repos=$1 output
+  output=$("${query_cmd[@]}" repoquery --installed --qf '%{name} %{evr} %{from_repo}\n' 2>/dev/null) || return 1
+  awk -v ours=" $repos " 'NF >= 3 && index(ours, " " $3 " ") { print $1, $2, $3 }' <<<"$output"
+}
+
+# --- --post-check -----------------------------------------------------------------
+
+if (( post_check )); then
+  current=$(current_release)
+  # Not Fedora (or an unparsable release): nothing to compare against.
+  [[ $current =~ ^[0-9]+$ ]] || exit 0
+  repos=$(our_repo_ids) || { warn "Could not resolve the Omedora repo id; skipped the rebuild check."; exit 0; }
+  installed=$(installed_from_ours "$repos") || { warn "Could not query installed packages; skipped the rebuild check."; exit 0; }
+
+  stale=$(awk -v cur="$current" '{
+    if (match($2, /\.fc[0-9]+/)) {
+      tag = substr($2, RSTART + 3, RLENGTH - 3)
+      if (tag + 0 < cur + 0) print $1, $2
+    }
+  }' <<<"$installed")
+
+  if [[ -n $stale ]]; then
+    warn "These Omedora packages are still builds for an older Fedora than the running Fedora $current:"
+    awk '{ print $1 "-" $2 }' <<<"$stale" | indent
+    echo "  Omedora probably hasn't rebuilt them for Fedora $current yet. Once it has," >&2
+    echo "  install the rebuilds with:" >&2
+    echo "    sudo dnf upgrade --refresh $(awk '{ print $1 }' <<<"$stale" | sort -u | paste -sd' ')" >&2
+    exit 1
+  fi
+  exit 0
+fi
+
+# --- preflight ---------------------------------------------------------------------
+
+current=$(current_release)
+[[ -n $current ]] || fail "This upgrade is only supported on Fedora (no ID=fedora in $os_release)."
+[[ $current =~ ^[0-9]+$ ]] || fail "Can't upgrade from Fedora '$current' (not a numbered release)."
+
+if [[ -z $target ]]; then
+  target=$((current + 1))
+fi
+[[ $target =~ ^[0-9]+$ ]] || fail "--releasever must be a Fedora release number (got '$target')."
+(( target > current )) || fail "Fedora $target is not newer than the running Fedora $current; nothing to upgrade."
+
+log "Preflight: Fedora $current -> Fedora $target"
+
+probe_rc=0
+probe_err=$("${copr_cmd[@]}" --chroot-available "$target" 2>&1 >/dev/null) || probe_rc=$?
+copr_project=$("${copr_cmd[@]}" 2>/dev/null || echo "the Omedora COPR")
+case "$probe_rc" in
+  0) log "$copr_project builds for Fedora $target." ;;
+  1)
+    [[ -n $probe_err ]] && printf '  %s\n' "$probe_err" >&2
+    fail "Omedora doesn't support Fedora $target yet ($copr_project has no builds for it). Upgrading now would remove or downgrade the Omedora session, so stay on Fedora $current until it does. Nothing was changed."
+    ;;
+  *)
+    [[ -n $probe_err ]] && printf '  %s\n' "$probe_err" >&2
+    fail "Couldn't verify that $copr_project builds for Fedora $target (COPR API unreachable?). Try again later. Nothing was changed."
+    ;;
+esac
+
+repos=$(our_repo_ids) || fail "Could not resolve the Omedora repo id. Nothing was changed."
+installed=$(installed_from_ours "$repos") || fail "Could not query installed packages. Nothing was changed."
+
+log "Dry run: dnf --releasever=$target distro-sync (nothing is changed)"
+dry_run=$(LC_ALL=C "${dnf_cmd[@]}" --releasever="$target" distro-sync --refresh --assumeno --allowerasing 2>&1) || true
+
+if [[ $dry_run == *"Failed to resolve the transaction"* ]]; then
+  printf '%s\n' "$dry_run" | sed -n '/^Failed to resolve the transaction/,$p' | sed 's/^/    /' >&2
+  fail "The Fedora $target package set doesn't resolve even with --allowerasing (see above). Nothing was changed."
+fi
+if [[ $dry_run != *"Transaction Summary"* && $dry_run != *"Nothing to do"* ]]; then
+  printf '%s\n' "$dry_run" | tail -n 15 | sed 's/^/    /' >&2
+  fail "The Fedora $target dry run failed (see above). Nothing was changed."
+fi
+
+# Classify the dry-run transaction table (dnf5 layout: "Section:" headers,
+# " name arch evr repo size" package rows, "   replacing name arch evr repo
+# size" rows naming the installed package an upgrade/downgrade replaces).
+transaction=$(awk -v ours=" $repos " '
+  function evr(v) { sub(/^0:/, "", v); return v }
+  /^(Installing|Upgrading|Downgrading|Reinstalling|Removing)[A-Za-z ]*:$/ { section = $0; next }
+  /^[^ ]/ { section = ""; next }
+  section == "" { next }
+  /^   replacing / {
+    if (section ~ /^Downgrading/ && index(ours, " " $5 " "))
+      print "downgraded-ours", $2, evr($4), $5, evr(new_evr), new_repo
+    else
+      print "replaced", $2, evr($4), $5
+    next
+  }
+  /^ [^ ]/ {
+    new_evr = $3; new_repo = $4
+    if (section ~ /^Removing/) print (index(ours, " " $4 " ") ? "removed-ours" : "removed-other"), $1, evr($3), $4
+    else print "incoming", $1, evr($3), $4
+  }
+' <<<"$dry_run")
+
+removed_ours=$(awk '$1 == "removed-ours" { print $2 "-" $3 }' <<<"$transaction")
+downgraded_ours=$(awk '$1 == "downgraded-ours" { print $2 "-" $3 " -> " $5 " (" $6 ")" }' <<<"$transaction")
+removed_other=$(awk '$1 == "removed-other" { print $2 "-" $3 " (" $4 ")" }' <<<"$transaction")
+# Omedora packages the transaction doesn't touch: no build for the target yet.
+not_rebuilt=$(awk 'NR == FNR { if ($1 != "incoming") seen[$2] = 1; next } !($1 in seen) { print $1 "-" $2 }' \
+  <(printf '%s\n' "$transaction") <(printf '%s\n' "$installed"))
+
+refuse=0
+if [[ -n $removed_ours || -n $downgraded_ours ]]; then
+  refuse=1
+  echo -e "\033[31mThe Fedora $target upgrade would break Omedora:\033[0m" >&2
+  if [[ -n $removed_ours ]]; then
+    echo "  Omedora packages it would REMOVE:" >&2
+    printf '%s\n' "$removed_ours" | indent
+  fi
+  if [[ -n $downgraded_ours ]]; then
+    echo "  Omedora packages it would DOWNGRADE to another repo's older build:" >&2
+    printf '%s\n' "$downgraded_ours" | indent
+  fi
+  echo "  $copr_project's Fedora $target builds are probably still incomplete." >&2
+  echo "  Stay on Fedora $current and re-run 'omedora-upgrade-fedora --check' later." >&2
+fi
+if [[ -n $removed_other ]]; then
+  if (( allowerasing )); then
+    warn "The upgrade will remove these non-Omedora packages (--allowerasing):"
+    printf '%s\n' "$removed_other" | indent
+  else
+    refuse=1
+    echo -e "\033[31mThe Fedora $target upgrade would have to remove these non-Omedora packages:\033[0m" >&2
+    printf '%s\n' "$removed_other" | indent
+    echo "  Remove them yourself, or re-run with --allowerasing to let the upgrade do it." >&2
+  fi
+fi
+if [[ -n $not_rebuilt ]]; then
+  warn "No Fedora $target build yet for these Omedora packages (the Fedora $current build stays installed):"
+  printf '%s\n' "$not_rebuilt" | indent
+fi
+
+if (( refuse )); then
+  fail "Preflight failed; not upgrading. Nothing was changed."
+fi
+
+n_ours=$(grep -c . <<<"$installed" || true)
+log "Preflight passed: the upgrade keeps all $n_ours installed Omedora packages."
+if (( check_only )); then
+  echo "Run 'omedora-upgrade-fedora --releasever $target' to upgrade."
+  exit 0
+fi
+
+# --- prompts -----------------------------------------------------------------------
+
+PROMPT_TTY=""
+if [[ -z ${OMEDORA_UPGRADE_PROMPT_STDIN:-} ]] && { true >/dev/tty; } 2>/dev/null; then
+  PROMPT_TTY=/dev/tty
+fi
+
+# confirm <question> — yes with --yes; otherwise ask (gum when present).
+confirm() {
+  (( yes )) && return 0
+  if [[ -z $PROMPT_TTY && -z ${OMEDORA_UPGRADE_PROMPT_STDIN:-} ]]; then
+    fail "No terminal to confirm '$1'. Re-run with --yes to proceed non-interactively."
+  fi
+  local reply
+  if command -v gum >/dev/null 2>&1; then
+    if [[ -n $PROMPT_TTY ]]; then gum confirm "$1" <"$PROMPT_TTY"; else gum confirm "$1"; fi
+    return
+  fi
+  if [[ -n $PROMPT_TTY ]]; then
+    read -r -p "$1 [y/N] " reply <"$PROMPT_TTY"
+  else
+    read -r -p "$1 [y/N] " reply || reply=""
+  fi
+  [[ $reply =~ ^[yY] ]]
+}
+
+confirm "Upgrade this system from Fedora $current to Fedora $target?" ||
+  { echo "Upgrade cancelled. Nothing was changed."; exit 1; }
+
+# --- snapshot ------------------------------------------------------------------------
+
+if (( snapshot )) && [[ "$(findmnt -no FSTYPE / 2>/dev/null || true)" == "btrfs" ]]; then
+  if confirm "Take a btrfs snapshot of / first (recommended)?"; then
+    "${snapshot_cmd[@]}" create "pre-fedora-$target" ||
+      warn "The snapshot failed; continuing without one."
+  fi
+fi
+echo "  Note: a snapshot covers / only, not /boot. After rolling back across this"
+echo "  upgrade, /boot still holds the Fedora $target kernels: pick a Fedora $current"
+echo "  kernel in the boot menu, then remove the newer kernel packages."
+
+# --- upgrade -------------------------------------------------------------------------
+
+yes_flag=()
+(( yes )) && yes_flag=(-y)
+erase_flag=()
+(( allowerasing )) && erase_flag=(--allowerasing)
+
+log "Updating Fedora $current first (dnf upgrade --refresh)"
+"${dnf_cmd[@]}" upgrade --refresh "${yes_flag[@]}"
+
+log "Downloading the Fedora $target upgrade (dnf system-upgrade download)"
+"${dnf_cmd[@]}" system-upgrade download --releasever="$target" "${erase_flag[@]}" "${yes_flag[@]}"
+
+echo
+echo "The Fedora $target upgrade is downloaded. It installs during a reboot, which"
+echo "takes a while. After it, log in and run 'omarchy update'."
+if confirm "Reboot now to install Fedora $target?"; then
+  "${dnf_cmd[@]}" offline reboot "${yes_flag[@]}"
+else
+  echo "Not rebooting. Run 'sudo dnf offline reboot' when you're ready."
+fi
