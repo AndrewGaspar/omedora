@@ -48,13 +48,35 @@ Release gates run on both supported releases:
 | L3 fresh install (`run-smoke.sh`, `update-verify.sh`) | required | required |
 | L4 `build-session.sh` + `headless/run-tests.sh` (standard and `--workstation`) | required | required |
 | VM `run-vm-test.sh` | required | required |
-| F44 → F45 upgrade, container and VM | — | required (planned) |
+| F44 → F45 upgrade: L3 `run-release-upgrade.sh` | — | required |
+| F44 → F45 upgrade: L4 `build-upgraded-session.sh --run` | — | required |
+| F44 → F45 upgrade: VM `run-vm-test.sh --upgrade-to 45` | — | required |
 
-The planned upgrade gate installs Omedora on Fedora 44, upgrades the system in
-place to Fedora 45 (`dnf system-upgrade`), and proves that Omedora's packages
-move to the fc45 COPR builds and that the session still boots, both in a
-container and in the VM tier. Until those runners land, record the upgrade
-gate as not run.
+The upgrade gates install Omedora on Fedora 44 from the live COPR, run
+`omedora-upgrade-fedora --check` (which must refuse a release the COPR does
+not build and accept 45), and then run the real dnf5 offline upgrade: the same
+`dnf system-upgrade download` transaction that `dnf5 offline _execute` applies
+at reboot. Each tier then proves the result from its own angle:
+
+- **L3** (`run-release-upgrade.sh`, ~25 min): every package that came from the
+  COPR is still installed, still from the COPR, a `.fc45` build and not
+  downgraded; `omarchy update` passes twice on Fedora 45.
+- **L4** (`build-upgraded-session.sh --run`): upgrades the Fedora 44 session
+  image under systemd, boots the result (the offline transaction's reboot
+  stops the container; starting it boots Fedora 45), runs `omarchy update`,
+  commits `omedora-test:fedora45-session-4-upgraded` and runs the headless
+  suite against it.
+- **VM** (`run-vm-test.sh --upgrade-to 45`): the session tests on Fedora 44,
+  then `omedora-upgrade-fedora --yes` with the real offline reboot, the
+  post-upgrade package checks and `--post-check`, `omarchy update`, and the
+  session tests again on Fedora 45 under GDM.
+
+All three drive Omedora's code from the checkout the way `omarchy dev link`
+does (`OMARCHY_PATH`, `PATH` and sudo's `secure_path`), so they gate
+unreleased code while every package still comes from the COPR. L3 and L4 take
+`--installed` to use the published `omedora` payload instead, which is the
+post-release check. They need the target chroot fully built; run them after
+the COPR backfill or a release's builds finish.
 
 ## 2. L1 gate
 
