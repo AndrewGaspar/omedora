@@ -8,13 +8,17 @@
 #   omedora/test/fedora/run-integration.sh
 #   omedora/test/fedora/run-integration.sh --shell   # drop into a shell instead
 #   omedora/test/fedora/run-integration.sh --rebuild # force image rebuild
+#   OMEDORA_FEDORA_RELEASE=45 omedora/test/fedora/run-integration.sh
+#                                                    # target Fedora 45 (default 44;
+#                                                    #   image omedora-test:fedora<N>)
 #
 # Requires: docker (or compatible runtime; tested with docker 29+).
 
 set -euo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
-IMAGE="${OMEDORA_TEST_IMAGE:-omedora-test:fedora44}"
+. "$REPO/omedora/test/fedora/lib/release.sh"
+IMAGE="${OMEDORA_TEST_IMAGE:-$OMEDORA_TEST_TAG}"
 
 cmd="bash /repo/omedora/test/fedora/integration.sh"
 rebuild=false
@@ -37,7 +41,8 @@ done
 
 if $rebuild || ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   echo "Building $IMAGE..."
-  docker build -t "$IMAGE" -f "$REPO/omedora/test/fedora/Dockerfile" "$REPO/omedora/test/fedora/"
+  docker build -t "$IMAGE" --build-arg "FEDORA_RELEASE=$OMEDORA_FEDORA_RELEASE" \
+    -f "$REPO/omedora/test/fedora/Dockerfile" "$REPO/omedora/test/fedora/"
 fi
 
 if $shell; then

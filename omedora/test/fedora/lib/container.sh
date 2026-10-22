@@ -1,6 +1,6 @@
 # Container-side test helpers — sourced by omedora/test/fedora/integration.sh.
-# Run only inside the fedora:44 test image; assume /repo is the bind-mounted
-# repo and we have real dnf/rpm/flatpak available.
+# Run only inside the Fedora test image (omedora-test:fedora<N>); assume /repo
+# is the bind-mounted repo and we have real dnf/rpm/flatpak available.
 #
 # Adds a couple of container-specific assertions on top of test/helpers.sh.
 

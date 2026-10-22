@@ -7,16 +7,21 @@
 # Run L2: docker run --rm -v "$PWD:/repo" omedora-test:fedora44 \
 #           bash /repo/omedora/test/fedora/integration.sh
 #
+# FEDORA_RELEASE selects the Fedora release (default 44). The host runners pass
+# it from OMEDORA_FEDORA_RELEASE and tag the image omedora-test:fedora<N>
+# (see lib/release.sh), e.g. --build-arg FEDORA_RELEASE=45 -t omedora-test:fedora45.
+#
 # dnf downloads are cached in a BuildKit cache mount so iterative rebuilds
 # don't re-fetch packages from mirrors. Cache survives across `docker build`
 # invocations but is NOT baked into the image. `keepcache=True` is dropped
 # into dnf.conf before each cache-mounted dnf call so the cache actually
 # persists rpms (default is keepcache=False, which deletes after install).
-# NOTE: Fedora 44 ships dnf5, which caches packages under /var/cache/libdnf5
+# NOTE: Fedora 44+ ships dnf5, which caches packages under /var/cache/libdnf5
 # (not the dnf4 /var/cache/dnf) — the cache mount MUST target the dnf5 path or
 # it stays empty and every rebuild re-downloads.
 
-FROM registry.fedoraproject.org/fedora:44
+ARG FEDORA_RELEASE=44
+FROM registry.fedoraproject.org/fedora:${FEDORA_RELEASE}
 
 # Install prereqs in one layer. dnf-plugins-core gives us `dnf copr enable`;
 # everything else is what omedora's helpers + tests need.
