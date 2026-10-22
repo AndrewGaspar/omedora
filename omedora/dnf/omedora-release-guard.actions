@@ -1,0 +1,7 @@
+# Omedora: refuse a Fedora release change (dnf --releasever=N distro-sync,
+# dnf system-upgrade download, GNOME Software upgrades) that would remove or
+# replace Omedora's COPR packages, or that runs before Omedora's COPR builds
+# for the target release. Same-release transactions are never blocked; the
+# guard fails open on its own errors (raise_error stays 0). Upgrade Fedora
+# with omedora-upgrade-fedora. See omedora/update-and-upgrade.md.
+goal_resolved:::enabled=host-only mode=json:/usr/libexec/omedora/omedora-release-guard ${pid}
