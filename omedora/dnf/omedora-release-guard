@@ -1,0 +1,312 @@
+#!/usr/bin/python3 -IS
+"""Omedora dnf5 release-upgrade guard (libdnf5 actions plugin, mode=json).
+
+Wired from /etc/dnf/libdnf5-plugins/actions.d/omedora-release-guard.actions on
+the goal_resolved callback. It fires for every resolved goal in every libdnf5
+front end: the dnf CLI (`dnf --releasever=N distro-sync`, `dnf system-upgrade
+download`), dnf5daemon-server (GNOME Software on Fedora 44+), and the
+PackageKit dnf5 backend.
+
+It blocks ONLY a transaction that targets a Fedora release other than the
+installed one AND either
+  - would remove, downgrade, or hand to another vendor a package installed from
+    Omedora's COPR (the broken-desktop outcome), or
+  - runs while Omedora's COPR has no build root for that release (its repo
+    loaded no packages and `omedora-copr --chroot-available N` exits 1).
+
+Everything else is allowed. The guard fails OPEN: any internal error, an
+unknown probe result (exit 2, timeout, missing command), or an unexpected
+plugin reply lets the transaction proceed. The actions line runs with the
+default raise_error=0, so even a crash of this script is only logged by dnf.
+
+It never touches the network in the offline (reboot) phase of a system
+upgrade: `dnf offline _execute` replays an already-checked transaction with
+cacheonly=all, no repositories, and the still-installed releasever; the guard
+returns before any probe there.
+
+Override: OMEDORA_ALLOW_RELEASE_UPGRADE=1 in dnf's environment
+(`sudo OMEDORA_ALLOW_RELEASE_UPGRADE=1 dnf ...`). omedora-upgrade-fedora does
+not need it: once its preflight passes, the guard only adds the per-package
+check (which still catches a partially built COPR release).
+
+`--decide` reads a JSON facts object on stdin and prints the verdict; the L1
+test (test/dnf-release-guard-test.sh) drives the decision logic through it.
+"""
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+OVERRIDE_ENV = "OMEDORA_ALLOW_RELEASE_UPGRADE"
+REPO_GLOB = "copr:copr.fedorainfracloud.org:*:omedora-*"
+DEFAULT_OWNER = "agaspar"
+PROBE_TIMEOUT = 20
+OS_RELEASE = os.environ.get("OMEDORA_OS_RELEASE", "/etc/os-release")  # test seam
+
+PROBE_AVAILABLE = 0
+PROBE_MISSING = 1
+PROBE_UNKNOWN = 2
+
+
+class ChannelClosed(Exception):
+  pass
+
+
+class Channel:
+  """Request/response client for the actions plugin json mode."""
+
+  def __init__(self, rfile, wfile):
+    self.rfile = rfile
+    self.wfile = wfile
+
+  def send(self, msg):
+    self.wfile.write(json.dumps(msg) + "\n")
+    self.wfile.flush()
+
+  def request(self, op, domain, args):
+    self.send({"op": op, "domain": domain, "args": args})
+    line = self.rfile.readline()
+    if not line:
+      raise ChannelClosed("actions plugin closed the channel")
+    reply = json.loads(line)
+    if reply.get("status") != "OK":
+      raise RuntimeError("actions plugin error for %s/%s: %s" % (op, domain, reply.get("message")))
+    return reply.get("return", {})
+
+  def log(self, level, message):
+    try:
+      self.send({"op": "log", "args": {"level": level, "message": message}})
+      self.rfile.readline()
+    except Exception:
+      pass
+
+  def stop(self, message):
+    self.send({"op": "stop", "args": {"message": message}})
+
+
+def truthy(value):
+  return str(value or "").strip().lower() in ("1", "yes", "true", "on")
+
+
+def read_os_release(path=OS_RELEASE):
+  data = {}
+  try:
+    with open(path, encoding="utf-8") as fh:
+      for line in fh:
+        key, sep, value = line.strip().partition("=")
+        if sep:
+          data[key] = value.strip().strip('"').strip("'")
+  except OSError:
+    pass
+  return data
+
+
+def same_release(target, os_release):
+  """True unless the target releasever is known and differs from the system."""
+  if not target:
+    return True
+  installed = os_release.get("VERSION_ID", "")
+  if not installed:
+    return True
+  if target == installed:
+    return True
+  # Rawhide: VERSION_ID is a number while dnf's releasever is "rawhide".
+  support = os_release.get("REDHAT_SUPPORT_PRODUCT_VERSION", "")
+  return bool(support) and target == support
+
+
+def copr_owner(repo_ids):
+  for repo_id in repo_ids:
+    parts = repo_id.split(":")
+    if len(parts) == 4 and parts[0] == "copr" and parts[3].startswith("omedora-"):
+      return parts[2]
+  return DEFAULT_OWNER
+
+
+def lost_packages(trans, vendor):
+  """Omedora COPR packages the transaction removes, downgrades, or hands to
+  another vendor. An obsoleted package counts only when nothing from
+  Omedora's COPR comes in (Omedora's own renames land as obsoletes)."""
+  ours_out = {}
+  inbound = {}
+  for pkg in trans:
+    name = pkg.get("name", "")
+    if pkg.get("direction") == "OUT" and pkg.get("vendor") == vendor:
+      ours_out[name] = pkg
+    elif pkg.get("direction") == "IN":
+      inbound[name] = pkg
+
+  ours_in = any(pkg.get("vendor") == vendor for pkg in inbound.values())
+  lost = []
+  for name, out in sorted(ours_out.items()):
+    new = inbound.get(name)
+    if out.get("action") == "E":
+      lost.append("%s (removed)" % name)
+    elif new is None:
+      if not ours_in:
+        lost.append("%s (obsoleted)" % name)
+    elif new.get("action") == "D":
+      lost.append("%s (downgraded to %s from %s)" % (name, new.get("evr", "?"), new.get("repo_id", "?")))
+    elif new.get("vendor") != vendor:
+      lost.append("%s (replaced by %s from %s)" % (name, new.get("evr", "?"), new.get("repo_id", "?")))
+  return lost
+
+
+def block_message(target, project, reasons):
+  lines = [
+    "Omedora blocked this switch to Fedora %s." % target,
+  ]
+  lines += ["  - " + reason for reason in reasons]
+  lines += [
+    "Upgrade Fedora with `omedora-upgrade-fedora`; it checks Omedora's COPR (%s) first." % project,
+    "To bypass this check: sudo %s=1 dnf ..." % OVERRIDE_ENV,
+  ]
+  return "\n".join(lines)
+
+
+def decide(facts, probe):
+  """Return {"verdict": allow|warn|block, "reason": str, "message": str}.
+
+  facts keys: override, offline, target, os_release, repo_ids (enabled
+  omedora COPR repo ids), repo_packages (packages loaded from them), trans.
+  probe(release) -> 0 available / 1 missing / 2 unknown; called only when
+  the COPR repo is enabled for the target release but loaded nothing.
+  """
+  if facts.get("override"):
+    return {"verdict": "allow", "reason": "override"}
+  if facts.get("offline"):
+    return {"verdict": "allow", "reason": "offline"}
+
+  target = facts.get("target", "")
+  if same_release(target, facts.get("os_release", {})):
+    return {"verdict": "allow", "reason": "same-release"}
+
+  repo_ids = facts.get("repo_ids", [])
+  owner = copr_owner(repo_ids)
+  project = "%s/%s" % (owner, repo_ids[0].split(":")[3]) if repo_ids else "%s/omedora-*" % owner
+  vendor = "Fedora Copr - user %s" % owner
+
+  reasons = []
+  warning = ""
+  if repo_ids and not facts.get("repo_packages"):
+    result = probe(target)
+    if result == PROBE_MISSING:
+      reasons.append("Omedora's COPR %s has no Fedora %s builds yet." % (project, target))
+    elif result != PROBE_AVAILABLE:
+      warning = "could not check whether %s builds for Fedora %s" % (project, target)
+
+  lost = lost_packages(facts.get("trans", []), vendor)
+  if lost:
+    shown = ", ".join(lost[:8]) + (", ..." if len(lost) > 8 else "")
+    reasons.append("It would remove or replace %d Omedora package(s): %s" % (len(lost), shown))
+
+  if reasons:
+    return {"verdict": "block", "reason": "; ".join(reasons), "message": block_message(target, project, reasons)}
+  if warning:
+    return {"verdict": "warn", "reason": warning}
+  return {"verdict": "allow", "reason": "release-change-safe"}
+
+
+def run_probe(target):
+  cmd = shutil.which("omedora-copr") or "/usr/bin/omedora-copr"
+  try:
+    result = subprocess.run(
+      [cmd, "--chroot-available", target],
+      stdin=subprocess.DEVNULL,
+      stdout=subprocess.DEVNULL,
+      stderr=subprocess.DEVNULL,
+      timeout=PROBE_TIMEOUT,
+      check=False,
+    )
+  except (OSError, subprocess.SubprocessError):
+    return PROBE_UNKNOWN
+  if result.returncode in (PROBE_AVAILABLE, PROBE_MISSING):
+    return result.returncode
+  return PROBE_UNKNOWN
+
+
+def parent_cmdline(pid):
+  try:
+    with open("/proc/%d/cmdline" % pid, "rb") as fh:
+      return [arg.decode("utf-8", "replace") for arg in fh.read().split(b"\0") if arg]
+  except (OSError, ValueError):
+    return []
+
+
+def gather(channel, dnf_pid):
+  facts = {"override": truthy(os.environ.get(OVERRIDE_ENV))}
+  if facts["override"]:
+    return facts
+
+  argv = parent_cmdline(dnf_pid)
+  cacheonly = channel.request("get", "conf", {"key": "cacheonly"}).get("keys_val", [])
+  all_repos = channel.request("get", "conf", {"key": "*.enabled"}).get("keys_val", [])
+  facts["offline"] = ("offline" in argv and "_execute" in argv) or (
+    bool(cacheonly) and cacheonly[0].get("value") == "all" and not all_repos
+  )
+  if facts["offline"]:
+    return facts
+
+  target_vars = channel.request("get", "vars", {"name": "releasever"}).get("vars", [])
+  facts["target"] = target_vars[0].get("value", "") if target_vars else ""
+  facts["os_release"] = read_os_release()
+  if same_release(facts["target"], facts["os_release"]):
+    return facts
+
+  repos = channel.request("get", "conf", {"key": REPO_GLOB + ".enabled"}).get("keys_val", [])
+  facts["repo_ids"] = sorted(kv["key"][: -len(".enabled")] for kv in repos if kv.get("value") == "1")
+  count = 0
+  for repo_id in facts["repo_ids"]:
+    pkgs = channel.request(
+      "get",
+      "packages",
+      {"output": ["name"], "filters": [{"key": "repo_id", "value": repo_id}, {"key": "available"}]},
+    ).get("packages", [])
+    count += len(pkgs)
+  facts["repo_packages"] = count
+  facts["trans"] = channel.request(
+    "get", "trans_packages", {"output": ["action", "direction", "name", "evr", "repo_id", "vendor"]}
+  ).get("trans_packages", [])
+  return facts
+
+
+def main(argv):
+  if len(argv) > 1 and argv[1] == "--decide":
+    facts = json.load(sys.stdin)
+    probe_result = facts.get("probe", PROBE_UNKNOWN)
+    calls = []
+
+    def probe(target):
+      calls.append(target)
+      return probe_result
+
+    verdict = decide(facts, probe)
+    verdict["probed"] = calls
+    print(json.dumps(verdict, sort_keys=True))
+    return 0
+
+  dnf_pid = int(argv[1]) if len(argv) > 1 and argv[1].isdigit() else os.getppid()
+  channel = Channel(sys.stdin, sys.stdout)
+  try:
+    verdict = decide(gather(channel, dnf_pid), run_probe)
+  except ChannelClosed:
+    return 0
+  except Exception as exc:  # fail open: a guard bug must never block dnf
+    print("omedora-release-guard: internal error, allowing transaction: %s" % exc, file=sys.stderr)
+    channel.log("WARNING", "omedora-release-guard internal error (allowed): %s" % exc)
+    return 0
+
+  channel.log("DEBUG", "omedora-release-guard: %s (%s)" % (verdict["verdict"], verdict["reason"]))
+  if verdict["verdict"] == "block":
+    channel.log("WARNING", "omedora-release-guard blocked: %s" % verdict["reason"])
+    channel.stop(verdict["message"])
+  elif verdict["verdict"] == "warn":
+    print("omedora-release-guard: warning: %s; allowing transaction." % verdict["reason"], file=sys.stderr)
+    channel.log("WARNING", "omedora-release-guard: %s (allowed)" % verdict["reason"])
+  return 0
+
+
+if __name__ == "__main__":
+  sys.exit(main(sys.argv))

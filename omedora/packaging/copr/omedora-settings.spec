@@ -74,6 +74,11 @@ Provides:       omarchy-settings = %{version}-%{release}
 Provides:       hyprland-omedora = %{version}-%{release}
 Obsoletes:      hyprland-omedora < 1.0.1
 
+# The dnf release-upgrade guard (see %%install) is a libdnf5 actions-plugin
+# drop-in; Fedora does not install the plugin by default (it is in no comps
+# group and nothing else requires it).
+Requires:       libdnf5-plugin-actions
+
 # The payload is config/data + a handful of bash scripts; the heavyweight
 # runtime dependencies belong to the `omedora` package and the install
 # transaction. RPM's automatic dependency generator still adds the script
@@ -297,6 +302,18 @@ install -Dpm644 etc/systemd/oomd.conf.d/10-omarchy.conf \
 # cups/, plymouth/ (never-touch; reference copies in etc-overrides/ above),
 # docker/daemon.json + gnupg/dirmngr.conf (reference copies, see above).
 
+# dnf release-upgrade guard: a libdnf5 actions-plugin drop-in (the
+# actions.d dir is owned by libdnf5-plugin-actions) that refuses a raw
+# `dnf --releasever=N distro-sync` / `dnf system-upgrade download` / GNOME
+# Software upgrade which would remove or replace Omedora's COPR packages, or
+# that runs before the COPR builds for release N. Fails open; never blocks a
+# same-release transaction or the offline reboot phase. See
+# omedora/update-and-upgrade.md and omedora/dnf/omedora-release-guard.
+install -Dpm755 omedora/dnf/omedora-release-guard \
+  %{buildroot}%{_libexecdir}/omedora/omedora-release-guard
+install -Dpm644 omedora/dnf/omedora-release-guard.actions \
+  %{buildroot}%{_sysconfdir}/dnf/libdnf5-plugins/actions.d/omedora-release-guard.actions
+
 # ---------------------------------------------------------------------------
 # Live-ISO debug trio (per the map: needed before the omedora package lands)
 # + their entries in the /usr/share/omarchy/bin symlink farm.
@@ -385,6 +402,10 @@ desktop-file-validate %{buildroot}%{_datadir}/wayland-sessions/omedora.desktop
 %config(noreplace) %{_sysconfdir}/systemd/system.conf.d/20-omarchy-nofile.conf
 %dir %{_sysconfdir}/systemd/user.conf.d
 %config(noreplace) %{_sysconfdir}/systemd/user.conf.d/20-omarchy-nofile.conf
+# dnf release-upgrade guard (actions.d is owned by libdnf5-plugin-actions).
+%dir %{_libexecdir}/omedora
+%{_libexecdir}/omedora/omedora-release-guard
+%config(noreplace) %{_sysconfdir}/dnf/libdnf5-plugins/actions.d/omedora-release-guard.actions
 
 %changelog
 * Sun Oct 18 2026 omedora <noreply@omedora> - 0.2.0~beta.7-1

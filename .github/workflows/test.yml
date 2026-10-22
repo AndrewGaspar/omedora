@@ -91,6 +91,9 @@ jobs:
       - name: Run upgrade-fedora test
         run: bash test/upgrade-fedora-test.sh
 
+      - name: Run dnf release-guard test
+        run: bash test/dnf-release-guard-test.sh
+
       - name: Run byte-identity audit (upstream files are additive-only)
         run: bash test/byte-identity-test.sh
 
