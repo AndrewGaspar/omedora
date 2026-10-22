@@ -157,6 +157,11 @@ names = ["tesseract-langpack-eng"]
 source = "flathub"
 app_id = "org.localsend.localsend_app"
 
+[pinta]
+source = "flathub"
+app_id = "com.github.PintaProject.Pinta"
+reason = "Retired from Fedora 45 (orphaned), so the RPM is gone there. Flathub on every release keeps one install path; an RPM already installed on Fedora 44 is left in place."
+
 # --- Omedora COPR packages and explicit skips ----------------------------
 
 [mise]
