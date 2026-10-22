@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Build an omedora RPM spec locally, inside a fedora:44 container.
+# Build an omedora RPM spec locally, inside a fedora:<N> container.
 #
 # Our dev host is Arch (no rpmbuild), so we build in a throwaway Fedora
 # container. This is exactly what a COPR does on Fedora's servers — same spec,
@@ -11,25 +11,37 @@
 #   packaging/copr/build-local.sh elephant.spec
 #
 # Output: built .rpm (and .src.rpm) land in packaging/copr/output/.
+#
+# Fedora release: OMEDORA_FEDORA_RELEASE (default 44) picks the build container
+# (registry.fedoraproject.org/fedora:<N>) and keeps each release's artifacts
+# apart, since fc44 and fc45 RPMs must never mix in one repo: Fedora 44 uses the
+# historical output/ + repo/ dirs, every other release output-f<N>/ + repo-f<N>/
+# (see omedora/test/fedora/lib/release.sh). OMEDORA_RPMBUILD_IMAGE still
+# overrides the container image outright.
 
 set -euo pipefail
 
 spec="${1:?usage: build-local.sh <name.spec>}"
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
+. "$REPO/omedora/test/fedora/lib/release.sh"
 COPR_DIR="$REPO/omedora/packaging/copr"
-IMAGE="${OMEDORA_RPMBUILD_IMAGE:-registry.fedoraproject.org/fedora:44}"
-# Persist dnf's package + metadata cache across builds. fedora:44 ships dnf5,
+IMAGE="${OMEDORA_RPMBUILD_IMAGE:-$OMEDORA_FEDORA_IMAGE}"
+# Per-release artifact + local-repo dirs (relative to COPR_DIR = /copr in-container).
+OUT_NAME="output$OMEDORA_RELEASE_SUFFIX"
+LOCAL_REPO_NAME="repo$OMEDORA_RELEASE_SUFFIX"
+# Persist dnf's package + metadata cache across builds. Fedora 44+ ships dnf5,
 # whose cache lives under /var/cache/libdnf5 (NOT the dnf4 path /var/cache/dnf).
 # With `--rm` each spec builds in a throwaway container, so without this volume
 # EVERY build re-downloads the rpm-build/rpmdevtools/builddep tooling AND each
 # spec's BuildRequires from scratch (most painful in build-repo.sh's 14-spec
 # loop, where the common tooling is fetched 14 times). The named volume is
-# auto-created on first use; keepcache=1 makes the downloaded RPMs stick.
-CACHE_VOL="${OMEDORA_RPMBUILD_DNF_CACHE:-omedora-rpmbuild-dnf-cache}"
+# auto-created on first use; keepcache=1 makes the downloaded RPMs stick. One
+# volume per release, so metadata and RPMs of different releases never mix.
+CACHE_VOL="${OMEDORA_RPMBUILD_DNF_CACHE:-omedora-rpmbuild-dnf-cache$OMEDORA_RELEASE_SUFFIX}"
 
 [[ -f "$COPR_DIR/$spec" ]] || { echo "spec not found: $COPR_DIR/$spec" >&2; exit 1; }
 
-mkdir -p "$COPR_DIR/output"
+mkdir -p "$COPR_DIR/$OUT_NAME"
 
 # SELF-SOURCE MODE: a spec that declares `Source0: omedora-self.tar.gz` (a
 # marker filename, not a URL) is sourced from THIS repo checkout — the
@@ -58,6 +70,8 @@ podman run --rm \
   -v "$CACHE_VOL:/var/cache/libdnf5" \
   -e OMEDORA_BUILD_SPEC="$spec" \
   -e OMEDORA_SELF_STAMP="$SELF_STAMP" \
+  -e OMEDORA_BUILD_OUT="/copr/$OUT_NAME" \
+  -e OMEDORA_BUILD_REPO="/copr/$LOCAL_REPO_NAME" \
   "$IMAGE" bash -euo pipefail -c '
     # rpm-build gives rpmbuild; rpmdevtools gives rpmdev-setuptree + spectool;
     # the builddep plugin installs a spec'\''s BuildRequires. keepcache=1 keeps
@@ -69,17 +83,17 @@ podman run --rm \
     # Expose ALREADY-BUILT sibling RPMs to this build as a local dnf repo. The
     # Hyprland stack has deep intra-stack BuildRequires (e.g. hyprland BR
     # hyprutils-devel, aquamarine-devel, ...). build-repo.sh copies each freshly
-    # built RPM into /copr/repo before invoking the next spec, so dnf builddep
-    # below resolves just-built siblings. We (re)generate repodata here so the
+    # built RPM into $OMEDORA_BUILD_REPO (/copr/repo[-f<N>]) before invoking the
+    # next spec, so dnf builddep below resolves just-built siblings. We (re)generate repodata here so the
     # repo is always valid even if an external caller only dropped RPMs in.
     # The repo is mounted read-write via /copr; createrepo_c needs the metadata
     # to exist for dnf to consume it.
-    if compgen -G "/copr/repo/*.rpm" >/dev/null 2>&1; then
-      [[ -d /copr/repo/repodata ]] || createrepo_c --quiet /copr/repo
+    if compgen -G "$OMEDORA_BUILD_REPO/*.rpm" >/dev/null 2>&1; then
+      [[ -d $OMEDORA_BUILD_REPO/repodata ]] || createrepo_c --quiet "$OMEDORA_BUILD_REPO"
       cat > /etc/yum.repos.d/omedora-local.repo <<EOF
 [omedora-local]
 name=omedora local build repo
-baseurl=file:///copr/repo
+baseurl=file://$OMEDORA_BUILD_REPO
 enabled=1
 gpgcheck=0
 priority=1
@@ -249,10 +263,10 @@ EOF
     rpmbuild -ba "$HOME/rpmbuild/SPECS/$OMEDORA_BUILD_SPEC"
 
     # Hand the artifacts back to the host via the bind mount.
-    cp -v ~/rpmbuild/RPMS/*/*.rpm /copr/output/ 2>/dev/null || true
-    cp -v ~/rpmbuild/SRPMS/*.rpm  /copr/output/ 2>/dev/null || true
+    cp -v ~/rpmbuild/RPMS/*/*.rpm "$OMEDORA_BUILD_OUT/" 2>/dev/null || true
+    cp -v ~/rpmbuild/SRPMS/*.rpm  "$OMEDORA_BUILD_OUT/" 2>/dev/null || true
   '
 
 echo ""
-echo "Done. Artifacts in packaging/copr/output/:"
-ls -1 "$COPR_DIR/output/" | sed 's/^/  /'
+echo "Done. Artifacts in packaging/copr/$OUT_NAME/:"
+ls -1 "$COPR_DIR/$OUT_NAME/" | sed 's/^/  /'
