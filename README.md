@@ -51,7 +51,11 @@ a from-scratch Omarchy OS, install upstream Omarchy on Arch.
 
 ### Requirements
 
-- **Fedora 44 Workstation**, **x86_64** (the COPR builds for `fedora-44-x86_64`).
+- **Fedora 44 or 45 Workstation**, **x86_64** (the COPR builds for
+  `fedora-44-x86_64` and `fedora-45-x86_64`). Omedora supports the current Fedora
+  release and the one before it; the installer refuses any other release. To move
+  to a newer Fedora later, use `omedora-upgrade-fedora` (see
+  [Fedora release upgrades](omedora/update-and-upgrade.md#fedora-release-upgrades)).
 - A regular user in the `wheel` group (the Workstation default). You are **not**
   root.
 - Internet access (Fedora mirrors, RPM Fusion, Flathub, the Omedora COPR).

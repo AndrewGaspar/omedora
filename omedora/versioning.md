@@ -54,6 +54,33 @@ channel switching is intentionally unavailable.
 The temporary git clone used by `omedora/boot.sh` is a pre-install plan source,
 not an installed update channel.
 
+## Fedora releases and COPR chroots
+
+Omedora supports Fedora N and N-1: the current Fedora release and the one before
+it. Support means the version-scoped COPR has that release's chroot (today
+`fedora-44-x86_64` and `fedora-45-x86_64`). The fresh-install gate, the updater,
+and `omedora-upgrade-fedora` all ask `omedora-copr --chroot-available`.
+
+- **Every build goes to every enabled chroot.** A push builds each changed
+  package for all enabled chroots; nothing is built for one release only.
+- **A new release's chroot is added by hand at Fedora branching.** Omedora keeps
+  no rawhide chroot, so COPR's "follow Fedora branching" has nothing to fork.
+  Enable `fedora-<N>-x86_64` on the project when Fedora branches N from rawhide,
+  then backfill it in dependency order with `copr-submit.sh` (re-register first;
+  see the script's header):
+
+  ```bash
+  BRANCH=$(git rev-parse origin/omedora-4) omedora/packaging/copr/copr-submit.sh register
+  CHROOTS=fedora-<N>-x86_64 omedora/packaging/copr/copr-submit.sh build
+  ```
+
+  Until the backfill finishes, the chroot exists but isn't complete.
+  `omedora-upgrade-fedora`'s dry run catches that: it refuses while any Omedora
+  package would be removed or downgraded.
+- **A release's chroot is dropped after Fedora's end of life** for that release.
+  N-1 reaches end of life about four weeks after N+1 is released, by which time
+  N+1's chroot has been added.
+
 ## Release order
 
 1. Rebase the patch stack onto the selected official upstream commit.
