@@ -36,6 +36,9 @@
 #   omedora/test/fedora/vm/run-vm-test.sh --stage <name>  # resume at a stage (provision|install|session|tests)
 #   omedora/test/fedora/vm/run-vm-test.sh --ref <gitref>  # OMEDORA_REF channel/branch/tag (default: this branch)
 #   omedora/test/fedora/vm/run-vm-test.sh --cleanup       # destroy+undefine any omedora-vmtest-* and exit
+#   omedora/test/fedora/vm/run-vm-test.sh --upgrade-to 45 # after the session tests, upgrade the VM to
+#                                            #   Fedora 45 with omedora-upgrade-fedora (real offline
+#                                            #   reboot), update, and rerun the session tests there
 #   OMEDORA_FEDORA_RELEASE=45 omedora/test/fedora/vm/run-vm-test.sh
 #                                            # provision Fedora 45 instead of 44 (VM
 #                                            #   omedora-vmtest-f45, SSH port 2223; see base-image.sh)
@@ -117,7 +120,7 @@ vmscp() {
 # ---------------------------------------------------------------------------
 # args
 # ---------------------------------------------------------------------------
-keep=false; fast=false; provision_only=false; cleanup_only=false
+keep=false; fast=false; provision_only=false; cleanup_only=false; upgrade_to=""
 stage_from="provision"; ref="$DEFAULT_REF"
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -127,11 +130,18 @@ while [[ $# -gt 0 ]]; do
     --stage)           shift; stage_from="${1:?--stage needs a name}" ;;
     --ref)             shift; ref="${1:?--ref needs a value}" ;;
     --cleanup)         cleanup_only=true ;;
+    --upgrade-to)      shift; upgrade_to="${1:?--upgrade-to needs a Fedora release}" ;;
     --help|-h) grep '^# ' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "unknown arg: $1" ;;
   esac
   shift
 done
+# A release upgrade needs room for both releases' packages, and omarchy update
+# refuses to run with less than 10 GiB free afterwards; 24 GB runs out. The
+# overlay is sparse, so the larger size costs nothing until it is used.
+if [[ -n $upgrade_to && -z ${OMEDORA_VM_DISK_GB:-} ]]; then
+  VM_DISK_GB=40
+fi
 
 # ---------------------------------------------------------------------------
 # cleanup
@@ -440,9 +450,76 @@ run_session_tests() {
 }
 
 # ---------------------------------------------------------------------------
+# stage: upgrade — in-place Fedora release upgrade with omedora-upgrade-fedora
+# ---------------------------------------------------------------------------
+# Runs this checkout's code the way `omarchy dev link` would (OMARCHY_PATH and
+# PATH on the checkout, sudo's secure_path too), so the gate covers unreleased
+# Omedora code while every package still comes from the live COPR.
+VM_CHECKOUT="/home/$VM_USER/.local/share/omarchy"
+VM_DEV_ENV="export OMARCHY_PATH=$VM_CHECKOUT PATH=$VM_CHECKOUT/bin:\$PATH;"
+
+upgrade_release() {
+  local to="$1" i rc now
+  vmssh "printf 'Defaults secure_path=\"$VM_CHECKOUT/bin:/usr/local/sbin:/usr/local/bin:/usr/bin\"\\n' | sudo -n tee /etc/sudoers.d/omarchy-dev-path >/dev/null && sudo -n chmod 0440 /etc/sudoers.d/omarchy-dev-path" \
+    || { warn "dev-path sudoers setup failed"; return 1; }
+  # `omarchy update` pulls a dev-linked checkout and refuses one that isn't a
+  # git repo. The VM's copy came from `git archive`; commit it into a repo with
+  # no upstream, so the update skips the pull.
+  vmssh "cd $VM_CHECKOUT && { [[ -d .git ]] || { git init -q && git add -A && \
+    git -c user.name=vmtest -c user.email=vmtest@localhost commit -qm 'checkout snapshot'; }; }" \
+    || { warn "could not make the VM checkout a git repo"; return 1; }
+
+  log "omedora-upgrade-fedora --releasever $to --yes (the VM reboots into the offline upgrade)"
+  set +e
+  vmssh_tty "$VM_DEV_ENV omedora-upgrade-fedora --releasever $to --yes 2>&1 | tee ~/omedora-upgrade.out; \
+    echo \"UPGRADE_RC=\${PIPESTATUS[0]}\" >~/omedora-upgrade.rc"
+  set +o errexit 2>/dev/null || true
+  # A refused preflight or failed download exits without rebooting.
+  rc=$(vmssh 'sed -n "s/^UPGRADE_RC=//p" ~/omedora-upgrade.rc 2>/dev/null' 2>/dev/null | tr -dc 0-9)
+  if [[ -n $rc && $rc != "0" ]]; then
+    warn "omedora-upgrade-fedora failed (rc $rc) before rebooting"
+    vmssh 'tail -40 ~/omedora-upgrade.out' 2>/dev/null | sed 's/^/  /' >&2 || true
+    return 1
+  fi
+
+  # The command ends by rebooting into the offline transaction, which can take
+  # a long time; SSH is back once the upgraded system has booted.
+  log "waiting for the offline upgrade to finish and the VM to come back (up to 90 min)..."
+  sleep 30
+  for i in $(seq 1 180); do
+    now=$(vmssh '. /etc/os-release && echo "$VERSION_ID"' 2>/dev/null) && [[ $now == "$to" ]] && break
+    sleep 30
+  done
+  rc=$(vmssh 'sed -n "s/^UPGRADE_RC=//p" ~/omedora-upgrade.rc 2>/dev/null' 2>/dev/null | tr -dc 0-9)
+  if [[ $now != "$to" ]]; then
+    warn "VM is not on Fedora $to (os-release: ${now:-unreachable}; omedora-upgrade-fedora rc: ${rc:-none})"
+    vmssh 'tail -40 ~/omedora-upgrade.out' 2>/dev/null | sed 's/^/  /' >&2 || true
+    return 1
+  fi
+  log "VM upgraded to Fedora $now"
+
+  log "asserting the Omedora packages survived and were rebuilt for Fedora $to"
+  vmssh "$VM_DEV_ENV set -e; rpm -q omedora omedora-settings hyprland-no-session quickshell uwsm; \
+    repo=\$(omedora-copr --repo-id); \
+    for p in omedora hyprland-no-session quickshell; do \
+      r=\$(dnf repoquery --installed --qf '%{from_repo}' \$p); \
+      [[ \$r == \$repo ]] || { echo \"\$p came from \$r, not \$repo\"; exit 1; }; \
+    done; \
+    omedora-upgrade-fedora --post-check" || { warn "post-upgrade package assertions failed"; return 1; }
+
+  log "omarchy update on Fedora $to"
+  set +e
+  vmssh_tty "$VM_DEV_ENV omarchy-update -y 2>&1 | tee ~/omedora-update-after.out; \
+    echo \"UPDATE_RC=\${PIPESTATUS[0]}\" >~/omedora-update-after.rc"
+  set +o errexit 2>/dev/null || true
+  rc=$(vmssh 'sed -n "s/^UPDATE_RC=//p" ~/omedora-update-after.rc 2>/dev/null' 2>/dev/null | tr -dc 0-9)
+  [[ $rc == "0" ]] || { warn "omarchy update on Fedora $to failed (rc ${rc:-none})"; return 1; }
+}
+
+# ---------------------------------------------------------------------------
 # stage dispatch
 # ---------------------------------------------------------------------------
-order=(provision install session tests)
+order=(provision install session tests upgrade)
 should_run() {
   local target="$1"; local from_idx=-1 tgt_idx=-1 i
   for i in "${!order[@]}"; do
@@ -465,7 +542,7 @@ main() {
     return 0
   fi
 
-  local install_rc=0 assert_rc=0 tests_rc=0
+  local install_rc=0 assert_rc=0 tests_rc=0 upgrade_rc=0 upgraded_tests_rc=0
   if should_run install; then
     log "=== STAGE: install ==="
     do_install; install_rc=$?
@@ -480,15 +557,30 @@ main() {
     log "=== STAGE: session tests ==="
     run_session_tests; tests_rc=$?
   fi
+  if [[ -n $upgrade_to ]] && should_run upgrade; then
+    log "=== STAGE: upgrade to Fedora $upgrade_to ==="
+    upgrade_release "$upgrade_to"; upgrade_rc=$?
+    if (( upgrade_rc == 0 )); then
+      ARTIFACTS="$ARTIFACTS/upgraded-f$upgrade_to"
+      log "=== STAGE: session (Fedora $upgrade_to) ==="
+      start_session
+      log "=== STAGE: session tests (Fedora $upgrade_to) ==="
+      run_session_tests; upgraded_tests_rc=$?
+    fi
+  fi
 
   echo
   log "================= L4-VM SUMMARY ================="
   log "install-4.sh exit ... $install_rc"
   log "install asserts ... $assert_rc"
   log "session tests  ... $tests_rc"
+  if [[ -n $upgrade_to ]]; then
+    log "upgrade to F$upgrade_to ... $upgrade_rc"
+    log "F$upgrade_to session tests ... $upgraded_tests_rc"
+  fi
   log "artifacts      ... $ARTIFACTS/"
   log "================================================"
-  (( install_rc == 0 && assert_rc == 0 && tests_rc == 0 ))
+  (( install_rc == 0 && assert_rc == 0 && tests_rc == 0 && upgrade_rc == 0 && upgraded_tests_rc == 0 ))
 }
 
 main
