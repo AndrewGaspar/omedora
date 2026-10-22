@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # omarchy:summary=Print the omedora COPR project (owner/project) or its dnf repo id.
-# omarchy:args=[--repo-id]
-# omarchy:examples=omedora copr | omedora copr --repo-id
+# omarchy:args=[--repo-id | --chroot-available [RELEASE]]
+# omarchy:examples=omedora copr | omedora copr --repo-id | omedora-copr --chroot-available 45
 
 # Single source of truth for the omedora COPR name.
 #
@@ -20,6 +20,19 @@
 #   (default)   print "owner/project"                     e.g. agaspar/omedora-3
 #   --repo-id   print the dnf repo id dnf records as       e.g.
 #               copr:copr.fedorainfracloud.org:agaspar:omedora-3
+#   --chroot-available [RELEASE]
+#               probe the COPR API for the fedora-RELEASE-ARCH chroot (RELEASE
+#               defaults to the running VERSION_ID, ARCH to `uname -m`). Prints
+#               nothing on stdout. Exit status is the contract:
+#                 0  the project builds for fedora-RELEASE-ARCH
+#                 1  it does not (the Fedora releases it does build for are
+#                    printed to stderr); also when the project doesn't exist
+#                 2  could not check (network/API error, unparsable reply,
+#                    no Fedora VERSION_ID)
+#               Seams: OMEDORA_COPR_API_FIXTURE=<file> answers from that JSON
+#               body instead of the network (a missing file == network error);
+#               OMEDORA_OS_RELEASE overrides /etc/os-release; OMEDORA_COPR_ARCH
+#               overrides `uname -m`; OMEDORA_COPR_API overrides the API base.
 #
 # Everything that needs the COPR name (install/preflight/fedora-repos.sh, the
 # COPR submit script, the L3/L4 tests) MUST go through this — never hard-code it.
@@ -43,8 +56,77 @@ major="${base%%.*}"   # 3.8.2 -> 3 ; one COPR per Omarchy major line
 
 project="omedora-${major}"
 
+# --chroot-available: ask the COPR frontend which chroots the project has.
+chroot_available() {
+  local release=${1:-} os_release=${OMEDORA_OS_RELEASE:-/etc/os-release}
+  local arch=${OMEDORA_COPR_ARCH:-$(uname -m)}
+  local api=${OMEDORA_COPR_API:-https://copr.fedorainfracloud.org/api_3}
+  local body http_code chroots available
+
+  if [[ -z $release ]]; then
+    release=$( . "$os_release" 2>/dev/null && [[ ${ID:-} == "fedora" ]] && printf '%s' "${VERSION_ID:-}" ) || true
+    if [[ -z $release ]]; then
+      echo "omedora-copr: cannot determine the running Fedora release (no ID=fedora VERSION_ID in $os_release)" >&2
+      return 2
+    fi
+  fi
+  if [[ ! $release =~ ^[0-9]+$ ]]; then
+    echo "omedora-copr: invalid Fedora release '$release' (expected a number such as 45)" >&2
+    return 2
+  fi
+  local chroot="fedora-$release-$arch"
+
+  if [[ -n ${OMEDORA_COPR_API_FIXTURE:-} ]]; then
+    if [[ ! -r $OMEDORA_COPR_API_FIXTURE ]]; then
+      echo "omedora-copr: could not reach the COPR API (fixture $OMEDORA_COPR_API_FIXTURE unreadable)" >&2
+      return 2
+    fi
+    body=$(<"$OMEDORA_COPR_API_FIXTURE")
+    http_code=200
+  else
+    # curl's own diagnostic (e.g. "Could not resolve host") goes to stderr.
+    if ! body=$(curl -sS --max-time 15 --retry 1 -w '\n%{http_code}' \
+      "$api/project?ownername=$owner&projectname=$project"); then
+      echo "omedora-copr: could not reach the COPR API to check for $chroot" >&2
+      return 2
+    fi
+    http_code=${body##*$'\n'}
+    body=${body%$'\n'*}
+  fi
+
+  if [[ $http_code == "404" ]]; then
+    echo "omedora-copr: COPR project $owner/$project does not exist, so it has no $chroot chroot" >&2
+    return 1
+  fi
+  if [[ $http_code != "200" ]]; then
+    echo "omedora-copr: the COPR API answered HTTP $http_code while checking for $chroot" >&2
+    return 2
+  fi
+
+  if ! chroots=$(python3 -c '
+import json, sys
+print("\n".join(sorted(json.load(sys.stdin)["chroot_repos"])))
+' <<<"$body" 2>/dev/null); then
+    echo "omedora-copr: unexpected COPR API reply while checking for $chroot" >&2
+    return 2
+  fi
+
+  if grep -qxF "$chroot" <<<"$chroots"; then
+    return 0
+  fi
+
+  available=$(sed -n "s/^fedora-\([0-9][0-9]*\)-$arch\$/\1/p" <<<"$chroots" | sort -n | paste -sd' ')
+  echo "omedora-copr: $owner/$project has no $chroot chroot; available Fedora releases: ${available:-none}" >&2
+  return 1
+}
+
 case "${1:-}" in
   --repo-id) printf 'copr:copr.fedorainfracloud.org:%s:%s\n' "$owner" "$project" ;;
+  --chroot-available)
+    rc=0
+    chroot_available "${2:-}" || rc=$?
+    exit "$rc"
+    ;;
   "")        printf '%s/%s\n' "$owner" "$project" ;;
   *) echo "omedora-copr: unknown arg: $1" >&2; exit 2 ;;
 esac

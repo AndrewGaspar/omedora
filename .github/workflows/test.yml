@@ -79,6 +79,9 @@ jobs:
       - name: Run upgrade-to-4 test
         run: bash test/upgrade-to-4-test.sh
 
+      - name: Run COPR chroot probe test
+        run: bash test/copr-chroot-probe-test.sh
+
       - name: Run byte-identity audit (upstream files are additive-only)
         run: bash test/byte-identity-test.sh
 
