@@ -34,13 +34,39 @@ omedora/test/fedora/vm/run-vm-test.sh --ref stable
 # Leave the VM up for inspection; tear everything down later
 omedora/test/fedora/vm/run-vm-test.sh --keep
 omedora/test/fedora/vm/run-vm-test.sh --cleanup   # destroy+undefine any omedora-vmtest-*
+
+# Provision Fedora 45 instead of the default 44 (both tiers honor this)
+OMEDORA_FEDORA_RELEASE=45 omedora/test/fedora/vm/run-vm-test.sh
 ```
+
+### Fedora release and base image
+
+`OMEDORA_FEDORA_RELEASE` (default `44`; see `omedora/testing.md` §1) selects the
+Fedora release. On any release other than 44 the domain name, SSH port and
+artifact directory gain a release suffix (`omedora-vmtest-f45`, port 2223,
+`artifacts-f45/`; the snapshot tier uses `omedora-snaptest-f45` and port 2299),
+so both releases can run side by side. `base-image.sh` maps the release to a
+Generic Cloud Base qcow2, first match wins:
+
+1. `OMEDORA_VM_BASE_URL` / `OMEDORA_VM_BASE_NAME` overrides
+   (`OMEDORA_VM_BASE_SHA256` pins the digest of a custom download).
+2. The pinned GA image in `OMEDORA_VM_PINNED_IMAGES` (44 → `44-1.7`). Add a
+   release here once its GA image is published under `releases/<N>/`.
+3. The newest image for that release already cached in
+   `/var/tmp/omedora-vmtest/images/`, so runs work offline and the base does
+   not change with every nightly (`OMEDORA_VM_BASE_REFRESH=1` skips the cache).
+4. The newest `Fedora-Cloud-Base-Generic-<N>-*.x86_64.qcow2` listed under
+   `releases/<N>/`, then `development/<N>/` (pre-GA nightlies such as
+   `45-20261021.n.0`) on dl.fedoraproject.org.
+
+Every download is verified against the directory's published `CHECKSUM` file
+before it enters the cache.
 
 ## Architecture and why
 
-### Provisioning: Fedora 44 Cloud Base qcow2 + cloud-init, layered up to Workstation
+### Provisioning: Fedora Cloud Base qcow2 + cloud-init, layered up to Workstation
 
-We download the **Fedora 44 Cloud Base** qcow2 once (cached under
+We download the **Fedora Cloud Base** qcow2 for the selected release once (cached under
 `/var/tmp/omedora-vmtest/images/`), make a copy-on-write **overlay** per run, and
 seed first boot with **cloud-init** via a **NoCloud `cidata` ISO**.
 
@@ -232,8 +258,8 @@ omedora/test/fedora/vm/run-snapshot-vm-test.sh --keep     # leave the VM up
 omedora/test/fedora/vm/run-snapshot-vm-test.sh --cleanup  # destroy omedora-snaptest-*
 ```
 
-**Why no second disk:** the cached **Fedora 44 Cloud Base** qcow2 is *already*
-btrfs-root — verified empirically (boot + `findmnt -no FSTYPE /` = `btrfs`).
+**Why no second disk:** the cached **Fedora Cloud Base** qcow2 (verified on
+Fedora 44) is *already* btrfs-root — verified empirically (boot + `findmnt -no FSTYPE /` = `btrfs`).
 Its top level (subvolid=5) holds `root` (mounted `/`), `boot`, `home`, `var`,
 with fstab pinning `subvol=root` — the **exact layout `omedora-snapshot`
 expects**. So the test runs against the VM's real `/`, no extra disk needed.

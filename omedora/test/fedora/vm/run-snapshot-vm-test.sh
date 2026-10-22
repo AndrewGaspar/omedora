@@ -12,7 +12,7 @@
 # It reuses the L4-VM harness's plumbing exactly (run-vm-test.sh):
 #   * rootless qemu:///session  (NO host sudo)
 #   * passt user-mode networking with a hostfwd  (host 127.0.0.1:$SSH_PORT -> 22)
-#   * the cached Fedora 44 Cloud Base qcow2 + cloud-init NoCloud cidata ISO
+#   * the cached Fedora Cloud Base qcow2 + cloud-init NoCloud cidata ISO
 #     (built with xorriso) under /var/tmp/omedora-vmtest/
 #
 # KEY FACT (verified, see README): the Fedora 44 Cloud Base image is ALREADY
@@ -38,6 +38,7 @@
 #   run-snapshot-vm-test.sh                 # full run
 #   run-snapshot-vm-test.sh --keep          # leave the VM up for inspection
 #   run-snapshot-vm-test.sh --cleanup       # destroy+undefine any omedora-snaptest-* and exit
+#   OMEDORA_FEDORA_RELEASE=45 run-snapshot-vm-test.sh   # Fedora 45 (VM omedora-snaptest-f45, port 2299)
 #
 # Host requirements: virt-install, virsh, qemu-img, xorriso, ssh, openssl,
 # /dev/kvm, passt. None need sudo for qemu:///session.
@@ -60,16 +61,18 @@ IMAGES="$WORK/images"
 RUN="$WORK/run"
 mkdir -p "$IMAGES" "$RUN"
 
-BASE_IMG_NAME="Fedora-Cloud-Base-Generic-44-1.7.x86_64.qcow2"
-BASE_IMG="$IMAGES/$BASE_IMG_NAME"
-BASE_IMG_URL="https://download.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/$BASE_IMG_NAME"
+# Fedora release (OMEDORA_FEDORA_RELEASE, default 44) -> Cloud Base qcow2:
+# pinned GA table, cache, or newest nightly. BASE_IMG/BASE_IMG_NAME/BASE_IMG_URL
+# are resolved in preflight (see base-image.sh for overrides).
+. "$REPO/omedora/test/fedora/lib/release.sh"
+. "$HERE/base-image.sh"
 
-VM="${OMEDORA_SNAPTEST_VM_NAME:-omedora-snaptest}"   # libvirt domain (omedora-snaptest-*)
+VM="${OMEDORA_SNAPTEST_VM_NAME:-omedora-snaptest$OMEDORA_RELEASE_SUFFIX}"   # libvirt domain (omedora-snaptest-*)
 VM_USER="${OMEDORA_VM_USER:-omedora}"
 VM_RAM_MB="${OMEDORA_SNAPTEST_RAM_MB:-2048}"
 VM_VCPUS="${OMEDORA_SNAPTEST_VCPUS:-2}"
 VM_DISK_GB="${OMEDORA_SNAPTEST_DISK_GB:-8}"
-SSH_PORT="${OMEDORA_SNAPTEST_SSH_PORT:-2298}"        # distinct from run-vm-test.sh's 2222
+SSH_PORT="${OMEDORA_SNAPTEST_SSH_PORT:-$(( 2298 + OMEDORA_FEDORA_RELEASE - 44 ))}"  # 2298 on F44; distinct from run-vm-test.sh's 2222+
 SSH_KEY="$RUN/id_omedora_snaptest"
 OVERLAY="$IMAGES/${VM}-overlay.qcow2"
 SEED_ISO="$IMAGES/${VM}-seed.iso"
@@ -138,11 +141,8 @@ preflight() {
   [[ -e /dev/kvm ]] || die "/dev/kvm not present — KVM acceleration required"
   command -v passt >/dev/null || warn "passt not found — qemu:///session user networking may fail"
 
-  if [[ ! -f "$BASE_IMG" ]]; then
-    log "base image not cached; downloading Fedora 44 Cloud Base (~560MB)..."
-    curl -fSL -o "$BASE_IMG.part" "$BASE_IMG_URL" || die "base image download failed"
-    mv "$BASE_IMG.part" "$BASE_IMG"
-  fi
+  resolve_base_image || die "cannot resolve a Fedora $OMEDORA_FEDORA_RELEASE Cloud Base image"
+  ensure_base_image log || die "base image download failed"
   log "base image: $BASE_IMG"
 
   if [[ ! -f "$SSH_KEY" ]]; then
