@@ -60,13 +60,13 @@ BuildRequires:  pkgconfig(gbm)
 BuildRequires:  pkgconfig(gio-2.0)
 BuildRequires:  pkgconfig(glesv2)
 BuildRequires:  pkgconfig(hwdata)
-BuildRequires:  pkgconfig(hyprcursor)
-BuildRequires:  pkgconfig(hyprgraphics)
-BuildRequires:  pkgconfig(hyprlang)
-BuildRequires:  pkgconfig(hyprutils)
+BuildRequires:  pkgconfig(hyprcursor) >= 0.1.13
+BuildRequires:  pkgconfig(hyprgraphics) >= 0.5.1
+BuildRequires:  pkgconfig(hyprlang) >= 0.6.8
+BuildRequires:  pkgconfig(hyprutils) >= 0.14.0
 BuildRequires:  pkgconfig(hyprwire)
-BuildRequires:  pkgconfig(hyprwayland-scanner)
-BuildRequires:  cmake(hyprwayland-scanner)
+BuildRequires:  pkgconfig(hyprwayland-scanner) >= 0.4.6
+BuildRequires:  cmake(hyprwayland-scanner) >= 0.4.6
 BuildRequires:  pkgconfig(libdisplay-info)
 BuildRequires:  pkgconfig(libdrm)
 # 0.56.x added libeis (emulated input, for the RemoteDesktop portal path);

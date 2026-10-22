@@ -23,10 +23,10 @@ BuildRequires:  gcc-c++
 BuildRequires:  systemd-rpm-macros
 
 BuildRequires:  pkgconfig(gbm)
-BuildRequires:  pkgconfig(hyprland-protocols)
-BuildRequires:  pkgconfig(hyprlang)
-BuildRequires:  pkgconfig(hyprutils)
-BuildRequires:  pkgconfig(hyprwayland-scanner)
+BuildRequires:  pkgconfig(hyprland-protocols) >= 0.7.0
+BuildRequires:  pkgconfig(hyprlang) >= 0.6.8
+BuildRequires:  pkgconfig(hyprutils) >= 0.14.0
+BuildRequires:  pkgconfig(hyprwayland-scanner) >= 0.4.6
 BuildRequires:  pkgconfig(libdrm)
 BuildRequires:  pkgconfig(libpipewire-0.3)
 BuildRequires:  pkgconfig(libsystemd)
