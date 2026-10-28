@@ -44,8 +44,15 @@ assert_local_core() {
   echo "core RPMs are the local $EXPECT_TAG build $1"
 }
 
+# The managed update pins omedora/omedora-settings to the latest build in the
+# expected Omedora repo, the COPR, and replaces any other build (a locally
+# newer one included). Local-repo mode makes the overlay that expected repo for
+# the update runs, so the updater resolves, installs and verifies HEAD's build
+# from omedora-local the way it treats the COPR's.
+update_env=""
 if [[ -n $LOCAL_REPO ]]; then
   bash "$REPO/omedora/test/fedora/lib/local-repo-overlay.sh" "$LOCAL_REPO"
+  update_env="OMEDORA_COPR_REPO_ID=omedora-local "
 fi
 
 su omedora -c "OMEDORA_PLAN_AUTOCONFIRM=1 bash $REPO/omedora/install-4.sh" >/tmp/install.log 2>&1 \
@@ -64,10 +71,10 @@ assert_local_core "after install"
 printf 'Defaults:omedora !authenticate\n' >/etc/sudoers.d/zz-omedora-test-noauth
 chmod 0440 /etc/sudoers.d/zz-omedora-test-noauth
 
-su omedora -c "timeout 900 omarchy-update -y" >/tmp/up1.log 2>&1 \
+su omedora -c "${update_env}timeout 900 omarchy-update -y" >/tmp/up1.log 2>&1 \
   && echo "update run 1 ok" \
   || { echo "UPDATE 1 FAILED rc=$?"; tail -20 /tmp/up1.log; exit 1; }
-su omedora -c "timeout 900 omarchy-update -y" >/tmp/up2.log 2>&1 \
+su omedora -c "${update_env}timeout 900 omarchy-update -y" >/tmp/up2.log 2>&1 \
   && echo "update run 2 ok" \
   || { echo "UPDATE 2 FAILED rc=$?"; tail -20 /tmp/up2.log; exit 1; }
 
