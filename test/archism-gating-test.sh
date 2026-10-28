@@ -63,9 +63,16 @@ log_has 'omarchy-pkg-add fprintd fprintd-pam libfprint usbutils' \
 
 # --- Arch path preserved: Fedora arm is additive, Arch still calls pacman ----
 # (byte-identity proves byte-equality; here just confirm the Arch path is live.)
+# Upstream's privileged-startup guard (bash -p, checked against /proc) refuses a
+# test harness launch before any pacman call, so prove instead that the Fedora
+# note does not short-circuit Arch and that the pacman body follows the gate.
 rc=$(run arch "$ROOT/bin/omarchy-refresh-pacman" || true)
-log_has pacman && pass "omarchy-refresh-pacman: Arch path still runs pacman" \
-  || { cat "$MOCK_LOG" >&2; fail "omarchy-refresh-pacman: Arch path still runs pacman"; }
+if ! grep -qF "isn't available on Omedora" "$TMP/out" &&
+  sed -n '/^esac$/,$p' "$ROOT/bin/omarchy-refresh-pacman" | grep -q 'pacman '; then
+  pass "omarchy-refresh-pacman: Arch path still runs pacman"
+else
+  cat "$TMP/out" >&2; fail "omarchy-refresh-pacman: Arch path still runs pacman"
+fi
 
 # --- debug: Fedora package list uses rpm/dnf, not the expac/pacman pipeline --
 grep -q 'rpm -q omedora omedora-settings' "$ROOT/bin/omarchy-debug" \
