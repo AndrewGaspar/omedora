@@ -3,6 +3,14 @@
 # omarchy:summary=Add or remove an EFI boot entry for the Omarchy UKI, allowing the system to boot directly
 # omarchy:requires-sudo=true
 
+# Fedora: boot entries and EFI variables are Fedora's (omedora/AGENTS.md §6),
+# and there is no Omarchy UKI to point one at. Refuse before sudo or efibootmgr.
+# The Arch path below is unchanged.
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  echo "Direct boot isn't available on Omedora: Fedora's bootloader manages the EFI boot entries." >&2
+  exit 1
+fi
+
 # Apple Silicon boots m1n1, then U-Boot, which finds the bootloader on its own
 # and creates its boot entries itself, so there is no direct-boot entry to add
 # or remove.
