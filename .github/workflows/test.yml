@@ -121,6 +121,9 @@ jobs:
       - name: Run omacut-spec static guard
         run: bash test/omacut-spec-test.sh
 
+      - name: Run omarchy45-apps-spec static guard
+        run: bash test/omarchy45-apps-spec-test.sh
+
       - name: Run omawrite-spec static guard
         run: bash test/omawrite-spec-test.sh
 

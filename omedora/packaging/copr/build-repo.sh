@@ -62,6 +62,9 @@ SPECS=(
   # (the wallpaper engine behind owed.service and theme intros; meson/C).
   # Plain builds with BuildRequires only, no vendoring, no intra-stack deps.
   omasnap.spec owe.spec
+  # Omarchy 4.5's removable omacom preinstalls (qmake6 like omacut) and
+  # disktree, the dua-cli replacement (a release-binary repack like lazygit).
+  hype.spec monologue.spec signed.spec disktree.spec
   # ttfx is the native terminal-effects engine used by Quattro's screensaver
   # and first-run provisioner. Its Rust dependency set is vendored for COPR.
   ttfx.spec

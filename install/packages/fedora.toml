@@ -573,27 +573,31 @@ reason = "owe's lock-screen QML feed plugin. 4.5's lock screen uses a still post
 
 [omarchy-hyprland-titlebars]
 source = "skip"
-reason = "Hyprland plugin (hyprbars fork) for 4.5's floating-workspace mode. It must be built against the exact hyprland-devel EVR and rebuilt with every hyprland.spec build; not packaged yet. workspace-modes.lua skips titlebars when the .so is absent."
+reason = "Hyprland plugin (hyprbars fork) for 4.5's floating-workspace mode. Not packaged: a plugin loads only into the exact Hyprland build it was compiled against, so it would need an exact-EVR Requires and a rebuild with every hyprland.spec build (and its HypXR consumers). workspace-modes.lua skips titlebars when the .so is absent."
 
 [hype]
-source = "skip"
-reason = "Markdown slides app (Qt6, github.com/omacom/hype), a removable preinstall. Not packaged yet; a qmake build like omacut.spec would do."
+source = "dnf"
+names = ["hype"]
+reason = "Markdown slides app (Qt6, github.com/omacom/hype), a removable preinstall. Not in Fedora; built from source by omedora/packaging/copr/hype.spec (qmake6, like omacut). Requires ffmpeg/ffprobe by path and source-highlight."
 
 [monologue]
-source = "skip"
-reason = "Webcam recorder (Qt6, github.com/omacom/monologue), a removable preinstall. Not packaged yet; a qmake build like omacut.spec would do."
+source = "dnf"
+names = ["monologue"]
+reason = "Webcam recorder (Qt6, github.com/omacom/monologue), a removable preinstall. Not in Fedora; built from source by omedora/packaging/copr/monologue.spec (qmake6, like omacut). Requires ffmpeg/ffprobe by path."
 
 [signed]
-source = "skip"
-reason = "PDF signing/filling app (Qt6 + poppler-qt6 + qpdf, github.com/omacom/signed), a removable preinstall. Not packaged yet; a qmake build like omacut.spec would do."
+source = "dnf"
+names = ["signed"]
+reason = "PDF signing/filling app (Qt6 + poppler-qt6 + qpdf, github.com/omacom/signed), a removable preinstall. Not in Fedora; built from source by omedora/packaging/copr/signed.spec (qmake6, like omacut)."
 
 [gliff]
 source = "skip"
-reason = "Hyprland remote desktop over SSH (Rust, github.com/omacom/gliff). A COPR build needs vendored crates (see the Rust/COPR vendoring rule). The remote-session indicator just finds no gliff-server."
+reason = "Hyprland remote desktop over SSH (Rust, github.com/omacom/gliff). Not packaged: its Cargo tree builds Cisco OpenH264 from source (openh264-sys2), a patent-encumbered codec that neither Fedora nor COPR may ship. The remote-session indicator just finds no gliff-server."
 
 [disktree-bin]
-source = "skip"
-reason = "Disk-usage treemap GUI (tobi/disktree, Rust). Not packaged yet (a binary repackage like lazygit would do). Migration 1791345484, which swaps dua-cli for it, is Fedora-gated until it is, so users keep dua."
+source = "dnf"
+names = ["disktree"]
+reason = "Disk-usage treemap GUI (tobi/disktree, MIT), 4.5's dua-cli replacement. Not in Fedora; omedora/packaging/copr/disktree.spec repackages the upstream x86_64 release binary, as Arch's disktree-bin does (like lazygit.spec)."
 
 [asus-proart-p14-speaker-firmware]
 source = "skip"
