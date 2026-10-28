@@ -214,6 +214,7 @@ path must fit one row below.
 | `README.md` | Document replacement | Fedora-facing project landing page; exact upstream deletions are byte-audited |
 | `bin/omarchy-pkg-*`, `bin/omarchy-update-*`, `bin/omarchy-channel-*`, `bin/omarchy-snapshot`, `bin/omarchy-version*` | Prepend/early dispatch | Fedora sibling or clean no-op; Arch body retained |
 | `bin/omarchy-{apply-lock,debug,default-browser,locale-generate,migrate,provision-user,reinstall-configs,restart-terminal,setup-direct-boot,setup-security-fingerprint,system-factory-reset,system-lock,webapp-*}` | Narrow Fedora branch | Portable contract preserved; relocations are byte-audited |
+| `bin/omarchy-install-{and-launch,gaming-retroarch,service-sunshine}` | Fedora arm or gate | Fedora package source (Flatpak id, RPM Fusion set), or a message before any change when Fedora has none; Arch body retained |
 | `bin/fedora/*`, `bin/omedora*`, `bin/omarchy-distro`, `bin/omarchy-doctor`, `bin/omarchy-dev-validate-fedora-packages` | New additive files | Fedora implementation and Omedora commands |
 | `install/config/{docker,enable-services,firewall,theme-system}.sh`, `install/user/{mise-work,xcompose}.sh` | Dispatch or narrow branch | Fedora sibling handles host-safe behavior |
 | `install/hardware/all.sh`, `install/login/sddm.sh`, `install/post-install/pacman.sh`, `install/user/first-run/gnome-theme.sh`, `install/config/increase-lockout-limit.sh`, `install/config/locale.sh` | Fedora gate | Exclude Arch boot/login or host-policy behavior |

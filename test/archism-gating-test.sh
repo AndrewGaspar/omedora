@@ -20,7 +20,7 @@ BIN="$TMP/bin"; mkdir -p "$BIN"
 MOCK_LOG="$TMP/mock.log"; export MOCK_LOG
 
 for c in pacman mkinitcpio limine-mkinitcpio dracut plymouth-set-default-theme \
-         fprintd-enroll fprintd-verify authselect expac retroarch; do
+         fprintd-enroll fprintd-verify authselect expac retroarch systemctl ufw; do
   printf '#!/bin/bash\nprintf "%s %%s\\n" "$*" >>"%s"\nexit 0\n' "$c" "$MOCK_LOG" >"$BIN/$c"
 done
 # sudo: log + run the rest (so a sudo'd pacman still hits the pacman tracer).
@@ -60,6 +60,19 @@ log_has 'pacman -Rdd' && { cat "$MOCK_LOG" >&2; fail "fingerprint: no pacman -Rd
 log_has 'omarchy-pkg-add fprintd fprintd-pam libfprint usbutils' \
   && pass "fingerprint: installs the Fedora package set" \
   || { cat "$MOCK_LOG" >&2; fail "fingerprint: installs the Fedora package set"; }
+
+# Sunshine has no Fedora package source: the command stops before any step.
+rc=$(run fedora "$ROOT/bin/omarchy-install-service-sunshine")
+assert_equals "sunshine: Fedora exits 1" "1" "$rc"
+if [[ -s $MOCK_LOG ]] || ! grep -qF "not available through Omedora on Fedora" "$TMP/out"; then
+  cat "$TMP/out" "$MOCK_LOG" >&2; fail "sunshine: Fedora explains and changes nothing"
+else
+  pass "sunshine: Fedora explains and changes nothing"
+fi
+run arch "$ROOT/bin/omarchy-install-service-sunshine" >/dev/null || true
+log_has 'omarchy-pkg-add sunshine' \
+  && pass "sunshine: Arch path still installs the package" \
+  || { cat "$MOCK_LOG" >&2; fail "sunshine: Arch path still installs the package"; }
 
 # --- Arch path preserved: Fedora arm is additive, Arch still calls pacman ----
 # (byte-identity proves byte-equality; here just confirm the Arch path is live.)

@@ -9,7 +9,8 @@
 #      install/packages/fedora.toml the way pkg.py does (absent = the same
 #      name through dnf); every dnf/copr target must be provided by an enabled
 #      repository (Fedora, RPM Fusion, the Omedora COPR). A name absent from
-#      the map that dnf cannot resolve fails `omarchy-pkg-add` at runtime.
+#      the map that dnf cannot resolve fails `omarchy-pkg-add` at runtime, for
+#      the unattended base set and the on-demand installers alike.
 #   2. glibc-langpack-<lang> exists for every locale in
 #      default/i18n/locales.json (bin/fedora/locale-generate installs it).
 #   3. Setup > Language reaches omarchy-locale-generate through pkexec or sudo,
@@ -152,18 +153,18 @@ else
   fail "base/baseline/hardware dnf targets resolve from no enabled repository"
 fi
 
-# Optional installers (Install menu, AI, services, editors, gaming) belong to
-# the menu's Fedora package guard and the installer mappings, which are
-# reviewed separately. Report what would fail at runtime as a TAP TODO so the
-# gap stays visible without blocking this gate.
+# Optional installers (Install menu, AI, services, editors, gaming) run on
+# demand, but an unmapped name dnf cannot resolve still fails the command at
+# runtime, so every one must resolve too. A package Fedora cannot provide is
+# mapped to skip and its command gated (as for sunshine), which takes it out of
+# this list.
 command_unresolved=$(report_unresolved command)
 command_count=$(awk -F'\t' '$5 == "command" && $3 != "-"' "$work/targets" | wc -l)
 if [[ -z $command_unresolved ]]; then
   pass "all $command_count installer dnf targets resolve from enabled repositories"
 else
-  printf '%s\n' "$command_unresolved"
-  printf 'not ok - %s installer target(s) resolve from no enabled repository # TODO map or guard them\n' \
-    "$(wc -l <<<"$command_unresolved")"
+  printf '%s\n' "$command_unresolved" >&2
+  fail "installer dnf targets resolve from no enabled repository (map them, or skip and gate the command)"
 fi
 
 echo "=== glibc langpacks for the language registry ==="
