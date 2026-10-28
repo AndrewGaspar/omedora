@@ -132,8 +132,12 @@ SPECS=(
 
 # --- Incremental build selection -------------------------------------------
 # By default, only (re)build "dirty" specs: ones with no prior build stamp, a
-# spec file newer than its stamp, or built by an older build-local.sh. Pass
-# --force to rebuild everything, or name specs to build just those.
+# spec file newer than its stamp, or built by an older build-local.sh. A
+# self-source spec (omedora, omedora-settings: Source0 omedora-self.tar.gz =
+# git archive HEAD) is also dirty when HEAD has moved since its build: its
+# stamp records the commit it packaged, because the payload changes with every
+# commit while the spec file usually does not. Pass --force to rebuild
+# everything, or name specs to build just those.
 #   build-repo.sh                 # build dirty specs, then assemble the repo
 #   build-repo.sh --force         # rebuild all specs
 #   build-repo.sh walker.spec     # build just walker.spec if dirty (--force to force)
@@ -153,6 +157,16 @@ done
 STAMP_DIR="$COPR_DIR/$OUT_NAME/.stamps"
 BUILDER="$COPR_DIR/build-local.sh"
 mkdir -p "$STAMP_DIR"
+HEAD_SHA=$(git -C "$REPO" rev-parse HEAD)
+
+self_source_spec() {
+  grep -qE '^Source0:[[:space:]]*omedora-self\.tar\.gz[[:space:]]*$' "$COPR_DIR/$1"
+}
+
+# self_source_moved <spec> — a self-source spec whose stamp is not HEAD's.
+self_source_moved() {
+  self_source_spec "$1" && [[ $(<"$STAMP_DIR/$1") != "$HEAD_SHA" ]]
+}
 
 if (( ${#requested[@]} )); then
   candidates=("${requested[@]}")
@@ -164,7 +178,8 @@ to_build=()
 for s in "${candidates[@]}"; do
   [[ -f "$COPR_DIR/$s" ]] || { echo "spec not found: $COPR_DIR/$s" >&2; exit 1; }
   stamp="$STAMP_DIR/$s"
-  if $force || [[ ! -e $stamp || "$COPR_DIR/$s" -nt $stamp || "$BUILDER" -nt $stamp ]]; then
+  if $force || [[ ! -e $stamp || "$COPR_DIR/$s" -nt $stamp || "$BUILDER" -nt $stamp ]] ||
+    self_source_moved "$s"; then
     to_build+=("$s")
   else
     echo "  up-to-date, skipping: $s"
@@ -202,7 +217,13 @@ if (( ${#to_build[@]} )); then
     # re-index, so the NEXT spec's `dnf builddep` can resolve it.
     echo "==> Folding $s into local repo (createrepo_c --update)"
     seed_and_index_repo
-    touch "$STAMP_DIR/$s"   # stamp only after a successful build (set -e aborts on failure)
+    # Stamp only after a successful build (set -e aborts on failure). A
+    # self-source stamp records the commit it packaged (see self_source_moved).
+    if self_source_spec "$s"; then
+      printf '%s\n' "$HEAD_SHA" >"$STAMP_DIR/$s"
+    else
+      touch "$STAMP_DIR/$s"
+    fi
   done
 else
   echo "==> All specs up-to-date (use --force to rebuild all)"

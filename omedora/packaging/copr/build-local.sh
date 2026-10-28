@@ -62,6 +62,12 @@ if grep -qE '^Source0:[[:space:]]*omedora-self\.tar\.gz[[:space:]]*$' "$COPR_DIR
   # Release stamp (commit date + sha): keeps every payload rebuild a higher
   # NEVRA. Mirrors .copr/srpm.sh — keep the two in sync.
   SELF_STAMP="$(git -C "$REPO" log -1 --format=%cd --date=format:%Y%m%d%H%M HEAD)git$(git -C "$REPO" rev-parse --short=7 HEAD)"
+  # Keep exactly one build of a self-source package: drop earlier builds so the
+  # local repo cannot serve an older (or, after checking out an older commit, a
+  # newer-stamped) payload than the one built here. Remote-source specs keep
+  # their artifacts; their versions come from the spec, not the checkout.
+  self_name=$(grep -E '^Name:' "$COPR_DIR/$spec" | head -n1 | awk '{print $2}')
+  rm -f "$COPR_DIR/$OUT_NAME/$self_name-"[0-9]*.rpm
 fi
 
 echo "Building $spec in $IMAGE ..."
