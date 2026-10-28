@@ -22,6 +22,9 @@
 #   omedora/test/fedora/headless/run-tests.sh --workstation   # run the suite on a Fedora
 #                                            #   Workstation base (00-50 + the SKIP-gated
 #                                            #   90-workstation coexistence test)
+#   omedora/test/fedora/headless/run-tests.sh --local-repo    # run against the "-local" image
+#                                            #   lineage (built by build-session.sh --local-repo
+#                                            #   from the locally-built core RPMs)
 #   OMEDORA_FEDORA_RELEASE=45 omedora/test/fedora/headless/run-tests.sh
 #                                            # run against the Fedora 45 session image
 #                                            #   (default 44; see ../lib/release.sh)
@@ -50,13 +53,14 @@ LAUNCH_HEADLESS_IN_IMAGE="$LAUNCH_DIR_IN_IMAGE/session-launch-headless.sh"
 # Where we drop the suite inside the container (omedora-owned, on PATH-free tmp).
 SUITE_IN_CTR=/home/omedora/headless-suite
 
-rebuild=false; keep=false; test_glob='*.sh'; workstation=false
+rebuild=false; keep=false; test_glob='*.sh'; workstation=false; local_repo=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --rebuild)     rebuild=true ;;
     --keep)        keep=true ;;
     --test)        shift; test_glob="$1" ;;
     --workstation) workstation=true ;;
+    --local-repo)  local_repo=true ;;
     --help|-h) grep '^# ' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
@@ -67,7 +71,8 @@ done
 # Workstation run gets a "ws-" container prefix so it never collides with a
 # concurrent standard run. Explicit OMEDORA_* env still wins.
 variant=""; ctr_variant=""; $workstation && { variant="-workstation"; ctr_variant="ws-"; }
-SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-$OMEDORA_TEST_TAG-session-4${variant}}"
+local_variant=""; $local_repo && local_variant="-local"
+SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-$OMEDORA_TEST_TAG-session-4${variant}${local_variant}}"
 CTR="${OMEDORA_HTEST_CTR:-omedora-htest-${ctr_variant}$$}"
 
 log() { printf '\033[1;34m[htest]\033[0m %s\n' "$*"; }
@@ -76,6 +81,7 @@ log() { printf '\033[1;34m[htest]\033[0m %s\n' "$*"; }
 if $rebuild || ! podman image exists "$SESSION_IMAGE"; then
   log "Building session image..."
   build_flags=(); $rebuild && build_flags+=(--rebuild); $workstation && build_flags+=(--workstation)
+  $local_repo && build_flags+=(--local-repo)
   "$REPO/omedora/test/fedora/build-session.sh" "${build_flags[@]}"
 fi
 

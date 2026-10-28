@@ -35,12 +35,14 @@
 #
 # Package source: by default the install resolves omedora's packages from the
 # LIVE omedora COPR (bin/omedora-copr → agaspar/omedora-4 on this line) — the
-# real from-COPR install path a user gets. --local-repo instead injects the
-# locally-built RPM repo (omedora/packaging/copr/repo[-f<N>], built by build-repo.sh
-# from THIS checkout) as /etc/yum.repos.d/omedora-local.repo; the bootstrap's
-# repos.sh then skips the COPR enable and dnf resolves the omedora packages
-# from the local overlay — hermetic, and the way to test unpublished payload
-# (RPM) changes on this branch.
+# real from-COPR install path a user gets. --local-repo instead overlays the
+# locally-built RPM repo (omedora/packaging/copr/repo[-f<N>], built by
+# build-repo.sh from THIS checkout) on the COPR: lib/local-repo-overlay.sh
+# writes /etc/yum.repos.d/omedora-local.repo at priority=1 and enables the COPR
+# for everything the local repo does not hold. The bootstrap's repos.sh then
+# skips its own COPR enable, and every package in the local repo wins — the way
+# to test unpublished payload (RPM) changes on this branch. Building the two
+# core specs is enough; see lib/local-repo.sh.
 #
 # Usage:
 #   omedora/test/fedora/build-session.sh             # build pkgs image if needed, then config → session
@@ -49,11 +51,12 @@
 #                                            #   re-run ONLY system/adopt/finalize/first-run → session
 #                                            #   (alias: --config-only). Seconds, not ~15 min.
 #   omedora/test/fedora/build-session.sh --packages-only   # build/refresh just the pkgs image, no session
-#   omedora/test/fedora/build-session.sh --local-repo  # hermetic mode: inject the locally-built RPM
-#                                            #   repo instead of enabling the live COPR (builds the
-#                                            #   repo first if a spec changed; --rebuild-repo forces).
-#                                            #   Produces a separate "-local" image lineage.
-#   omedora/test/fedora/build-session.sh --rebuild-repo  # with --local-repo: force-rebuild the local repo
+#   omedora/test/fedora/build-session.sh --local-repo  # overlay the locally-built RPM repo on the
+#                                            #   live COPR (first builds the core omedora +
+#                                            #   omedora-settings RPMs from HEAD when the repo
+#                                            #   lacks them; --rebuild-repo forces). Produces a
+#                                            #   separate "-local" image lineage.
+#   omedora/test/fedora/build-session.sh --rebuild-repo  # with --local-repo: force-rebuild the core RPMs
 #   omedora/test/fedora/build-session.sh --workstation  # build on a Fedora Workstation base
 #                                            #   (standard base + workstation-product-environment);
 #                                            #   separate omedora-test:fedora44-session-4-workstation*
@@ -74,6 +77,7 @@ set -euo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
 . "$REPO/omedora/test/fedora/lib/release.sh"
+. "$REPO/omedora/test/fedora/lib/local-repo.sh"
 # Image/container names are resolved AFTER arg parsing so --workstation /
 # --local-repo can apply their infixes (see the resolution block below).
 # DNF_CACHE_VOL is shared by every variant on purpose — they pull mostly the
@@ -91,9 +95,6 @@ DOCKERFILE_WORKSTATION="$REPO/omedora/test/fedora/omedora-session/Dockerfile.wor
 # The standard base image name is fixed (it's what the Workstation tier FROMs);
 # --workstation does NOT rename it.
 STD_BASE_IMAGE="$OMEDORA_TEST_TAG-session-4-base"
-COPR_DIR="$REPO/omedora/packaging/copr"
-# build-repo.sh's per-release output repo (repo/ on 44, repo-f<N>/ otherwise).
-LOCAL_REPO_DIR="$COPR_DIR/repo$OMEDORA_RELEASE_SUFFIX"
 SESSION_DIR="$REPO/omedora/test/fedora/omedora-session"
 STAGED_IN_IMAGE=/home/omedora/.local/share/omarchy/omedora/test/fedora/omedora-session/staged-install-4.sh
 # SELinux-enforcing hosts (default Fedora): the build container runs systemd and
@@ -171,14 +172,17 @@ wait_for_systemd() {
   echo "  user@1000.service: active"
 }
 
-# inject_local_repo <container> — copy the createrepo'd RPMs in + drop a .repo.
-# Its presence makes the bootstrap's repos.sh skip the live-COPR enable.
+# inject_local_repo <container> — copy the createrepo'd RPMs in and overlay
+# them on the COPR (lib/local-repo-overlay.sh, piped in from this checkout).
+# The .repo file's presence makes the bootstrap's repos.sh skip its COPR enable.
 inject_local_repo() {
   local ctr="$1"
-  log "Injecting local omedora RPM repo (repos.sh will skip the COPR enable)"
-  podman cp "$LOCAL_REPO_DIR" "$ctr:/opt/omedora-repo"
-  podman exec "$ctr" bash -c \
-    'printf "[omedora-local]\nname=Omedora local packages\nbaseurl=file:///opt/omedora-repo\nenabled=1\ngpgcheck=0\n" >/etc/yum.repos.d/omedora-local.repo'
+  log "Overlaying the local omedora RPM repo on the COPR (repos.sh will skip its COPR enable)"
+  podman exec "$ctr" rm -rf /opt/omedora-repo
+  podman cp "$OMEDORA_LOCAL_REPO_DIR" "$ctr:/opt/omedora-repo"
+  podman exec -i -e "OMEDORA_LOCAL_REPO_ONLY=${OMEDORA_LOCAL_REPO_ONLY:-}" "$ctr" \
+    bash -s -- /opt/omedora-repo "$(OMARCHY_PATH='' "$REPO/bin/omedora-copr")" \
+    <"$REPO/omedora/test/fedora/lib/local-repo-overlay.sh"
 }
 
 # run_phase <container> <packages|config|all> <human-label> — run a staged
@@ -220,30 +224,30 @@ commit_systemd() {
     "$ctr" "$image" >/dev/null
 }
 
-# --- 0. (--local-repo only) build the local omedora RPM repo ------------------
-# The repo build is expensive (each spec builds in a throwaway Fedora
-# container). It only depends on the specs and the two build scripts, so
-# rebuild it only when one of those is newer than the built repomd.xml. Force
-# with --rebuild-repo (or run build-repo.sh yourself).
-repo_is_stale() {
-  local repomd="$LOCAL_REPO_DIR/repodata/repomd.xml" f
-  [[ -f "$repomd" ]] || return 0   # missing → stale
-  for f in "$COPR_DIR"/*.spec "$COPR_DIR/build-repo.sh" "$COPR_DIR/build-local.sh"; do
-    [[ -e "$f" && "$f" -nt "$repomd" ]] && return 0
-  done
-  return 1
-}
+# --- 0. (--local-repo only) build the local core RPMs --------------------------
+# The core omedora + omedora-settings RPMs package `git archive HEAD`, so they
+# are rebuilt (noarch, ~2 min) whenever the local repo lacks HEAD's build.
+# Other specs are never built here (the C++ stack takes hours and the COPR
+# serves it); build one yourself with build-repo.sh <name>.spec to overlay it.
 if $local_repo && ! $fast; then
-  if $rebuild_repo || repo_is_stale; then
-    log "Building local omedora RPM repo (spec changed or repo missing)"
-    "$COPR_DIR/build-repo.sh"
+  if $rebuild_repo; then
+    log "Rebuilding the local core RPMs from HEAD (--rebuild-repo)"
+    local_repo_build_core --force
+  elif stale_reason=$(local_repo_core_status); then
+    log "Local core RPMs are HEAD's build ($(local_repo_head_tag)); --rebuild-repo to force"
   else
-    log "Local omedora RPM repo up to date (no spec newer than repomd.xml; --rebuild-repo to force)"
+    log "Building the local core RPMs from HEAD ($stale_reason)"
+    local_repo_build_core
   fi
+  if ! stale_reason=$(local_repo_core_status); then
+    echo "The local repo still does not hold HEAD's core RPMs: $stale_reason" >&2
+    exit 1
+  fi
+  local_repo_warn_dirty
 elif ! $local_repo; then
   # OMARCHY_PATH is cleared so a dev host's own omarchy install can't shadow
   # this checkout's version file (omedora-copr prefers $OMARCHY_PATH/version).
-  log "Live-COPR mode (default): the bootstrap's repos.sh will enable $(OMARCHY_PATH= "$REPO/bin/omedora-copr" 2>/dev/null || echo 'the omedora COPR') and pull from it (--local-repo for the hermetic local-repo overlay)"
+  log "Live-COPR mode (default): the bootstrap's repos.sh will enable $(OMARCHY_PATH= "$REPO/bin/omedora-copr" 2>/dev/null || echo 'the omedora COPR') and pull from it (--local-repo overlays the locally-built RPM repo on it)"
 fi
 
 # =============================================================================
