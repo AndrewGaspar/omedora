@@ -46,6 +46,11 @@ jobs:
       - name: Run pkg helper test
         run: bash test/pkg-helper-test.sh
 
+      - name: Run Fedora menu package-guard test
+        # node (preinstalled on ubuntu-latest) builds the guard batch from
+        # shell/plugins/menu/MenuModel.js, as the menu does.
+        run: bash test/menu-guard-fedora-test.sh
+
       - name: Run adopt-user test
         run: bash test/adopt-user-test.sh
 

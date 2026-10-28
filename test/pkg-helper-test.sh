@@ -189,6 +189,42 @@ exit_code=$?
 set -e
 assert_equals "pkg-present not-installed → exit 1 (missing)" "$exit_code" "1"
 
+# --- pkg.py installed: the menu's batched form of present ---
+# Prints each named package `present` accepts, from one rpm query and one
+# flatpak listing, and agrees with `present` name by name.
+
+PKG_PY="$ROOT/bin/fedora/pkg.py"
+installed_case() {
+  reset_log
+  MOCK_RPM_INSTALLED="$1" MOCK_FLATPAK_INSTALLED="$2" "$PKG_PY" installed \
+    ttf-jetbrains-mono-nerd ghostty obsidian ufw docker jq absent jq 2>/dev/null | tr '\n' ' '
+}
+
+assert_equals "installed: nothing installed prints nothing" "$(installed_case "" "")" ""
+assert_equals "installed: map-resolved RPMs, a Flatpak and an unmapped name; never a skip; once each" \
+  "$(installed_case "jetbrains-mono-fonts-all ghostty moby-engine docker-cli jq ufw" "md.obsidian.Obsidian")" \
+  "ttf-jetbrains-mono-nerd ghostty obsidian docker jq "
+assert_equals "installed: a satisfied_by provider counts, as for present" \
+  "$(installed_case "docker-ce" "")" "docker "
+assert_equals "installed: an entry with only some of its RPMs is absent" \
+  "$(installed_case "moby-engine" "")" ""
+(( $(grep -c '^rpm ' "$MOCK_LOG") == 1 && $(grep -c '^flatpak ' "$MOCK_LOG") == 1 )) ||
+  { cat "$MOCK_LOG" >&2; fail "installed: one rpm query and one flatpak listing"; }
+pass "installed: one rpm query and one flatpak listing however many names"
+
+for name in ttf-jetbrains-mono-nerd ghostty obsidian ufw docker jq absent; do
+  set +e
+  MOCK_RPM_INSTALLED="jetbrains-mono-fonts-all docker-ce jq ufw" MOCK_FLATPAK_INSTALLED="md.obsidian.Obsidian" \
+    "$ROOT/bin/omarchy-pkg-present" "$name" >/dev/null 2>&1
+  present_rc=$?
+  set -e
+  listed=$(MOCK_RPM_INSTALLED="jetbrains-mono-fonts-all docker-ce jq ufw" MOCK_FLATPAK_INSTALLED="md.obsidian.Obsidian" \
+    "$PKG_PY" installed "$name" 2>/dev/null)
+  { (( present_rc == 0 )) && [[ $listed == "$name" ]]; } || { (( present_rc != 0 )) && [[ -z $listed ]]; } ||
+    fail "installed agrees with present for $name (present=$present_rc listed='$listed')"
+done
+pass "installed agrees with present name by name"
+
 # --- since/until: inactive entries are treated as intentional no-ops ---
 
 reset_log
