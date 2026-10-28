@@ -26,7 +26,10 @@
 # Local-repo mode (run-smoke.sh --update-verify --local-repo): as in smoke.sh,
 # OMEDORA_TEST_LOCAL_REPO is overlaid on the COPR before the install, and the
 # core RPMs must come from it with OMEDORA_TEST_EXPECT_TAG before and after
-# both updates (the managed update must not swap them for the COPR's).
+# both updates. The managed update reconciles the core RPMs to the newest
+# build in the Omedora repository, downgrading if need be, so the updates name
+# omedora-local as that repository through bin/fedora/update-system-pkgs'
+# OMEDORA_COPR_REPO_ID seam; everything else still updates from the COPR.
 
 set -e
 
@@ -84,6 +87,7 @@ chmod 0440 /etc/sudoers.d/zz-omedora-test-noauth
 # never sets OMARCHY_PATH. Since 4.5 omarchy-update refuses to run unless
 # OMARCHY_PATH names the code it runs from; a session or terminal always has it.
 OMARCHY_ENV="OMARCHY_PATH=/usr/share/omarchy"
+[[ -z $LOCAL_REPO ]] || OMARCHY_ENV+=" OMEDORA_COPR_REPO_ID=omedora-local"
 
 # Watch logind while the first update runs: the inhibitor must be held.
 rm -f /tmp/inhibit-seen
