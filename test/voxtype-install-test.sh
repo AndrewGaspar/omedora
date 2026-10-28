@@ -1,32 +1,27 @@
 #!/bin/bash
 #
-# L1 unit test for on-demand voxtype install on Fedora.
+# L1 unit test for on-demand Voxtype dictation on Fedora.
 #
-# voxtype is hosted in the omedora COPR as a single from-source RPM (tiered
-# whisper CPU + Vulkan binaries + OSD helpers; no GPU add-on subpackages — the
-# old voxtype-cuda / voxtype-migraphx split died with the 0.7.5
-# binary-repackage). The Fedora installer (bin/fedora/voxtype-install-pkg)
-# installs the base and nothing else; GPU users get acceleration from the
-# Vulkan tier. This covers that sibling + the Fedora/Arch dispatch in
-# bin/omarchy-voxtype-install and bin/omarchy-voxtype-remove.
+# Omarchy 4.5 replaced omarchy-voxtype-install/-remove with the dictation
+# backends (omarchy-install-dictation-voxtype, omarchy-remove-dictation-voxtype,
+# omarchy-dictation-voxtype). Omedora carries no patch on them: upstream's
+# `omarchy-pkg-add wtype voxtype-bin` / `omarchy-pkg-drop voxtype-bin` resolve
+# through install/packages/fedora.toml to the single from-source `voxtype` RPM
+# in the omedora COPR (omedora/packaging/copr/voxtype.spec).
 #
-#   PART 1 — voxtype-install-pkg: always adds exactly `wtype voxtype-bin` (base,
-#            mapped to voxtype) via omarchy-pkg-add on EVERY GPU profile
-#            (NVIDIA / AMD / Intel / none / hybrid) and NEVER adds the retired
-#            voxtype-cuda / voxtype-migraphx names. Honors OMARCHY_PKG_DRY_RUN
-#            (no-op here since omarchy-pkg-add is stubbed, but the script never
-#            shells out to dnf directly).
-#   PART 2 — omarchy-voxtype-install dispatches to the sibling on Fedora and runs
-#            `omarchy-pkg-add wtype voxtype-bin` VERBATIM on Arch.
-#   PART 3 — omarchy-voxtype-remove runs `omarchy-pkg-drop voxtype-bin` on BOTH
-#            distros (the script is byte-identical to upstream; on Fedora pkg.py
-#            maps that to `dnf remove voxtype`).
-#   PART 4 — omarchy-voxtype-config (the bar mic click): on Fedora, OFFERS THE
-#            INSTALL (launches omarchy-voxtype-install) when voxtype is absent, and
-#            runs `voxtype configure` once it's installed.
+#   PART 1 — the package map: `wtype voxtype-bin` resolves to the dnf names
+#            `wtype voxtype` (bin/fedora/pkg.py dry run), never to the retired
+#            voxtype-cuda / voxtype-migraphx add-ons.
+#   PART 2 — omarchy-install-dictation-voxtype on Fedora installs exactly
+#            `wtype voxtype-bin` through omarchy-pkg-add, then runs the shared
+#            setup and selects voxtype as the dictation backend.
+#   PART 3 — omarchy-remove-dictation-voxtype drops `voxtype-bin` through
+#            omarchy-pkg-drop on both distros and never shells out to dnf.
 #
-# Everything external is stubbed on PATH; no network, no real dnf, no real
-# package manager.
+# Everything external is stubbed on PATH; no network, no real dnf. A voxtype the
+# host has installed must never run: the PATH is the stubs plus system
+# directories only, and omarchy-cmd-missing is stubbed so only the stub voxtype
+# (created by the stubbed install) counts as installed.
 
 set -euo pipefail
 
@@ -43,116 +38,69 @@ export MOCK_LOG
 
 stub() { printf '#!/bin/bash\n%s\n' "$2" >"$SHIM/$1"; chmod +x "$SHIM/$1"; }
 
-# Record every traced action to $MOCK_LOG so assertions can grep it.
-stub omarchy-pkg-add     'printf "omarchy-pkg-add %s\n" "$*" >>"$MOCK_LOG"'
-stub omarchy-pkg-drop    'printf "omarchy-pkg-drop %s\n" "$*" >>"$MOCK_LOG"'
-# The installer takes no GPU branch at all (no lspci probe); the stub exists so
-# PART 1 can prove GPU-flavored lspci output is ignored. Default: no GPU.
-stub lspci               'exit 0'   # prints nothing -> no GPU match by default
-
-export PATH="$SHIM:$ROOT/bin:$PATH"
-
-PKG="$ROOT/bin/fedora/voxtype-install-pkg"
+BASE_PATH="/usr/bin:/bin"
 
 # ===========================================================================
-echo "# --- PART 1: voxtype-install-pkg installs the base on every GPU ---"
+echo "# --- PART 1: the package map resolves voxtype-bin to the COPR RPM ---"
 # ===========================================================================
-# The installer takes NO GPU branch (no lspci probe, no add-on subpackages):
-# every profile below must produce exactly one pkg-add line and never the
-# retired voxtype-cuda / voxtype-migraphx names.
-
-# Helper: run the installer and assert the base-only transaction.
-assert_base_only() { # $1 = profile label
-  : >"$MOCK_LOG"
-  ( export OMARCHY_DISTRO=fedora; bash "$PKG" ) >/dev/null 2>&1
-  grep -q "^omarchy-pkg-add wtype voxtype-bin$" "$MOCK_LOG" \
-    && pass "$1: installs the base (wtype voxtype-bin)" \
-    || { cat "$MOCK_LOG" >&2; fail "$1: installs the base (wtype voxtype-bin)"; }
-  grep -qE "voxtype-(cuda|migraphx)" "$MOCK_LOG" \
-    && { cat "$MOCK_LOG" >&2; fail "$1: never adds the retired GPU add-ons"; } \
-    || pass "$1: never adds the retired GPU add-ons"
-  [[ $(grep -c "^omarchy-pkg-add " "$MOCK_LOG") == 1 ]] \
-    && pass "$1: exactly one pkg-add call" \
-    || { cat "$MOCK_LOG" >&2; fail "$1: exactly one pkg-add call"; }
-}
-
-# Helper: stub lspci to print a given line (the installer must ignore it).
-lspci_prints() { stub lspci 'cat <<'"'"'EOF'"'"'
-'"$1"'
-EOF'; }
-
-# --- (a) NVIDIA present -> base only ------------------------------------------
-lspci_prints '01:00.0 VGA compatible controller: NVIDIA Corporation GA104 [GeForce RTX 3070]'
-assert_base_only "NVIDIA"
-
-# --- (b) AMD present -> base only ---------------------------------------------
-lspci_prints '0a:00.0 VGA compatible controller: Advanced Micro Devices, Inc. [AMD/ATI] Navi 31 [Radeon RX 7900 XTX]'
-assert_base_only "AMD"
-
-# --- (c) Intel/none -> base only ----------------------------------------------
-lspci_prints '00:02.0 VGA compatible controller: Intel Corporation Raptor Lake-S UHD Graphics'
-assert_base_only "Intel/none"
-
-# --- (d) hybrid NVIDIA+AMD laptop -> base only --------------------------------
-lspci_prints $'c1:00.0 VGA compatible controller: NVIDIA Corporation GB206M [GeForce RTX 5070]\nc2:00.0 Display controller: Advanced Micro Devices, Inc. [AMD/ATI] Strix [Radeon 890M]'
-assert_base_only "hybrid NVIDIA+AMD"
-
-# restore defaults
-stub lspci 'exit 0'
+out=$(OMARCHY_DISTRO=fedora OMARCHY_PKG_DRY_RUN=1 OMARCHY_PATH="$ROOT" \
+  PATH="$ROOT/bin:$BASE_PATH" "$ROOT/bin/omarchy-pkg-add" wtype voxtype-bin 2>&1) || true
+grep -q 'dnf install .* wtype voxtype' <<<"$out" \
+  && pass "wtype voxtype-bin resolves to dnf names 'wtype voxtype'" \
+  || { echo "$out" >&2; fail "wtype voxtype-bin resolves to dnf names 'wtype voxtype'"; }
+grep -qE 'voxtype-(cuda|migraphx)' <<<"$out" \
+  && { echo "$out" >&2; fail "map never resolves to the retired GPU add-ons"; } \
+  || pass "map never resolves to the retired GPU add-ons"
 
 # ===========================================================================
-echo "# --- PART 2: omarchy-voxtype-install dispatch ---"
+echo "# --- PART 2: omarchy-install-dictation-voxtype on Fedora ---"
 # ===========================================================================
-# Stub the shared setup tools so the script runs past the dispatch hermetically.
-stub gum                       'exit 0'   # confirm yes
-stub voxtype                   'printf "voxtype %s\n" "$*" >>"$MOCK_LOG"; exit 0'
-stub omarchy-hyprland-toggle   'printf "toggle %s\n" "$*" >>"$MOCK_LOG"'
-stub omarchy-restart-shell     ':'
-stub omarchy-notification-send ':'
+stub omarchy-cmd-missing        '[[ -x "$(dirname "$0")/$1" ]] && exit 1; exit 0'
+stub omarchy-cmd-present        '[[ -x "$(dirname "$0")/$1" ]]'
+stub omarchy-pkg-add            'printf "omarchy-pkg-add %s\n" "$*" >>"$MOCK_LOG"; ln -sf "$(dirname "$0")/voxtype-installed" "$(dirname "$0")/voxtype"'
+stub voxtype-installed          'printf "voxtype %s\n" "$*" >>"$MOCK_LOG"; exit 0'
+stub gum                        'exit 0'   # confirm yes
+stub omarchy-i18n               'echo "$1"'
+stub omarchy-hw-vulkan          'exit 1'
+stub systemctl                  'printf "systemctl %s\n" "$*" >>"$MOCK_LOG"'
+stub hyprctl                    ':'
+stub omarchy-notification-send  ':'
+stub omarchy-dictation-use      'printf "dictation-use %s\n" "$*" >>"$MOCK_LOG"'
 
 FAKE_OMARCHY="$SCRATCH/omarchy"
 mkdir -p "$FAKE_OMARCHY/default/voxtype"
 printf 'cfg\n' >"$FAKE_OMARCHY/default/voxtype/config.toml"
 
-# --- Fedora: dispatches to the sibling (omarchy-pkg-add wtype voxtype-bin) ----
 : >"$MOCK_LOG"
 ( export OMARCHY_DISTRO=fedora OMARCHY_PATH="$FAKE_OMARCHY" HOME="$SCRATCH/home-fed"
+  export XDG_CONFIG_HOME="$HOME/.config" PATH="$SHIM:$ROOT/bin:$BASE_PATH"
   mkdir -p "$HOME"
-  bash "$ROOT/bin/omarchy-voxtype-install" ) >/dev/null 2>&1 || true
+  bash "$ROOT/bin/omarchy-install-dictation-voxtype" ) >/dev/null 2>&1 || true
 grep -q "^omarchy-pkg-add wtype voxtype-bin$" "$MOCK_LOG" \
-  && pass "Fedora install dispatches to the sibling (adds wtype voxtype-bin base)" \
-  || { cat "$MOCK_LOG" >&2; fail "Fedora install dispatches to the sibling (adds wtype voxtype-bin base)"; }
-# The single-package build adds nothing beyond the base, whatever the GPU.
-grep -qE "voxtype-(cuda|migraphx)" "$MOCK_LOG" \
-  && { cat "$MOCK_LOG" >&2; fail "Fedora install never adds the retired GPU add-ons"; } \
-  || pass "Fedora install never adds the retired GPU add-ons"
-
-# --- Arch path: verbatim omarchy-pkg-add wtype voxtype-bin -------------------
-: >"$MOCK_LOG"
-( export OMARCHY_DISTRO=arch OMARCHY_PATH="$FAKE_OMARCHY" HOME="$SCRATCH/home-arch"
-  mkdir -p "$HOME"
-  bash "$ROOT/bin/omarchy-voxtype-install" ) >/dev/null 2>&1 || true
-grep -q "^omarchy-pkg-add wtype voxtype-bin$" "$MOCK_LOG" \
-  && pass "Arch install runs omarchy-pkg-add wtype voxtype-bin verbatim" \
-  || { cat "$MOCK_LOG" >&2; fail "Arch install runs omarchy-pkg-add wtype voxtype-bin verbatim"; }
-grep -qE "voxtype-(cuda|migraphx)" "$MOCK_LOG" \
-  && fail "Arch install never touches the retired GPU add-on names" \
-  || pass "Arch install never touches the retired GPU add-on names"
+  && pass "Fedora install adds exactly 'wtype voxtype-bin'" \
+  || { cat "$MOCK_LOG" >&2; fail "Fedora install adds exactly 'wtype voxtype-bin'"; }
+[[ $(grep -c "^omarchy-pkg-add " "$MOCK_LOG") == 1 ]] \
+  && pass "Fedora install makes one pkg-add call" \
+  || { cat "$MOCK_LOG" >&2; fail "Fedora install makes one pkg-add call"; }
+grep -q "^voxtype setup --download --no-post-install$" "$MOCK_LOG" \
+  && pass "Fedora install runs the shared voxtype setup" \
+  || { cat "$MOCK_LOG" >&2; fail "Fedora install runs the shared voxtype setup"; }
+grep -q "^dictation-use voxtype$" "$MOCK_LOG" \
+  && pass "Fedora install selects voxtype as the dictation backend" \
+  || { cat "$MOCK_LOG" >&2; fail "Fedora install selects voxtype as the dictation backend"; }
 
 # ===========================================================================
-echo "# --- PART 3: omarchy-voxtype-remove dispatch (byte-identical) ---"
+echo "# --- PART 3: omarchy-remove-dictation-voxtype (byte-identical) ---"
 # ===========================================================================
-stub voxtype 'exit 0'  # omarchy-cmd-present voxtype -> true
-stub systemctl ':'
+stub omarchy-pkg-drop 'printf "omarchy-pkg-drop %s\n" "$*" >>"$MOCK_LOG"'
+stub voxtype          'exit 0'  # omarchy-cmd-present voxtype -> true
 
-# Both distros run `omarchy-pkg-drop voxtype-bin` — the script is byte-identical
-# to upstream. On Fedora pkg.py maps voxtype-bin -> `dnf remove voxtype`, which
-# cascades to the installed -cuda/-migraphx subpackages.
 for distro in fedora arch; do
   : >"$MOCK_LOG"
   ( export OMARCHY_DISTRO=$distro HOME="$SCRATCH/home-rm-$distro"
+    export XDG_CONFIG_HOME="$HOME/.config" PATH="$SHIM:$ROOT/bin:$BASE_PATH"
     mkdir -p "$HOME"
-    bash "$ROOT/bin/omarchy-voxtype-remove" ) >/dev/null 2>&1 || true
+    bash "$ROOT/bin/omarchy-remove-dictation-voxtype" ) >/dev/null 2>&1 || true
   grep -q "^omarchy-pkg-drop voxtype-bin$" "$MOCK_LOG" \
     && pass "$distro remove runs omarchy-pkg-drop voxtype-bin" \
     || { cat "$MOCK_LOG" >&2; fail "$distro remove runs omarchy-pkg-drop voxtype-bin"; }
@@ -160,35 +108,5 @@ for distro in fedora arch; do
     && fail "$distro remove never shells out to dnf directly" \
     || pass "$distro remove never shells out to dnf directly"
 done
-
-# ===========================================================================
-echo "# --- PART 4: omarchy-voxtype-config mic-click dispatch ---"
-# ===========================================================================
-stub omarchy-launch-floating-terminal-with-presentation 'printf "launch %s\n" "$*" >>"$MOCK_LOG"'
-stub omarchy-restart-shell ':'
-
-# --- (a) Fedora + voxtype MISSING -> offers the install ----------------------
-rm -f "$SHIM/voxtype"   # voxtype absent from PATH
-: >"$MOCK_LOG"
-( export OMARCHY_DISTRO=fedora
-  bash "$ROOT/bin/omarchy-voxtype-config" ) >/dev/null 2>&1 || true
-grep -q "^launch omarchy-voxtype-install$" "$MOCK_LOG" \
-  && pass "Fedora mic-click offers the install when voxtype is missing" \
-  || { cat "$MOCK_LOG" >&2; fail "Fedora mic-click offers the install when voxtype is missing"; }
-grep -q "voxtype configure" "$MOCK_LOG" \
-  && fail "Fedora mic-click does NOT run 'voxtype configure' when voxtype missing" \
-  || pass "Fedora mic-click does NOT run 'voxtype configure' when voxtype missing"
-
-# --- (b) Fedora + voxtype PRESENT -> runs voxtype configure ------------------
-stub voxtype 'exit 0'   # voxtype now on PATH
-: >"$MOCK_LOG"
-( export OMARCHY_DISTRO=fedora
-  bash "$ROOT/bin/omarchy-voxtype-config" ) >/dev/null 2>&1 || true
-grep -q "^launch voxtype configure$" "$MOCK_LOG" \
-  && pass "Fedora mic-click runs 'voxtype configure' once voxtype is installed" \
-  || { cat "$MOCK_LOG" >&2; fail "Fedora mic-click runs 'voxtype configure' once installed"; }
-grep -q "omarchy-voxtype-install" "$MOCK_LOG" \
-  && fail "Fedora mic-click does NOT re-offer install when voxtype present" \
-  || pass "Fedora mic-click does NOT re-offer install when voxtype present"
 
 echo "# all voxtype-install tests passed"

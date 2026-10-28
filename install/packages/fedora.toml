@@ -499,7 +499,7 @@ reason = "Not in Fedora main or RPM Fusion (verified against both, 2026-06-11); 
 [voxtype-bin]
 source = "dnf"
 names = ["voxtype"]
-reason = "voxtype-bin (the Arch package) maps to the single 'voxtype' RPM we build from source in the omedora COPR (omedora/packaging/copr/voxtype.spec: AndrewGaspar/voxtype fork feat/muse-stack-v1.0.1, CPU-only tiered whisper avx2/avx512/vulkan + OSD helpers). On-demand only (not in any base package set); installed by omarchy-pkg-add via bin/fedora/voxtype-install-pkg (base only — no GPU add-on subpackages; the Vulkan tier accelerates inference on any GPU vendor). dnf-updatable. wtype resolves natively. Bump = Version: / fork_commit + .sources sha in the spec."
+reason = "voxtype-bin (the Arch package) maps to the single 'voxtype' RPM we build from source in the omedora COPR (omedora/packaging/copr/voxtype.spec: AndrewGaspar/voxtype fork feat/muse-stack-v1.0.1, CPU-only tiered whisper avx2/avx512/vulkan + OSD helpers). On-demand only (not in any base package set); upstream's omarchy-install-dictation-voxtype installs it unpatched through this entry (`omarchy-pkg-add wtype voxtype-bin`; base only — no GPU add-on subpackages; the Vulkan tier accelerates inference on any GPU vendor). dnf-updatable. wtype resolves natively. Bump = Version: / fork_commit + .sources sha in the spec."
 
 [yaru-icon-theme]
 source = "dnf"
