@@ -506,6 +506,7 @@ var GUARD_READERS = [
   "omarchy-default-editor",
   "omarchy-default-terminal",
   "omarchy-default-dictation",
+  "omarchy-distro",
   "omarchy-dns",
   "omarchy-dock autohide",
   "omarchy-dock position",
