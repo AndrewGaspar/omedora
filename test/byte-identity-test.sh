@@ -150,6 +150,9 @@ if ! omarchy-cmd-browser-handoff "$browser_exec" --app="$1" "${@:2}"; then
 #     command is installed (`|| omarchy-cmd-present <cmd>`), since selecting it
 #     then installs nothing. test/menu-pkg-audit-test.sh keeps the set honest.
 #     Unwind a row when its package gets a Fedora mapping.
+#  6. Install > Style > Font rows whose Nerd Font Fedora doesn't package
+#     (everything but Cascadia, which omedora-nerd-fonts ships) gain the same
+#     distro gate. Unwind a row when omedora-nerd-fonts carries its family.
 ALLOW["default/omarchy/omarchy-menu.jsonc"]='  "install.aur": {"icon":"󰣇","label":"AUR","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install"},
   "update.omarchy": {"icon":"","iconFont":"omarchy","label":"Omarchy","action":"omarchy-launch-floating-terminal-with-presentation omarchy-update"},
   "install.ai.claude": {"icon":"","iconFont":"omarchy","label":"Claude Desktop","disabled":"omarchy-pkg-present claude-desktop","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-ai-claude"},
@@ -186,7 +189,12 @@ ALLOW["default/omarchy/omarchy-menu.jsonc"]='  "install.aur": {"icon":"󰣇","la
   "setup.default.editor.cursor": {"icon":"","iconFont":"omarchy","label":"Cursor","checked":"[[ \"$(omarchy-default-editor)\" == \"cursor\" ]]","action":"omarchy-default-editor cursor"},
   "setup.default.editor.zed": {"icon":"","label":"Zed","checked":"[[ \"$(omarchy-default-editor)\" == \"zeditor\" ]]","action":"omarchy-default-editor zed"},
   "setup.default.editor.sublime": {"icon":"","label":"Sublime Text","checked":"[[ \"$(omarchy-default-editor)\" == \"subl\" ]]","action":"omarchy-default-editor sublime_text"},
-  "setup.default.editor.emacs": {"icon":" ","label":"Emacs","checked":"[[ \"$(omarchy-default-editor)\" == \"emacs\" ]]","action":"omarchy-default-editor emacs"},'
+  "setup.default.editor.emacs": {"icon":" ","label":"Emacs","checked":"[[ \"$(omarchy-default-editor)\" == \"emacs\" ]]","action":"omarchy-default-editor emacs"},
+  "install.style.font.meslo": {"icon":"","label":"Meslo LG Mono","action":"omarchy-install-font '"'"'Meslo LG Mono'"'"' ttf-meslo-nerd '"'"'MesloLGL Nerd Font'"'"'"},
+  "install.style.font.fira": {"icon":"","label":"Fira Code","action":"omarchy-install-font '"'"'Fira Code'"'"' ttf-firacode-nerd '"'"'FiraCode Nerd Font'"'"'"},
+  "install.style.font.victor": {"icon":"","label":"Victor Code","action":"omarchy-install-font '"'"'Victor Code'"'"' ttf-victor-mono-nerd '"'"'VictorMono Nerd Font'"'"'"},
+  "install.style.font.bitstream": {"icon":"","label":"Bitstream Vera Mono","action":"omarchy-install-font '"'"'Bitstream Vera Code'"'"' ttf-bitstream-vera-mono-nerd '"'"'BitstromWera Nerd Font'"'"'"},
+  "install.style.font.iosevka": {"icon":"","label":"Iosevka","action":"omarchy-install-font Iosevka ttf-iosevka-nerd '"'"'Iosevka Nerd Font Mono'"'"'"},'
 # --- the audit ---------------------------------------------------------------
 # Modified upstream files = files that differ from the pin AND exist on the pin
 # (so omedora-ADDED files like bin/omedora-* are out of scope — they have no
