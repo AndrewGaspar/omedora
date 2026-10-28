@@ -33,6 +33,22 @@
 # install-4.sh (see omedora-session/staged-install-4.sh) — full fidelity, no
 # install-4.sh patch.
 #
+# --- The checkout is copied in per phase, never baked into an image ----------
+# The bootstrap runs from a checkout at ~omedora/.local/share/omarchy. Right
+# before EVERY phase (packages, config, --fast) this script replaces that tree
+# in the build container with the current checkout (tracked + untracked,
+# non-ignored files, uncommitted edits included; see lib/checkout.sh), so a
+# phase always runs this checkout's install scripts, whichever older pkgs
+# image it boots. The base image (Dockerfile.base) holds no tree at all. The
+# committed images carry the copied tree and an `omedora.tree` label naming
+# it; run-session.sh and headless/run-tests.sh warn when that label is not
+# the checkout they run from.
+#
+# The pkgs image is reused only while its inputs are unchanged: it carries an
+# `omedora.pkgs-key` label hashing the base image id, the package source (COPR,
+# or the local repo's repomd.xml) and the files the packages phase reads
+# (PKGS_INPUTS below). A mismatch rebuilds it; --fast warns and reuses it.
+#
 # Package source: by default the install resolves omedora's packages from the
 # LIVE omedora COPR (bin/omedora-copr → agaspar/omedora-4 on this line) — the
 # real from-COPR install path a user gets. --local-repo instead overlays the
@@ -67,9 +83,10 @@
 # --rebuild packages phase re-uses already-downloaded RPMs.
 #
 # Products:
-#   omedora-test:fedora44-session-4-base   (Fedora + systemd + tree; CMD /sbin/init)
-#   omedora-test:fedora44-session-4-pkgs   (the above, after plan+repos+packages)
-#   omedora-test:fedora44-session-4        (the above, after system/adopt/finalize; ready to run)
+#   omedora-test:fedora44-session-4-sysbase  (Fedora + systemd + deps, no tree; CMD /sbin/init)
+#   omedora-test:fedora44-session-4-pkgs     (the above + checkout, after plan+repos+packages)
+#   omedora-test:fedora44-session-4          (the above, after system/adopt/finalize; ready to run)
+# The "-sysbase" names replace the "-base" ones, whose images baked a checkout in.
 #
 # Full install log is also copied out to /tmp/omedora-session-build.log.
 
@@ -77,6 +94,7 @@ set -euo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
 . "$REPO/omedora/test/fedora/lib/release.sh"
+. "$REPO/omedora/test/fedora/lib/checkout.sh"
 . "$REPO/omedora/test/fedora/lib/local-repo.sh"
 # Image/container names are resolved AFTER arg parsing so --workstation /
 # --local-repo can apply their infixes (see the resolution block below).
@@ -94,13 +112,26 @@ DOCKERFILE_BASE="$REPO/omedora/test/fedora/omedora-session/Dockerfile.base"
 DOCKERFILE_WORKSTATION="$REPO/omedora/test/fedora/omedora-session/Dockerfile.workstation"
 # The standard base image name is fixed (it's what the Workstation tier FROMs);
 # --workstation does NOT rename it.
-STD_BASE_IMAGE="$OMEDORA_TEST_TAG-session-4-base"
+STD_BASE_IMAGE="$OMEDORA_TEST_TAG-session-4-sysbase"
 SESSION_DIR="$REPO/omedora/test/fedora/omedora-session"
-STAGED_IN_IMAGE=/home/omedora/.local/share/omarchy/omedora/test/fedora/omedora-session/staged-install-4.sh
-# SELinux-enforcing hosts (default Fedora): the build container runs systemd and
-# bind-mounts staged-install-4.sh from the checkout. Confined (container_t),
-# the bind-mounted file is unreadable (no :z label) and systemd's sandboxed
-# services cannot set up their /proc + cgroupfs mount namespaces (AVC mounton
+# Where the bootstrap's checkout lives in the image (OMEDORA_REPO_ROOT).
+TREE_IN_IMAGE=/home/omedora/.local/share/omarchy
+STAGED_IN_IMAGE=$TREE_IN_IMAGE/omedora/test/fedora/omedora-session/staged-install-4.sh
+# Every file the packages phase (plan + snapshot + repos + packages) reads to
+# decide what it installs. A change to any of them rebuilds the pkgs image;
+# config-phase files (system/adopt/finalize/first-run, install/, config/) do
+# not, because the config phase re-runs from the fresh checkout every build.
+PKGS_INPUTS=(
+  omedora/install/plan.sh omedora/install/release.sh omedora/install/snapshot.sh
+  omedora/install/repos.sh omedora/install/packages.sh
+  omedora/install/fedora-baseline.packages install/omarchy-base.packages
+  install/packages bin/fedora bin/omedora-copr bin/omedora-replace-foreign
+  bin/omedora-snapshot version omedora/version
+  omedora/test/fedora/omedora-session/staged-install-4.sh
+  omedora/test/fedora/lib/local-repo-overlay.sh
+)
+# SELinux-enforcing hosts (default Fedora): the build container runs systemd.
+# Confined (container_t), systemd's sandboxed services cannot set up their /proc + cgroupfs mount namespaces (AVC mounton
 # proc_t/cgroup_t) — logind crashloops, user@1000 never starts and the phase
 # dies with "Permission denied". This is test scaffolding, not the product:
 # run the build container unconfined. No-op where SELinux is off.
@@ -111,8 +142,8 @@ rebuild_repo=false
 fast=false
 packages_only=false
 workstation=false
-# --local-repo / OMEDORA_LOCAL_REPO=1: hermetic mode — inject the local RPM
-# repo so repos.sh skips the live-COPR enable and dnf resolves from it.
+# --local-repo / OMEDORA_LOCAL_REPO=1: overlay the local RPM repo on the COPR
+# (lib/local-repo-overlay.sh); repos.sh then skips its own COPR enable.
 local_repo=false
 [[ "${OMEDORA_LOCAL_REPO:-}" == "1" ]] && local_repo=true
 for arg in "$@"; do
@@ -141,7 +172,7 @@ fi
 # repo-agnostic base. Explicit OMEDORA_SYSTEMD_* env overrides still win.
 variant=""; $workstation && variant="-workstation"
 local_variant=""; $local_repo && local_variant="-local"
-BASE_IMAGE="${OMEDORA_SYSTEMD_BASE_IMAGE:-$OMEDORA_TEST_TAG-session-4${variant}-base}"
+BASE_IMAGE="${OMEDORA_SYSTEMD_BASE_IMAGE:-$OMEDORA_TEST_TAG-session-4${variant}-sysbase}"
 SESSION_IMAGE="${OMEDORA_SYSTEMD_SESSION_IMAGE:-$OMEDORA_TEST_TAG-session-4${variant}${local_variant}}"
 # Intermediate "packages installed" image; derived from SESSION_IMAGE's name so a
 # custom OMEDORA_SYSTEMD_SESSION_IMAGE gets a matching pkgs image, but can be
@@ -172,6 +203,17 @@ wait_for_systemd() {
   echo "  user@1000.service: active"
 }
 
+# sync_tree <container> — replace the container's checkout with this one, so
+# the next phase runs the current install scripts (see the header).
+sync_tree() {
+  local ctr="$1"
+  log "Copying this checkout ($TREE_ID) into $ctr:$TREE_IN_IMAGE"
+  podman exec "$ctr" rm -rf "$TREE_IN_IMAGE"
+  podman exec "$ctr" install -d -o omedora -g omedora "$TREE_IN_IMAGE"
+  checkout_stream | podman exec -i "$ctr" tar -C "$TREE_IN_IMAGE" --no-same-owner -xf -
+  podman exec "$ctr" chown -R omedora:omedora "$TREE_IN_IMAGE"
+}
+
 # inject_local_repo <container> — copy the createrepo'd RPMs in and overlay
 # them on the COPR (lib/local-repo-overlay.sh, piped in from this checkout).
 # The .repo file's presence makes the bootstrap's repos.sh skip its COPR enable.
@@ -183,6 +225,30 @@ inject_local_repo() {
   podman exec -i -e "OMEDORA_LOCAL_REPO_ONLY=${OMEDORA_LOCAL_REPO_ONLY:-}" "$ctr" \
     bash -s -- /opt/omedora-repo "$(OMARCHY_PATH='' "$REPO/bin/omedora-copr")" \
     <"$REPO/omedora/test/fedora/lib/local-repo-overlay.sh"
+}
+
+# pkgs_key — hash of everything the pkgs image depends on (see the header).
+pkgs_key() {
+  local f
+  {
+    printf 'base %s\n' "$(podman image inspect -f '{{.Id}}' "$BASE_IMAGE")"
+    if $local_repo; then
+      printf 'local-repo %s only=%s\n' \
+        "$(sha256sum <"$OMEDORA_LOCAL_REPO_DIR/repodata/repomd.xml" | cut -d' ' -f1)" \
+        "${OMEDORA_LOCAL_REPO_ONLY:-}"
+    else
+      printf 'copr\n'
+    fi
+    git -C "$REPO" ls-files -z --cached --others --exclude-standard -- "${PKGS_INPUTS[@]}" |
+      sort -z | while IFS= read -r -d '' f; do
+        [[ -f $REPO/$f ]] && printf '%s %s\n' "$(sha256sum <"$REPO/$f" | cut -d' ' -f1)" "$f"
+      done
+  } | sha256sum | cut -c1-16
+}
+
+# image_label <image> <label> — the label's value, "" when unset.
+image_label() {
+  podman image inspect -f "{{index .Labels \"$2\"}}" "$1" 2>/dev/null | sed 's/^<no value>$//'
 }
 
 # run_phase <container> <packages|config|all> <human-label> — run a staged
@@ -213,16 +279,24 @@ run_phase() {
   log "install phase '$phase' succeeded"
 }
 
-# commit_systemd <container> <image> — commit preserving the systemd CMD so the
-# image still boots /sbin/init.
+# commit_systemd <container> <image> [label=value...] — commit preserving the
+# systemd CMD so the image still boots /sbin/init, labelled with the checkout
+# it was built from plus any extra labels.
 commit_systemd() {
-  local ctr="$1" image="$2"
+  local ctr="$1" image="$2" label changes=()
+  shift 2
+  for label in "$CHECKOUT_TREE_LABEL=$TREE_ID" "$@"; do
+    changes+=(--change "LABEL $label")
+  done
   log "Committing $ctr -> $image"
   podman commit \
     --change 'CMD ["/sbin/init"]' \
     --change 'STOPSIGNAL SIGRTMIN+3' \
+    "${changes[@]}" \
     "$ctr" "$image" >/dev/null
 }
+
+TREE_ID=$(checkout_tree_id)
 
 # --- 0. (--local-repo only) build the local core RPMs --------------------------
 # The core omedora + omedora-settings RPMs package `git archive HEAD`, so they
@@ -260,14 +334,18 @@ if $fast; then
     echo "Run a normal build first (omedora/test/fedora/build-session.sh) to create it." >&2
     exit 1
   fi
+  if podman image exists "$BASE_IMAGE" &&
+    [[ $(image_label "$PKGS_IMAGE" omedora.pkgs-key) != "$(pkgs_key)" ]]; then
+    printf '\033[1;33mwarning:\033[0m the packages-phase inputs changed since %s was built; --fast reuses it anyway (drop --fast to rebuild it).\n' "$PKGS_IMAGE" >&2
+  fi
   log "Fast (config-only) build: booting packages image $PKGS_IMAGE"
   podman rm -f "$BUILD_CTR" >/dev/null 2>&1 || true
   podman volume exists "$DNF_CACHE_VOL" >/dev/null 2>&1 || podman volume create "$DNF_CACHE_VOL" >/dev/null
   podman run -d --name "$BUILD_CTR" --systemd=always "${SELINUX_OPT[@]}" \
     -v "$DNF_CACHE_VOL:$DNF_CACHE_DIR" \
-    -v "$SESSION_DIR/staged-install-4.sh:$STAGED_IN_IMAGE:ro" \
     "$PKGS_IMAGE" >/dev/null
   wait_for_systemd "$BUILD_CTR"
+  sync_tree "$BUILD_CTR"
   run_phase "$BUILD_CTR" config "config-only"
   commit_systemd "$BUILD_CTR" "$SESSION_IMAGE"
   podman rm -f "$BUILD_CTR" >/dev/null
@@ -290,14 +368,14 @@ if $workstation; then
   if $rebuild || ! podman image exists "$STD_BASE_IMAGE"; then
     log "Building standard base image $STD_BASE_IMAGE (Workstation tier builds FROM it)"
     podman build -t "$STD_BASE_IMAGE" --build-arg "FEDORA_RELEASE=$OMEDORA_FEDORA_RELEASE" \
-      -f "$DOCKERFILE_BASE" "$REPO"
+      -f "$DOCKERFILE_BASE" "$SESSION_DIR"
   else
     log "Standard base image $STD_BASE_IMAGE already present (use --rebuild to force)"
   fi
   if $rebuild || ! podman image exists "$BASE_IMAGE"; then
     log "Building Workstation base image $BASE_IMAGE (standard base + workstation-product-environment)"
     podman build -t "$BASE_IMAGE" --build-arg "BASE=$STD_BASE_IMAGE" \
-      -f "$DOCKERFILE_WORKSTATION" "$REPO"
+      -f "$DOCKERFILE_WORKSTATION" "$SESSION_DIR"
   else
     log "Workstation base image $BASE_IMAGE already present (use --rebuild to force)"
   fi
@@ -305,20 +383,26 @@ else
   if $rebuild || ! podman image exists "$BASE_IMAGE"; then
     log "Building base image $BASE_IMAGE"
     podman build -t "$BASE_IMAGE" --build-arg "FEDORA_RELEASE=$OMEDORA_FEDORA_RELEASE" \
-      -f "$DOCKERFILE_BASE" "$REPO"
+      -f "$DOCKERFILE_BASE" "$SESSION_DIR"
   else
     log "Base image $BASE_IMAGE already present (use --rebuild to force)"
   fi
 fi
 
 # Decide whether to rebuild the PACKAGES image. It's the expensive layer; reuse
-# it when it already exists and we're not doing a clean --rebuild. (Editing a
-# setup/adopt/finalize script and re-running the default build skips straight
-# to the config phase below, against the existing pkgs image — same as --fast.)
+# it when it exists, its inputs are unchanged (the pkgs-key label) and we're
+# not doing a clean --rebuild. (Editing a setup/adopt/finalize script and
+# re-running the default build skips straight to the config phase below,
+# against the existing pkgs image — same as --fast.)
+PKGS_KEY=$(pkgs_key)
 build_packages=true
 if ! $rebuild && podman image exists "$PKGS_IMAGE"; then
-  build_packages=false
-  log "Packages image $PKGS_IMAGE already present (use --rebuild to force a clean repackage)"
+  if [[ $(image_label "$PKGS_IMAGE" omedora.pkgs-key) == "$PKGS_KEY" ]]; then
+    build_packages=false
+    log "Packages image $PKGS_IMAGE is current (use --rebuild to force a clean repackage)"
+  else
+    log "Packages image $PKGS_IMAGE is out of date (base image, package source or packages-phase files changed); rebuilding it"
+  fi
 fi
 
 # --- 2. PACKAGES phase: boot base, (overlay repo), install packages, commit ---
@@ -330,16 +414,16 @@ if $build_packages; then
   # builds (the base image set keepcache=True so rpms actually stick).
   podman run -d --name "$BUILD_CTR" --systemd=always "${SELINUX_OPT[@]}" \
     -v "$DNF_CACHE_VOL:$DNF_CACHE_DIR" \
-    -v "$SESSION_DIR/staged-install-4.sh:$STAGED_IN_IMAGE:ro" \
     "$BASE_IMAGE" >/dev/null
   wait_for_systemd "$BUILD_CTR"
+  sync_tree "$BUILD_CTR"
   if $local_repo; then
     inject_local_repo "$BUILD_CTR"
   else
     log "Live-COPR mode: no local repo injected — repos.sh enables the live COPR"
   fi
   run_phase "$BUILD_CTR" packages "this takes a while"
-  commit_systemd "$BUILD_CTR" "$PKGS_IMAGE"
+  commit_systemd "$BUILD_CTR" "$PKGS_IMAGE" "omedora.pkgs-key=$PKGS_KEY"
   podman rm -f "$BUILD_CTR" >/dev/null
 fi
 
@@ -355,9 +439,9 @@ podman rm -f "$BUILD_CTR" >/dev/null 2>&1 || true
 podman volume exists "$DNF_CACHE_VOL" >/dev/null 2>&1 || podman volume create "$DNF_CACHE_VOL" >/dev/null
 podman run -d --name "$BUILD_CTR" --systemd=always "${SELINUX_OPT[@]}" \
   -v "$DNF_CACHE_VOL:$DNF_CACHE_DIR" \
-  -v "$SESSION_DIR/staged-install-4.sh:$STAGED_IN_IMAGE:ro" \
   "$PKGS_IMAGE" >/dev/null
 wait_for_systemd "$BUILD_CTR"
+sync_tree "$BUILD_CTR"
 run_phase "$BUILD_CTR" config "config stages"
 commit_systemd "$BUILD_CTR" "$SESSION_IMAGE"
 podman rm -f "$BUILD_CTR" >/dev/null
