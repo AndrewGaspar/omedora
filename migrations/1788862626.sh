@@ -1,5 +1,9 @@
 echo "Expose the Elgato Cam Link 4K as a 16:9 virtual camera"
 
+# omedora: skipped on Fedora — the Cam Link fix installs a DKMS v4l2loopback
+# and generic /etc udev/modprobe/systemd files (omedora/AGENTS.md §6).
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 if omarchy-hw-elgato-camlink-4k; then
   source "$OMARCHY_PATH/install/hardware/fix-elgato-camlink-4k.sh"
 
