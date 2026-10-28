@@ -210,6 +210,20 @@ def cmd_present(entries: list[Entry], _: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_app_id(entries: list[Entry], _: argparse.Namespace) -> int:
+    """Print the Flatpak app id of the first Flathub-mapped entry.
+
+    A Flathub app registers its launcher as <app-id>.desktop, not under the
+    Arch desktop id, so callers that launch by desktop id need this instead.
+    Exit 1 (no output) when no entry comes from Flathub.
+    """
+    for entry in entries:
+        if entry.source == "flathub" and entry.app_id:
+            print(entry.app_id)
+            return 0
+    return 1
+
+
 def cmd_add(entries: list[Entry], args: argparse.Namespace) -> int:
     """Install each entry per its source. Coalesces dnf installs into one call."""
     dnf_names: list[str] = []
@@ -351,7 +365,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     subparsers = parser.add_subparsers(dest="action", required=True)
 
-    for name in ("add", "missing", "present", "drop", "aur-add"):
+    for name in ("add", "missing", "present", "drop", "aur-add", "app-id"):
         sp = subparsers.add_parser(name)
         sp.add_argument("packages", nargs="+", metavar="PKG")
 
@@ -367,6 +381,7 @@ def main(argv: list[str] | None = None) -> int:
         "present": cmd_present,
         "drop": cmd_drop,
         "aur-add": cmd_aur_add,
+        "app-id": cmd_app_id,
     }
     return handlers[args.action](entries, args)
 

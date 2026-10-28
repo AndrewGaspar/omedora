@@ -399,3 +399,45 @@ else
   cat "$MOCK_LOG" >&2
   fail "Arch path leaked a dnf call"
 fi
+
+# --- omarchy-install-and-launch: launch a Flathub app by its app id ---
+# A Flathub app's launcher is <app-id>.desktop, not the Arch desktop id the
+# menu passes; the Fedora dispatch swaps it in before the upstream body runs.
+
+LAUNCH_MOCKS="$TMPDIR/launch-mocks"
+mkdir -p "$LAUNCH_MOCKS"
+cat >"$LAUNCH_MOCKS/omarchy-launch-floating-terminal-with-presentation" <<'MOCK'
+#!/bin/bash
+printf '%s\n' "$*" >>"$MOCK_LOG"
+MOCK
+chmod +x "$LAUNCH_MOCKS/omarchy-launch-floating-terminal-with-presentation"
+
+reset_log
+MOCK_LOG="$MOCK_LOG" PATH="$LAUNCH_MOCKS:$PATH" \
+  "$ROOT/bin/omarchy-install-and-launch" Obsidian obsidian obsidian >/dev/null 2>&1 || true
+if log_contains "gtk-launch md.obsidian.Obsidian"; then
+  pass "install-and-launch launches a Flathub-mapped app by its app id"
+else
+  cat "$MOCK_LOG" >&2
+  fail "install-and-launch obsidian → expected gtk-launch md.obsidian.Obsidian"
+fi
+
+reset_log
+MOCK_LOG="$MOCK_LOG" PATH="$LAUNCH_MOCKS:$PATH" \
+  "$ROOT/bin/omarchy-install-and-launch" Ghostty ghostty com.mitchellh.ghostty >/dev/null 2>&1 || true
+if log_contains "gtk-launch com.mitchellh.ghostty"; then
+  pass "install-and-launch keeps the desktop id for a non-Flathub package"
+else
+  cat "$MOCK_LOG" >&2
+  fail "install-and-launch ghostty → expected the caller's desktop id"
+fi
+
+reset_log
+OMARCHY_DISTRO=arch MOCK_LOG="$MOCK_LOG" PATH="$LAUNCH_MOCKS:$PATH" \
+  "$ROOT/bin/omarchy-install-and-launch" Obsidian obsidian obsidian >/dev/null 2>&1 || true
+if log_contains "gtk-launch obsidian"; then
+  pass "install-and-launch keeps the Arch desktop id on Arch"
+else
+  cat "$MOCK_LOG" >&2
+  fail "install-and-launch on Arch → expected gtk-launch obsidian"
+fi
