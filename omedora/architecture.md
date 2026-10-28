@@ -1,8 +1,8 @@
 # Omedora 4 architecture
 
-> **Current base (2026-10-18):** official Omarchy `v4.0.5`, commit
-> `94a8fbc2d67eec5673c7f16b8c5e8a9c8452ffdc`. The immutable Omedora
-> pin is `omedora-base-20261018-omarchy4-94a8fbc2`, cut locally on this
+> **Current base (2026-10-27):** Omarchy `v4.5.0-rc2`, commit
+> `5978d93ae7da0a325b7493501911e3f1266cadd3`. The immutable Omedora
+> pin is `omedora-base-20261027-omarchy4-5978d93a`, to be cut locally on this
 > branch; push the tag before the branch at promote time.
 
 Omedora is an additive Fedora port of Omarchy, not a separate implementation.
@@ -100,6 +100,11 @@ alone.
 Generic Fedora-owned configuration is never overwritten. Reference material
 that is useful to Omedora stays under `/usr/share/omarchy/etc-overrides`; only
 Omedora-namespaced drop-ins reviewed in `omedora-settings.spec` are packaged.
+The spec installs upstream `etc/` files by name, never by glob, so a new
+upstream drop-in is reviewed before it ships. For 4.5 that review added mise's
+`conf.d/omarchy*.toml` and the `omarchy` XKB option, and kept the
+locale-generate sudoers grant, the ARP sysctl policy and the other new
+machine-wide drop-ins out of `/etc`.
 
 ## 7. User and branding boundary
 
@@ -116,7 +121,7 @@ metadata retain upstream naming. See [`branding.md`](branding.md).
 ## 8. Version identity
 
 - `omedora/version`: Omedora release identity, currently `0.2.0-beta.2`.
-- `omedora/base-version`: reported upstream base, currently `4.0.0`.
+- `omedora/base-version`: reported upstream base, currently `4.5.0-rc2`.
 - root `version`: upstream-owned package metadata and intentionally unchanged.
 - the `omedora-base-*` tag: immutable git object used by the rebase and
   byte-identity audits.
@@ -203,10 +208,10 @@ path must fit one row below.
 | --- | --- | --- |
 | `README.md` | Document replacement | Fedora-facing project landing page; exact upstream deletions are byte-audited |
 | `bin/omarchy-pkg-*`, `bin/omarchy-update-*`, `bin/omarchy-channel-*`, `bin/omarchy-snapshot`, `bin/omarchy-version*` | Prepend/early dispatch | Fedora sibling or clean no-op; Arch body retained |
-| `bin/omarchy-{apply-lock,debug,default-browser,migrate,provision-user,reinstall-configs,restart-terminal,setup-security-fingerprint,system-lock,voxtype-*,webapp-*}` | Narrow Fedora branch | Portable contract preserved; relocations are byte-audited |
+| `bin/omarchy-{apply-lock,debug,default-browser,locale-generate,migrate,provision-user,reinstall-configs,restart-terminal,setup-direct-boot,setup-security-fingerprint,system-factory-reset,system-lock,webapp-*}` | Narrow Fedora branch | Portable contract preserved; relocations are byte-audited |
 | `bin/fedora/*`, `bin/omedora*`, `bin/omarchy-distro`, `bin/omarchy-doctor`, `bin/omarchy-dev-validate-fedora-packages` | New additive files | Fedora implementation and Omedora commands |
 | `install/config/{docker,enable-services,firewall,theme-system}.sh`, `install/user/{mise-work,xcompose}.sh` | Dispatch or narrow branch | Fedora sibling handles host-safe behavior |
-| `install/hardware/all.sh`, `install/login/sddm.sh`, `install/post-install/pacman.sh`, `install/user/first-run/gnome-theme.sh`, `install/config/increase-lockout-limit.sh` | Fedora gate | Exclude Arch boot/login or host-policy behavior |
+| `install/hardware/all.sh`, `install/login/sddm.sh`, `install/post-install/pacman.sh`, `install/user/first-run/gnome-theme.sh`, `install/config/increase-lockout-limit.sh`, `install/config/locale.sh` | Fedora gate | Exclude Arch boot/login or host-policy behavior |
 | `install/**/*-fedora.sh`, `install/packages/fedora.toml` | New additive files | Fedora implementations and package translation |
 | `migrations/*.sh` modified by Omedora | Early Fedora gate/branch | Must pass static and runtime migration gating tests |
 | `default/omarchy/omarchy-menu.jsonc`, `etc/fastfetch/config.jsonc` | User-facing Fedora adaptation | Menu availability/branding and Omedora version display |
@@ -239,6 +244,9 @@ change even though they share that directory.
 | `install/user/xcompose.sh` | Fedora backup-then-write branch |
 | `install/user/mise-work.sh` | Dispatch; avoid the Arch ISO package cache |
 | `install/user/first-run/gnome-theme.sh` | Gate; do not clobber a coexisting GNOME appearance |
+| `install/config/locale.sh` | Gate; the system locale is Fedora's (no locale.gen/locale-gen) |
+| `bin/omarchy-locale-generate` (Setup > Language) | Dispatch to `bin/fedora/locale-generate`, which installs the registry language's glibc langpack; no passwordless grant |
+| `bin/omarchy-setup-direct-boot`, `bin/omarchy-system-factory-reset` | Refuse; EFI entries and boot snapshots are Fedora's |
 
 All other setup-system/user steps run unchanged or self-guard based on command
 availability. A new upstream setup step must be explicitly classified here when
