@@ -1,3 +1,34 @@
+## v0.2.0-beta.8 — 2026-10-27 (Omarchy 4.0.6)
+
+Rebased onto Omarchy 4.0.6. Adds Fedora 45 support and guarded in-place upgrades from Fedora 44 (`omedora-upgrade-fedora`). On Fedora 45, a system still on beta.7 may need `omarchy update` run twice: the first run installs beta.8, the second finishes the update.
+
+- chore(release): prepare core specs at 0.2.0~beta.8
+- chore(rebase): re-pin Omedora 4 onto Omarchy v4.0.6
+- rebase(4.0.6): Fedora-gate the vconsole initramfs rebuild migration
+- test(vm): ignore per-release artifact directories
+- test(vm): wait for a new boot after the session reboot
+- test(vm): add a Fedora release-upgrade stage
+- test(fedora): L4 gate for in-place Fedora release upgrades
+- test(fedora): L3 gate for in-place Fedora release upgrades
+- test(install): keep the release-gate test off the real rpmdb
+- test(l4): regenerate the 30-visual golden for the new default wallpaper
+- docs: point the release-upgrade section at the dnf guard
+- omedora-settings: add a dnf guard against unsafe Fedora release changes
+- docs: Fedora 44 and 45 support, release upgrades and chroot policy
+- omedora-upgrade-fedora: point the /boot caveat at kernel-install remove
+- update: explain an unsupported Fedora release instead of dnf's error
+- omedora-upgrade-fedora: guarded in-place Fedora release upgrade
+- install: refuse an unsupported Fedora release before the plan
+- omedora-copr: add --chroot-available release probe
+- docs(testing): document the Fedora release knob and gate matrix
+- test(vm): map the Fedora release to a Cloud Base image
+- test(fedora): select the Fedora release for container tiers
+- packaging: build local RPMs per Fedora release
+- copr-submit: document re-registering before a chroot backfill
+- packaging: floor BuildRequires on vendored hypr libraries
+- packages(fedora): install pinta from Flathub
+- copr-submit: add CHROOTS to build only selected chroots
+
 ## v0.2.0-beta.7 — 2026-10-18 (Omarchy 4.0.5)
 
 - upgrade-to-4: retire the Omarchy 4.0.5 fastfetch default
