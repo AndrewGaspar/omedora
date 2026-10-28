@@ -72,11 +72,9 @@ declare -A ALLOW
 # upstream line is therefore a deletion; allowlist them all. The Omedora landing
 # content lives in README.md; the omedora/ docs folder is indexed by omedora/README.md.
 ALLOW["README.md"]='# Omarchy
-Omarchy is a beautiful, modern & opinionated Linux distribution by DHH.
+Omarchy is a beautiful, fun & agentic Linux distribution by DHH.
 Read more at [omarchy.org](https://omarchy.org).
-## Docs
-- [omarchy-shell](docs/omarchy-shell.md) — shell host, plugin manifest, IPC, `shell.json`, custom bar modules
-## License
+The manual lives in [`manual/`](manual/), which is its authoritative source.
 Omarchy is released under the [MIT License](https://opensource.org/licenses/MIT).'
 
 ALLOW["bin/omarchy-provision-user"]='env -u BROWSER XDG_CURRENT_DESKTOP= xdg-settings set default-web-browser chromium.desktop
@@ -89,14 +87,6 @@ xdg-mime default HEY.desktop x-scheme-handler/mailto'
 # answer itself.
 ALLOW["bin/omarchy-system-lock"]='omarchy-shell lock lock >/dev/null'
 
-# voxtype install: the upstream unconditional package line moved into the Arch
-# arm of a distro case (verbatim) so Fedora dispatches to the omedora from-source
-# installer (single voxtype RPM, tiered CPU + Vulkan) instead of the Arch
-# voxtype-bin package. The REMOVE script is byte-identical to upstream again
-# (`omarchy-pkg-drop voxtype-bin` -> dnf remove voxtype), so it has NO
-# allowlist entry.
-ALLOW["bin/omarchy-voxtype-install"]='  omarchy-pkg-add wtype voxtype-bin'
-
 # printer-discovery migration: the bare `systemctl daemon-reload` /
 # `try-reload-or-restart` moved one level deeper under a /run/systemd/system
 # guard (verbatim) so CI containers without a system bus skip the reload.
@@ -107,9 +97,13 @@ ALLOW["migrations/1787815267.sh"]='  sudo systemctl daemon-reload
 ALLOW["bin/omarchy-update"]='if [[ -z ${OMARCHY_UPDATE_LOGGED:-} ]]; then
 trap '"'"'echo ""; echo -e "\033[0;31mSomething went wrong during the update!\n\nPlease review the output above carefully, correct the error, and retry the update.\n\nIf you need assistance, get help from the community at https://omarchy.org/discord\033[0m"'"'"' ERR'
 
-ALLOW["bin/omarchy-update-confirm"]='  "What'"'"'s new: https://github.com/omacom/omarchy/releases/latest"'
+# omarchy-update-confirm: the release-notes URL becomes a per-distro variable so
+# Fedora links Omedora's releases; the Arch URL is unchanged.
+ALLOW["bin/omarchy-update-confirm"]='  "$(omarchy-i18n update.whatsNew "https://github.com/omacom/omarchy/releases/latest")"'
 
-ALLOW["bin/omarchy-update-restart"]='  if [[ -f $kernel ]] && pacman -Qo "$kernel" &>/dev/null; then'
+# omarchy-update-restart: the kernel ownership probe goes through
+# pkg_owns_file (pacman -Qo verbatim on Arch, rpm -qf on Fedora).
+ALLOW["bin/omarchy-update-restart"]='    if [[ -f $kernel ]] && pacman -Qo "$kernel" &>/dev/null; then'
 
 # omarchy-debug: the inline expac/pacman package-list moved into the Arch arm of
 # a distro case (verbatim) so Fedora can use rpm/dnf; the heredoc now prints
