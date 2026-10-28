@@ -3,6 +3,14 @@
 # omarchy:summary=Remove fingerprint authentication from sudo, polkit, and lock screen
 # omarchy:requires-sudo=true
 
+# Fedora dispatch — Fedora's PAM stack is authselect's, so the sibling turns
+# off with-fingerprint (what Fedora's setup turned on) instead of sed-editing
+# Fedora-owned PAM files. The Arch body below is unchanged. See
+# omedora/architecture.md.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora) exec "$(dirname -- "${BASH_SOURCE[0]}")/fedora/remove-security-fingerprint" "$@" ;;
+esac
+
 set -e
 
 # Resolve the invoking account before changing authentication or packages.

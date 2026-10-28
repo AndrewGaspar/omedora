@@ -1,0 +1,100 @@
+#!/bin/bash
+#
+# Fedora sibling of bin/omarchy-remove-security-fido2 (exec'd by its distro
+# dispatch).
+#
+# Omedora has no Fedora FIDO2 setup: Setup > Security > Fido2 runs upstream's
+# omarchy-setup-security-fido2 unchanged. On Fedora that script stops at its
+# hardware check unless fido2-tools and pamu2fcfg were installed by hand, and
+# when it does finish it has written, and this undoes exactly:
+#
+#   - "auth sufficient pam_u2f.so cue authfile=/etc/fido2/fido2" as the first
+#     line of /etc/pam.d/sudo (a file the sudo package owns);
+#   - /etc/pam.d/polkit-1 when it was absent, which on Fedora it is: polkit's
+#     own file is /usr/lib/pam.d/polkit-1, and an /etc copy overrides it. An
+#     unowned file holding exactly one of the stacks the setup writes is
+#     deleted, which brings back the vendor file; any other /etc copy only
+#     loses the setup's line;
+#   - /etc/fido2, the registration.
+#
+# Upstream deletes every pam_u2f line in sudo and polkit-1. Here a pam_u2f line
+# the setup did not write (an administrator's own, or authselect's
+# with-pam-u2f in system-auth) is left alone, and pam-u2f stays installed while
+# any PAM service still loads the module: removing it under a "required" line
+# would lock everyone out. libfido2 goes only when nothing else needs it, and
+# on Fedora openssh-clients and libssh do, so omarchy-pkg-drop keeps it and
+# says so.
+
+set -e
+
+setup_line_pattern='^auth[[:space:]]+sufficient[[:space:]]+pam_u2f\.so cue authfile=/etc/fido2/fido2$'
+
+# The two polkit-1 stacks upstream's setup has written when the file was absent.
+polkit_stack_pam_unix='auth      sufficient pam_u2f.so cue authfile=/etc/fido2/fido2
+auth      required pam_unix.so
+
+account   required pam_unix.so
+password  required pam_unix.so
+session   required pam_unix.so'
+polkit_stack_system_auth='auth      sufficient pam_u2f.so cue authfile=/etc/fido2/fido2
+auth      include system-auth
+
+account   include system-auth
+password  include system-auth
+session   include system-auth'
+
+has_setup_line() {
+  [[ -f $1 ]] && grep -Eq "$setup_line_pattern" "$1"
+}
+
+remove_setup_line() {
+  sudo sed -i -E "\\#$setup_line_pattern#d" "$1"
+}
+
+remove_pam_config() {
+  if has_setup_line /etc/pam.d/sudo; then
+    echo "Removing FIDO2 authentication from sudo..."
+    remove_setup_line /etc/pam.d/sudo
+  fi
+
+  local polkit=/etc/pam.d/polkit-1 content
+  [[ -f $polkit ]] || return 0
+
+  content=$(<"$polkit")
+  if ! rpm -qf "$polkit" >/dev/null 2>&1 &&
+    [[ $content == "$polkit_stack_pam_unix" || $content == "$polkit_stack_system_auth" ]]; then
+    echo "Removing the FIDO2 polkit configuration (restoring Fedora's)..."
+    sudo rm -f "$polkit"
+  elif has_setup_line "$polkit"; then
+    echo "Removing FIDO2 authentication from polkit..."
+    remove_setup_line "$polkit"
+  fi
+}
+
+echo -e "\e[32mRemoving FIDO2 device from authentication.\n\e[0m"
+
+remove_pam_config
+
+authdir=/etc/fido2
+
+# -d follows symlinks, so a dangling link at /etc/fido2 would survive this and
+# a later setup would install the authfile through it. rm -rf on a symlink
+# removes the link itself, never the directory it points at.
+if [[ -e $authdir || -L $authdir ]]; then
+  echo "Removing FIDO2 configuration..."
+  sudo rm -rf "$authdir"
+fi
+
+# /etc/pam.d/system-auth is authselect's symlink, which grep follows. A
+# dangling link makes grep exit 2 even on a match, so test the output.
+pam_u2f_services=$(grep -lsF pam_u2f.so /etc/pam.d/* /usr/lib/pam.d/* || true)
+if [[ -n $pam_u2f_services ]]; then
+  echo -e "\e[33mKeeping the FIDO2 packages: PAM still loads pam_u2f.so in ${pam_u2f_services//$'\n'/, }, which Omarchy did not set up.\e[0m"
+  echo -e "\e[32mOmarchy's FIDO2 authentication has been removed.\e[0m"
+  exit 0
+fi
+
+echo "Removing FIDO2 packages..."
+omarchy-pkg-drop libfido2 pam-u2f
+
+echo -e "\e[32mFIDO2 authentication has been completely removed.\e[0m"

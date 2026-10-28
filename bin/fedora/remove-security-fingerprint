@@ -1,0 +1,91 @@
+#!/bin/bash
+#
+# Fedora sibling of bin/omarchy-remove-security-fingerprint (exec'd by its
+# distro dispatch). Undoes what the Fedora branch of
+# omarchy-setup-security-fingerprint does, and nothing else:
+#
+#   setup                                     remove (here)
+#   enrolls the user's prints (fprintd)       deletes them, reader then disk
+#   authselect enable-feature with-fingerprint  authselect disable-feature
+#   /etc/pam.d/omarchy-lock-fingerprint       removed
+#   fprintd fprintd-pam libfprint             dropped (usbutils stays)
+#
+# Fedora's PAM stack is authselect's: pam_fprintd reaches sudo, polkit and the
+# desktop logins through system-auth, so the feature switch is the only change
+# to it. Upstream's sed edits of /etc/pam.d/sudo and polkit-1 never apply here
+# (those files hold no pam_fprintd line on Fedora, and are Fedora's to own).
+# Fedora Workstation enables with-fingerprint at install time; removing
+# fingerprint authentication turns that off too, which is what was asked.
+#
+# The packages go only once nothing in the stack loads pam_fprintd any more,
+# so an authselect opt-out (hand-managed PAM) never ends up pointing at a
+# module that is gone. omarchy-pkg-drop keeps any package that something else
+# still needs and says so.
+
+set -e
+
+# Resolve the invoking account before changing authentication or packages.
+if (( EUID == 0 )) && [[ -v SUDO_UID ]]; then
+  if [[ ! $SUDO_UID =~ ^[0-9]+$ ]]; then
+    echo "Cannot identify the invoking fingerprint user" >&2
+    exit 1
+  fi
+  fingerprint_user=$(/usr/bin/id -nu "+$SUDO_UID") || exit 1
+else
+  fingerprint_user=$(/usr/bin/id -un) || exit 1
+fi
+
+if [[ -z $fingerprint_user || $fingerprint_user == "." || $fingerprint_user == ".." || $fingerprint_user == */* ]]; then
+  echo "Unsafe fingerprint user name" >&2
+  exit 1
+fi
+
+echo -e "\e[32mRemoving fingerprint scanner from authentication.\n\e[0m"
+
+if ! sudo -n true 2>/dev/null && ! sudo -v; then
+  echo -e "\e[31mRemoving fingerprint authentication needs administrator rights.\e[0m"
+  exit 1
+fi
+
+# A match-on-chip reader keeps the prints in the device as well, so fprintd
+# deletes them there first, while it is still installed. No reader (or no
+# system bus) leaves nothing it can reach, which is said plainly.
+if omarchy-cmd-present fprintd-delete && ! delete_output=$(sudo fprintd-delete "$fingerprint_user" 2>&1); then
+  if [[ $delete_output == *"No devices available"* ]]; then
+    echo -e "\e[33mNo fingerprint reader is available now, so any fingerprints stored on the reader itself stay there.\e[0m"
+  else
+    echo -e "\e[33mThe reader's own copy of $fingerprint_user's fingerprints may not have been deleted: $(tail -n 1 <<<"$delete_output")\e[0m"
+  fi
+fi
+
+if [[ -f /etc/pam.d/omarchy-lock-fingerprint ]]; then
+  echo "Removing lock screen fingerprint authentication..."
+  sudo rm -f /etc/pam.d/omarchy-lock-fingerprint
+fi
+
+# `authselect current --raw` prints "<profile> <feature>...", and fails when
+# authselect does not manage this system's PAM (an opt-out).
+if omarchy-cmd-present authselect && authselect_current=$(authselect current --raw 2>/dev/null); then
+  if [[ " $authselect_current " == *" with-fingerprint "* ]]; then
+    echo "Disabling fingerprint authentication via authselect..."
+    sudo authselect disable-feature with-fingerprint
+    sudo authselect apply-changes
+  fi
+fi
+
+sudo rm -rf -- "/var/lib/fprint/$fingerprint_user"
+
+# The stacks sudo and polkit read. (gdm-fingerprint names pam_fprintd too, but
+# GDM only offers it while fprintd is there to answer.)
+# grep exits 2 when any of them is absent, even on a match: test the output.
+pam_fprintd_stacks=$(grep -lsF pam_fprintd.so /etc/pam.d/system-auth /etc/pam.d/password-auth /etc/pam.d/sudo /etc/pam.d/polkit-1 || true)
+if [[ -n $pam_fprintd_stacks ]]; then
+  echo -e "\e[33mKeeping the fingerprint packages: PAM outside authselect still loads pam_fprintd.so in ${pam_fprintd_stacks//$'\n'/, }.\e[0m"
+  echo -e "\e[32mOmarchy's fingerprint setup and $fingerprint_user's local saved fingerprints have been removed.\e[0m"
+  exit 0
+fi
+
+echo "Removing fingerprint packages..."
+omarchy-pkg-drop fprintd fprintd-pam libfprint
+
+echo -e "\e[32mFingerprint authentication and $fingerprint_user's local saved fingerprints have been removed.\e[0m"

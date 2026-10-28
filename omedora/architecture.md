@@ -212,6 +212,7 @@ path must fit one row below.
 | Paths | Patch type | Contract |
 | --- | --- | --- |
 | `README.md` | Document replacement | Fedora-facing project landing page; exact upstream deletions are byte-audited |
+| `bin/omarchy-remove-security-{fido2,fingerprint}` | Prepend dispatch | Fedora sibling undoes what setup changed: authselect `with-fingerprint`, or exactly the pam_u2f line and polkit-1 file upstream's FIDO2 setup wrote; other Fedora PAM content is never edited |
 | `bin/omarchy-pkg-*`, `bin/omarchy-update-*`, `bin/omarchy-channel-*`, `bin/omarchy-snapshot`, `bin/omarchy-version*` | Prepend/early dispatch | Fedora sibling or clean no-op; Arch body retained |
 | `bin/omarchy-{apply-lock,debug,default-browser,locale-generate,migrate,provision-user,reinstall-configs,restart-terminal,setup-direct-boot,setup-security-fingerprint,system-factory-reset,system-lock,webapp-*}` | Narrow Fedora branch | Portable contract preserved; relocations are byte-audited |
 | `bin/omarchy-install-{and-launch,gaming-retroarch,service-sunshine}` | Fedora arm or gate | Fedora package source (Flatpak id, RPM Fusion set), or a message before any change when Fedora has none; Arch body retained |
