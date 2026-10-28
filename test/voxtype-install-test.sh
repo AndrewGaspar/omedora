@@ -109,4 +109,21 @@ for distro in fedora arch; do
     || pass "$distro remove never shells out to dnf directly"
 done
 
+# ===========================================================================
+echo "# --- PART 4: Voxtype is Fedora's default dictation backend ---"
+# ===========================================================================
+# Upstream seeds superwhisper (proprietary, skip-mapped). omedora-settings
+# overrides the seeded file in both payload copies; upstream's config/ path
+# must still exist for that override to land on a real file.
+SETTINGS="$ROOT/omedora/packaging/copr/omedora-settings.spec"
+[[ -f $ROOT/config/omarchy/defaults/dictation ]] \
+  && pass "upstream still seeds config/omarchy/defaults/dictation" \
+  || fail "upstream still seeds config/omarchy/defaults/dictation"
+for dest in '%{buildroot}%{_datadir}/omarchy/config/omarchy/defaults/dictation' \
+  '%{buildroot}/etc/skel/.config/omarchy/defaults/dictation'; do
+  grep -qF "printf 'voxtype\\n' >$dest" "$SETTINGS" \
+    && pass "omedora-settings seeds voxtype at $dest" \
+    || fail "omedora-settings seeds voxtype at $dest"
+done
+
 echo "# all voxtype-install tests passed"

@@ -118,6 +118,11 @@ install -d %{buildroot}%{_datadir}/omarchy
 # config/** -> /usr/share/omarchy/config/** (resync source for
 # omarchy-reinstall-configs; the same tree also seeds /etc/skel below).
 cp -a config %{buildroot}%{_datadir}/omarchy/config
+# Fedora's default dictation backend is Voxtype (the COPR voxtype RPM), not
+# upstream's superwhisper (proprietary, skip-mapped in fedora.toml). Same
+# one-word file upstream ships; Hyprland binds dictation only once the
+# backend's binary is installed (Setup > Defaults > Dictation > Voxtype).
+printf 'voxtype\n' >%{buildroot}%{_datadir}/omarchy/config/omarchy/defaults/dictation
 
 # applications/ (launchers + their icon sources) -> /usr/share/omarchy/
 # (omarchy-refresh-applications and several bins copy from $OMARCHY_PATH here).
@@ -164,6 +169,7 @@ install -Dpm644 etc/plymouth/plymouthd.conf \
 # ---------------------------------------------------------------------------
 install -d %{buildroot}/etc/skel/.config
 cp -a config/. %{buildroot}/etc/skel/.config/
+printf 'voxtype\n' >%{buildroot}/etc/skel/.config/omarchy/defaults/dictation
 # Branding seeds (about <- icon.txt [upstream], screensaver <- the Omedora
 # wordmark; matches what omarchy-branding-{about,screensaver} reset to now that
 # /usr/share/omarchy/logo.txt is Omedora's). This is the v4 home of the 3.8.2
