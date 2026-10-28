@@ -37,6 +37,7 @@ set -euo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../../.." && pwd)
 . "$REPO/omedora/test/fedora/lib/release.sh"
+. "$REPO/omedora/test/fedora/lib/checkout.sh"
 HEADLESS_DIR="$REPO/omedora/test/fedora/headless"
 # Per-release so concurrent Fedora 44 / 45 runs never clobber each other.
 ARTIFACTS_DIR="$HEADLESS_DIR/artifacts$OMEDORA_RELEASE_SUFFIX"
@@ -84,6 +85,10 @@ if $rebuild || ! podman image exists "$SESSION_IMAGE"; then
   $local_repo && build_flags+=(--local-repo)
   "$REPO/omedora/test/fedora/build-session.sh" "${build_flags[@]}"
 fi
+rebuild_hint="omedora/test/fedora/build-session.sh"
+$workstation && rebuild_hint+=" --workstation"
+$local_repo && rebuild_hint+=" --local-repo"
+checkout_image_check "$SESSION_IMAGE" "$rebuild_hint"
 
 # --- boot one headless container ---------------------------------------------
 cleanup() {
@@ -153,11 +158,14 @@ if ! podman exec "$CTR" machinectl shell "${setenv_args[@]}" \
 fi
 
 # --- copy the suite into the container ---------------------------------------
-# Drop lib.sh + tests/ into an omedora-owned dir so the omedora session shell
-# can read+run them (machinectl shell runs as omedora).
+# Drop lib.sh, the shared TAP helpers + tests/ into an omedora-owned dir so the
+# omedora session shell can read+run them (machinectl shell runs as omedora).
+# The helpers ship beside lib.sh (as on the L4 VM) so the suite never depends
+# on the checkout copy inside the image.
 podman exec "$CTR" rm -rf "$SUITE_IN_CTR"
 podman exec "$CTR" mkdir -p "$SUITE_IN_CTR/tests" "$SUITE_IN_CTR/fixtures"
 podman cp "$HEADLESS_DIR/lib.sh"   "$CTR:$SUITE_IN_CTR/lib.sh"
+podman cp "$REPO/test/helpers.sh"  "$CTR:$SUITE_IN_CTR/helpers.sh"
 podman cp "$HEADLESS_DIR/tests/."  "$CTR:$SUITE_IN_CTR/tests/"
 # Committed fixtures (e.g. the 30-visual reference screenshot) the tests diff
 # against. Optional — only present once a visual test ships.

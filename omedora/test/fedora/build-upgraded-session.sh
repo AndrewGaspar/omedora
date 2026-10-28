@@ -28,6 +28,7 @@ set -euo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
 . "$REPO/omedora/test/fedora/lib/release.sh"
+. "$REPO/omedora/test/fedora/lib/checkout.sh"
 
 code_mode=checkout
 run_tests=false
@@ -98,6 +99,7 @@ if ! podman image exists "$FROM_IMAGE"; then
   log "Building the Fedora $FROM_RELEASE session image first"
   OMEDORA_SYSTEMD_SESSION_IMAGE="$FROM_IMAGE" "$REPO/omedora/test/fedora/build-session.sh"
 fi
+checkout_image_check "$FROM_IMAGE" "omedora/test/fedora/build-session.sh (Fedora $FROM_RELEASE)"
 
 log "Booting $FROM_IMAGE (Fedora $FROM_RELEASE) under systemd"
 podman rm -f "$CTR" >/dev/null 2>&1 || true
