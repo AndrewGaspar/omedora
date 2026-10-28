@@ -569,12 +569,19 @@ def main(argv: list[str] | None = None) -> int:
         sp = subparsers.add_parser(name)
         sp.add_argument("packages", nargs="+", metavar="PKG")
     subparsers.add_parser("installed").add_argument("packages", nargs="*", metavar="PKG")
+    subparsers.choices["drop"].add_argument(
+        "--rpm",
+        action="store_true",
+        help="The names are RPM names, as installed: remove them untranslated",
+    )
 
     args = parser.parse_args(argv)
 
     map_path = Path(os.environ.get("OMARCHY_FEDORA_MAP", DEFAULT_MAP))
     pkg_map = load_map(map_path)
     entries = resolve(args.packages, pkg_map)
+    if getattr(args, "rpm", False):
+        entries = [Entry(package=name, names=[name]) for name in args.packages]
 
     handlers = {
         "add": cmd_add,

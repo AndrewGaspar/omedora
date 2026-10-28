@@ -465,6 +465,17 @@ else
   fail "pkg-drop obsidian → expected an unchanged flatpak uninstall"
 fi
 
+# --rpm takes RPM names as they are: pkg-remove's picker lists RPMs, and a
+# map key (ttf-jetbrains-mono-nerd here) must not translate one.
+reset_log
+MOCK_RPM_INSTALLED="ttf-jetbrains-mono-nerd" "$ROOT/bin/fedora/pkg.py" drop --rpm ttf-jetbrains-mono-nerd >/dev/null 2>&1
+if log_contains "sudo dnf remove -y ttf-jetbrains-mono-nerd" && log_lacks "jetbrains-mono-fonts-all"; then
+  pass "pkg.py drop --rpm removes the RPM named, untranslated"
+else
+  cat "$MOCK_LOG" >&2
+  fail "pkg.py drop --rpm removes the RPM named, untranslated"
+fi
+
 # --- omarchy-pkg-aur-add: behaves identically to pkg-add on Fedora ---
 
 reset_log
