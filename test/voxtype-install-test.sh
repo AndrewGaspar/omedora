@@ -45,9 +45,18 @@ echo "# --- PART 1: the package map resolves voxtype-bin to the COPR RPM ---"
 # ===========================================================================
 out=$(OMARCHY_DISTRO=fedora OMARCHY_PKG_DRY_RUN=1 OMARCHY_PATH="$ROOT" \
   PATH="$ROOT/bin:$BASE_PATH" "$ROOT/bin/omarchy-pkg-add" wtype voxtype-bin 2>&1) || true
-grep -q 'dnf install .* wtype voxtype' <<<"$out" \
-  && pass "wtype voxtype-bin resolves to dnf names 'wtype voxtype'" \
-  || { echo "$out" >&2; fail "wtype voxtype-bin resolves to dnf names 'wtype voxtype'"; }
+# The map entry itself, then the live resolution. On a Fedora host where wtype
+# or voxtype is already installed, pkg.py only lists what is missing.
+block=$(awk '$0 == "[voxtype-bin]" {on=1; next} /^\[/ {on=0} on' "$ROOT/install/packages/fedora.toml")
+grep -qx 'source = "dnf"' <<<"$block" && grep -qx 'names = \["voxtype"\]' <<<"$block" \
+  && pass "fedora.toml maps voxtype-bin to the voxtype RPM" \
+  || fail "fedora.toml maps voxtype-bin to the voxtype RPM"
+install_line=$(sed -E 's/\x1b\[[0-9;]*m//g' <<<"$out" | grep 'dnf install' || true)
+if [[ -z $install_line ]] || grep -qE ' (wtype )?voxtype$' <<<"$install_line"; then
+  pass "wtype voxtype-bin resolves to dnf names 'wtype voxtype' (minus installed ones)"
+else
+  echo "$out" >&2; fail "wtype voxtype-bin resolves to dnf names 'wtype voxtype' (minus installed ones)"
+fi
 grep -qE 'voxtype-(cuda|migraphx)' <<<"$out" \
   && { echo "$out" >&2; fail "map never resolves to the retired GPU add-ons"; } \
   || pass "map never resolves to the retired GPU add-ons"
