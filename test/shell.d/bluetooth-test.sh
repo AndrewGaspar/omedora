@@ -6,6 +6,9 @@ source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/base-test.sh"
 
 run_node_test <<'JS'
 const bluetooth = requireFromRoot('shell/plugins/panels/bluetooth/Model.js')
+// Upstream dropped its source-reading assertions (#16334); the rename feature's
+// wiring lives in Panel.qml, so its checks still read the source.
+const panelSource = require('fs').readFileSync(path.join(root, 'shell/plugins/panels/bluetooth/Panel.qml'), 'utf8')
 
 // BlueZ keeps Name (advertised) and Alias (user-settable, defaults to Name).
 // Quickshell exposes them as deviceName and name, and the alias is the one the
