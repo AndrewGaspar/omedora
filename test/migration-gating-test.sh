@@ -86,7 +86,7 @@ for c in pacman snapper limine-mkinitcpio mkinitcpio omarchy-pkg-add omarchy-pkg
 done
 chmod +x "$BIN"/*
 
-for base in 1781984677.sh 1781286586.sh 1781587663.sh 1786567036.sh 1786605598.sh; do
+for base in 1781984677.sh 1781286586.sh 1781587663.sh 1786567036.sh 1786605598.sh 1791581004.sh 1791621765.sh; do
   f="$MIGRATIONS_DIR/$base"
   [[ -e $f ]] || { pass "# SKIP $base absent (pin rotated past it)"; continue; }
   : >"$MOCK_LOG"
