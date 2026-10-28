@@ -57,6 +57,11 @@ export OMEDORA_REPO_ROOT="$ROOT"
 # plan.sh's release-support gate probes the live COPR API; answer "supported"
 # offline (test/install-release-gate-test.sh covers the gate itself).
 export OMEDORA_COPR_CMD="true"
+# plan.sh discloses the local test repo instead of the COPR when the harness
+# injected /etc/yum.repos.d/omedora-local.repo — as the L3 smoke's --local-repo
+# mode does before re-running this suite. Point the seam at a scratch path so
+# the result never depends on the machine the suite runs on (set below, once
+# SCRATCH exists).
 
 PLAN="$ROOT/omedora/install/plan.sh"
 
@@ -104,6 +109,7 @@ run_gate() {
 }
 
 SCRATCH="$(mktemp -d)"
+export OMEDORA_LOCAL_REPO_FILE="$SCRATCH/omedora-local.repo"
 make_shim
 export PATH="$ROOT/bin:$SHIM:$PATH"
 # Hermetic by default: skip the pkg.py dry-run except where PART 3 opts in.
@@ -272,7 +278,8 @@ assert_output_contains "P3: docker's Fedora names are in the transaction on a cl
 assert_output_lacks "P3: a clean machine has nothing to keep" \
   "$PLAN_OUT" "kept (never replaced or removed)"
 assert_output_contains "P3: skip-mapped packages disclosed" "$PLAN_OUT" "ufw"
-assert_output_contains "P3: omedora COPR disclosed" "$PLAN_OUT" "omedora-4"
+assert_output_contains "P3: omedora COPR disclosed" "$PLAN_OUT" "enable the omedora COPR: agaspar/omedora-4"
+assert_output_lacks "P3: no local test repo claimed without one" "$PLAN_OUT" "local test repo"
 assert_output_contains "P3: RPM Fusion disclosed" "$PLAN_OUT" "RPM Fusion"
 assert_output_contains "P3: /etc drop-ins disclosed" "$PLAN_OUT" "ignore power button"
 assert_output_contains "P3: docker daemon.json only-if-absent disclosed" "$PLAN_OUT" "ONLY"
@@ -313,6 +320,19 @@ dnf_only="$(printf '%s\n' "$PLAN_OUT" | grep -v 'will not be installed')"
 assert_output_lacks "P3-docker: moby-engine is out of the dnf transaction" "$dnf_only" "moby-engine"
 assert_output_lacks "P3-docker: docker-cli is out of the dnf transaction" "$dnf_only" "docker-cli"
 assert_output_contains "P3-docker: the rest of the base set still installs" "$PLAN_OUT" "btop"
+
+# With the harness's local repo injected, the package source is still
+# disclosed: the local repo replaces the COPR line, it does not drop it.
+gate_home P3local
+touch "$OMEDORA_LOCAL_REPO_FILE"
+export OMEDORA_PLAN_FORCE_NONINTERACTIVE=1 OMEDORA_PLAN_AUTOCONFIRM=1
+run_gate
+unset OMEDORA_PLAN_FORCE_NONINTERACTIVE OMEDORA_PLAN_AUTOCONFIRM
+rm -f "$OMEDORA_LOCAL_REPO_FILE"
+assert_equals "P3-local: disclosure run with the local repo proceeds" "$PLAN_RC" "0"
+assert_output_contains "P3-local: the local test repo is disclosed as the package source" \
+  "$PLAN_OUT" "omedora local test repo already present (COPR enable will be skipped)"
+assert_output_lacks "P3-local: no COPR enable is promised" "$PLAN_OUT" "enable the omedora COPR"
 
 # ===========================================================================
 echo "# --- PART 4: proceed -> apply actually backs up ---"

@@ -31,7 +31,8 @@ fi
 # walker/elephant/swayosd, nerd-fonts, TUIs, uwsm... The test harness can
 # instead inject a LOCAL repo at /etc/yum.repos.d/omedora-local.repo for
 # hermetic, network-free runs; when present, skip the COPR enable.
-if [[ ! -f /etc/yum.repos.d/omedora-local.repo ]]; then
+# (OMEDORA_LOCAL_REPO_FILE overrides the path, as in plan.sh and release.sh.)
+if [[ ! -f ${OMEDORA_LOCAL_REPO_FILE:-/etc/yum.repos.d/omedora-local.repo} ]]; then
   # dnf-plugins-core provides the `copr` subcommand. `copr enable` is idempotent.
   sudo dnf install -y dnf-plugins-core >/dev/null 2>&1 || true
   sudo dnf -y copr enable "$("$OMEDORA_REPO_ROOT/bin/omedora-copr")"
