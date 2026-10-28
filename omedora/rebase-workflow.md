@@ -158,11 +158,27 @@ Determine rebuilds from payload changes, not from the rebase itself:
 - HypXR is a separate package stream. Do not fold another agent's HypXR refresh
   into a Quattro rebase commit.
 
-For the 4.5 rebase, rebuild `omedora` and `omedora-settings`, and build the
-new `omasnap` and `owe` specs (register both COPR packages first). No Hyprland
+For the 4.5 rebase, rebuild `omedora` and `omedora-settings`, build the new
+`omasnap`, `owe`, `hype`, `monologue`, `signed` and `disktree` specs (register
+each COPR package individually first), and rebuild `voxtype` (its whisper tiers
+moved to `/usr/lib/voxtype`). No Hyprland
 stack bump or HypXR ABI rebuild is required: 4.5 still targets Hyprland 0.56.2.
 Recommended but not blocking: quickshell at upstream `2b4501a28` plus
 Omarchy's `load_qtquick_611.patch`, before Fedora moves to Qt 6.12.
+
+### Deferred from the 4.5 rebase
+
+These were reviewed and deliberately left for follow-up work, each its own
+reviewed change:
+
+| Item | State on Fedora | Follow-up |
+| --- | --- | --- |
+| Timed passwordless sudo (`omarchy-sudo-passwordless MINUTES`, 4.5) | Fails closed with "Temporary sudo cleanup is unavailable"; permanent grants and `--disable` work | Ship `etc/tmpfiles.d/omarchy-nopasswd-sudo.conf`, add an RPM `%preun` that runs the package-removal revoke in place of the libalpm hook, give `verify_boot_cleanup` a Fedora branch, and add the patch-map row |
+| quickshell `0.3.2` | Works on Fedora's Qt 6.11.2; `shell.qml`'s `//@ pragma OmarchyLoadPatch` only logs a warning | Move to upstream `2b4501a28` plus Omarchy's `load_qtquick_611.patch` before Fedora ships Qt 6.12 (rawhide already has it) |
+| omarchy-hyprland-titlebars | Skip-mapped; floating mode runs without titlebars | Needs an exact-EVR `Requires: hyprland-no-session` and a rebuild with every hyprland.spec build |
+| gliff | Skip-mapped | Its crates build Cisco OpenH264 from source, which Fedora and COPR can't ship |
+| fprintd resume hook (migration 1791125650) | Gated; `bin/fedora/setup-lock` doesn't install it | Decide whether setup-lock adopts the hook and the stop-timeout drop-in |
+| `omarchy-reinstall-pkgs` | CLI-only; runs pacman | Exit with a message on Fedora or route to `bin/fedora/update-system-pkgs` |
 
 ## 8. Promotion
 
