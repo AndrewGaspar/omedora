@@ -78,7 +78,7 @@ run_batch() {
   OMARCHY_DISTRO="$distro" PATH="$STUBS:$ROOT/bin:$PATH" bash -c "$script" | sort
 }
 
-ROWS=(remove.dictation install.ai.dictation install.ai.openclaw remove.ai.openclaw install.service.spotify)
+ROWS=(remove.dictation install.ai.dictation install.ai.openclaw remove.ai.openclaw install.service.spotify install.ai.grok-bot)
 script=$(guard_script "${ROWS[@]}")
 
 # --- Fedora: every RPM and Flatpak reports installed ------------------------
@@ -103,6 +103,9 @@ answers=$(MOCK_RPM_INSTALLED="" MOCK_FLATPAK_INSTALLED="" run_batch fedora "$scr
 assert_output_contains "Fedora: Remove > Dictation hides without voxtype" "$answers" "remove.dictation:w:0"
 assert_output_contains "Fedora: Install > AI > OpenClaw shows without openclaw" "$answers" "install.ai.openclaw:w:1"
 assert_output_contains "Fedora: Install > Service > Spotify shows without its Flatpak" "$answers" "install.service.spotify:w:1"
+# grok-bot is skip-mapped, so its installer would install and launch nothing:
+# the row carries a distro gate and never shows on Fedora.
+assert_output_contains "Fedora: Install > AI > Grok Bot is gated off (grok-bot is skip-mapped)" "$answers" "install.ai.grok-bot:w:0"
 
 # --- Fedora: the shadows agree with the real helpers ------------------------
 # A name no guard spelled out (built at run time) goes to the real helper. A
@@ -136,6 +139,7 @@ answers=$(PACMAN_INSTALLED="voxtype-bin openclaw" MOCK_RPM_INSTALLED="*" run_bat
 assert_output_contains "Arch: Remove > Dictation shows from pacman" "$answers" "remove.dictation:w:1"
 assert_output_contains "Arch: Install > AI > OpenClaw hides from pacman" "$answers" "install.ai.openclaw:w:0"
 assert_output_contains "Arch: spotify absent from pacman keeps its Install row" "$answers" "install.service.spotify:w:1"
+assert_output_contains "Arch: Install > AI > Grok Bot still shows when grok-bot is absent" "$answers" "install.ai.grok-bot:w:1"
 grep -q '^pacman -Qq' "$PACMAN_LOG" || fail "Arch: the guard batch reads pacman"
 pass "Arch: the guard batch reads its package set from pacman"
 [[ ! -s $MOCK_LOG ]] || { cat "$MOCK_LOG" >&2; fail "Arch: the guard batch never asks rpm or flatpak"; }

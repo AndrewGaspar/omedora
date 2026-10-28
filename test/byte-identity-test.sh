@@ -134,17 +134,22 @@ if ! omarchy-cmd-browser-handoff "$browser_exec" --app="$1" "${@:2}"; then
 
 
 
-# Two relocations in the menu data, combined under one key (a bash assoc array
-# overwrites on a second assignment to the same key, so both deleted lines
-# must share one value, newline-separated):
+# Three relocations in the menu data, combined under one key (a bash assoc
+# array overwrites on a second assignment to the same key, so every deleted
+# line must share one value, newline-separated):
 #  1. The Menu > Install > AUR entry gains a `when` distro gate so it hides on
 #     Fedora (the AUR doesn't exist there). Editing the line deletes the
 #     ungated upstream original. Unwind if the entry is dropped/repurposed.
 #  2. The Menu > Update entry is rebranded Omarchy -> Omedora (user-facing
 #     label). learn.omarchy keeps "Omarchy" (it is the actual Omarchy manual).
 #     Unwind if the pin ever ships an Omedora-branded menu.
+#  3. Install > AI > Grok Bot gains the same distro gate (`&&`-ed onto its
+#     `when`): grok-bot is skip-mapped in install/packages/fedora.toml, so on
+#     Fedora the row installed nothing and then launched nothing. Unwind if
+#     Fedora gets a grok-bot package.
 ALLOW["default/omarchy/omarchy-menu.jsonc"]='  "install.aur": {"icon":"󰣇","label":"AUR","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install"},
-  "update.omarchy": {"icon":"","iconFont":"omarchy","label":"Omarchy","action":"omarchy-launch-floating-terminal-with-presentation omarchy-update"},'
+  "update.omarchy": {"icon":"","iconFont":"omarchy","label":"Omarchy","action":"omarchy-launch-floating-terminal-with-presentation omarchy-update"},
+  "install.ai.grok-bot": {"icon":"","iconFont":"omarchy","label":"Grok Bot","when":"! omarchy-pkg-present grok-bot","action":"omarchy-install-and-launch '"'"'Grok Bot'"'"' grok-bot grok-bot"},'
 # --- the audit ---------------------------------------------------------------
 # Modified upstream files = files that differ from the pin AND exist on the pin
 # (so omedora-ADDED files like bin/omedora-* are out of scope — they have no
@@ -158,7 +163,7 @@ ALLOW["default/omarchy/omarchy-menu.jsonc"]='  "install.aur": {"icon":"󰣇","la
 declare -A CARRIED
 CARRIED["shell/plugins/bar/Bar.qml"]='bar keyboard navigation: a focus ring over the bar icons'
 CARRIED["shell/Ui/PanelKeyCatcher.qml"]='XF86Back handling: up one menu level, close at root'
-CARRIED["shell/plugins/menu/MenuModel.js"]='menu search tolerates dictated punctuation and filler words; XF86Back handling; Fedora port: package guards resolve through pkg.py installed (fedoraPackageGuards); the upstream pacman snapshot is unchanged'
+CARRIED["shell/plugins/menu/MenuModel.js"]='menu search tolerates dictated punctuation and filler words; XF86Back handling; Fedora port: package guards resolve through pkg.py installed (fedoraPackageGuards); the upstream pacman snapshot is unchanged; omarchy-distro is a guard reader, read once for the menu distro gates'
 CARRIED["shell/plugins/panels/bluetooth/Model.js"]='Bluetooth panel: rename a device, show its friendly name, match either name'
 CARRIED["shell/plugins/panels/bluetooth/Panel.qml"]='Bluetooth panel: rename a device, show its friendly name'
 CARRIED["test/shell.d/bluetooth-test.sh"]='tests for the Bluetooth rename / friendly-name feature'

@@ -460,6 +460,7 @@ var GUARD_READERS = [
   "omarchy-default-browser",
   "omarchy-default-editor",
   "omarchy-default-terminal",
+  "omarchy-distro",
   "omarchy-dns"
 ]
 
