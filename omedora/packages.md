@@ -212,6 +212,16 @@ for each package_name in args:
 Notes:
 
 - Failures from `dnf install` are surfaced; the helper exits non-zero like upstream.
+- `drop` never cascades. Upstream's `pacman -Rns` refuses to remove a package
+  another installed package depends on, but `dnf remove` removes the
+  dependents with it (dropping `libfido2` would take `openssh-clients`,
+  `libssh` and, through `libcurl`, dnf itself). Before dnf runs, `drop` asks
+  `rpm -e --test` which targets something outside the removal set still needs
+  (by name, soname, file or rich dependency), keeps those with a line such as
+  `Kept libfido2: needed by libssh, openssh-clients`, and removes the rest.
+  Dependents inside the set go with it, and dnf's unneeded-dependency cleanup
+  stays on, as `-s` does on Arch. A kept package is not a failure: `drop`
+  exits 0, so upstream's removers carry on under `set -e`.
 - `flatpak install` output is surfaced, but an individual Flatpak failure is
   best-effort and does not abort the remaining package install. A missing user
   session bus also skips Flatpaks with a warning; rerun from a desktop session.

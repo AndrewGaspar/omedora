@@ -12,7 +12,9 @@ Subcommands:
   present <pkg> [<pkg>...]  Exit 0 if ALL packages present, 1 if any missing
   installed [<pkg>...]      Print each named package `present` would accept, one
                             per line, from one rpm query and one flatpak listing
-  drop <pkg> [<pkg>...]     Remove if installed (best-effort per source)
+  drop <pkg> [<pkg>...]     Remove if installed (best-effort per source); like
+                            pacman -R, never removes an RPM another installed
+                            package still needs (--rpm: names are RPM names)
   aur-add <pkg> [<pkg>...]  Tier-fallback install (alias for `add` on Fedora)
 
 Env vars:
@@ -24,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -385,8 +388,133 @@ def cmd_add(entries: list[Entry], args: argparse.Namespace) -> int:
     return 0
 
 
+# One unmet dependency in `rpm -e --test` output (always run under LC_ALL=C):
+#   "\tlibfido2.so.1()(64bit) is needed by (installed) libssh-0.12.2-1.fc44.x86_64"
+_NEEDED_BY = re.compile(r"^\s*(?P<dep>.+?) is needed by \(installed\) (?P<nevra>\S+)\s*$")
+_NOT_INSTALLED = re.compile(r"^error: package (?P<name>\S+) is not installed\s*$")
+
+
+def _rpm(args: list[str]) -> subprocess.CompletedProcess:
+    """Run a read-only rpm query in the C locale, so its messages parse."""
+    return subprocess.run(
+        ["rpm", *args],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env={**os.environ, "LC_ALL": "C"},
+    )
+
+
+def _nevra_name(nevra: str) -> str:
+    """The package name of an rpm NEVRA such as openssh-clients-10.2p1-16.fc44.x86_64."""
+    base = nevra.rsplit(".", 1)[0] if "." in nevra else nevra
+    parts = base.rsplit("-", 2)
+    return parts[0] if len(parts) == 3 else nevra
+
+
+def _rpm_capabilities(names: list[str]) -> dict[str, set[str]]:
+    """What each target name provides: its Provides and its files, in one query.
+
+    A target may be a bare name or name.arch (the map names i686 libraries
+    that way); both forms key the same installed package.
+    """
+    result = _rpm([
+        "-q", "--qf",
+        "[%{=NAME}\t%{=ARCH}\t%{PROVIDENAME}\n][%{=NAME}\t%{=ARCH}\t%{FILENAMES}\n]",
+        "--", *names,
+    ])
+    caps: dict[str, set[str]] = {name: set() for name in names}
+    for line in result.stdout.splitlines():
+        fields = line.split("\t", 2)
+        if len(fields) != 3:
+            continue
+        pkg, arch, cap = fields
+        for key in (pkg, f"{pkg}.{arch}"):
+            if key in caps:
+                caps[key].add(cap)
+    return caps
+
+
+def _satisfiers(dep: str, candidates: list[str], caps: dict[str, set[str]]) -> list[str]:
+    """The candidates that satisfy one unmet dependency rpm reported.
+
+    rpm prints the dependency as written: a name or soname, a versioned
+    "name >= 1.2", a file path, or a rich "(a or b)" expression. Any word of it
+    a candidate provides counts, so a rich dependency keeps every candidate it
+    names. When nothing matches, `rpm --whatprovides` answers for this one
+    dependency; failing that, every candidate is kept, since keeping too much
+    is the safe side of this question.
+    """
+    words: set[str] = set()
+    for token in dep.split():
+        # A rich expression's parentheses cling to its words, and a soname
+        # carries its own: "(libfoo.so.1()(64bit)" and "bar)". Try each form.
+        token = token.lstrip("(")
+        while token:
+            words.add(token)
+            if not token.endswith(")"):
+                break
+            token = token[:-1]
+    found = [name for name in candidates if words & caps.get(name, set())]
+    if found:
+        return found
+    result = _rpm(["-q", "--whatprovides", "--qf", "%{NAME}\n", "--", dep])
+    providers = set(result.stdout.split()) if result.returncode == 0 else set()
+    found = [name for name in candidates if name in providers or name.rsplit(".", 1)[0] in providers]
+    return found or list(candidates)
+
+
+def plan_rpm_removal(names: list[str]) -> tuple[list[str], dict[str, list[str]]]:
+    """Split installed RPM names into (removable, kept -> the packages needing it).
+
+    pacman -R refuses to remove a package another installed package depends
+    on; `dnf remove` instead removes the dependents too (libfido2 would take
+    openssh-clients, libssh and, through libcurl, dnf itself). This restores
+    pacman's answer one package at a time: `rpm -e --test` reports every
+    dependency the removal would break, whether on a name, a soname, a file or
+    a rich expression, and each target that satisfies one is kept. Keeping a
+    target can strand another one it needs, so the test repeats on what is
+    left until it passes; each round keeps at least one target, so it ends.
+    Dependents inside the removal set are fine: rpm only reports packages
+    outside it.
+    """
+    remaining = list(dict.fromkeys(names))
+    kept: dict[str, set[str]] = {}
+    if not remaining or shutil.which("rpm") is None:
+        return remaining, {}
+    caps = _rpm_capabilities(remaining)
+    while remaining:
+        result = _rpm(["-e", "--test", "--allmatches", "--", *remaining])
+        if result.returncode == 0:
+            break
+        needed: dict[str, set[str]] = {}
+        gone: set[str] = set()
+        for line in result.stdout.splitlines():
+            if match := _NEEDED_BY.match(line):
+                requirer = _nevra_name(match["nevra"])
+                for name in _satisfiers(match["dep"], remaining, caps):
+                    needed.setdefault(name, set()).add(requirer)
+            elif match := _NOT_INSTALLED.match(line):
+                gone.add(match["name"])
+        if not needed and not gone:
+            die(
+                "could not check what still needs "
+                f"{' '.join(remaining)}; nothing was removed:\n{result.stdout.strip()}"
+            )
+        for name, requirers in needed.items():
+            kept.setdefault(name, set()).update(requirers)
+        remaining = [name for name in remaining if name not in needed and name not in gone]
+    return remaining, {name: sorted(requirers) for name, requirers in kept.items()}
+
+
 def cmd_drop(entries: list[Entry], args: argparse.Namespace) -> int:
-    """Remove each entry per its source. Coalesces dnf removes into one call."""
+    """Remove each entry per its source. Coalesces dnf removes into one call.
+
+    An RPM another installed package still needs is kept with a line naming
+    them, the rest are removed, and the exit status stays 0: as with pacman
+    refusing a dependency, the system is consistent and nothing failed, so the
+    upstream removers (which run under set -e) carry on with their cleanup.
+    """
     dnf_names: list[str] = []
     flathub_ids: list[str] = []
 
@@ -401,6 +529,11 @@ def cmd_drop(entries: list[Entry], args: argparse.Namespace) -> int:
             dnf_names.extend(entry.names)
         elif entry.source == "flathub":
             flathub_ids.append(entry.app_id)
+
+    dnf_names, kept = plan_rpm_removal(dnf_names)
+    for name, requirers in kept.items():
+        shown = ", ".join(requirers[:6]) + (f" and {len(requirers) - 6} more" if len(requirers) > 6 else "")
+        print(f"\033[33mKept {name}: needed by {shown}\033[0m")
 
     if dnf_names:
         info(f"Removing via dnf: {' '.join(dnf_names)}")
