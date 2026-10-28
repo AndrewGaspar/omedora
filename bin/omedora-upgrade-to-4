@@ -179,6 +179,7 @@ v4_kept_packages=(
   quickshell
   omedora-nerd-fonts
   lazygit lazydocker mise starship usage satty tensaku omacut omawrite omacalc
+  omasnap owe
   ttfx herdr
   gpu-screen-recorder
   hyprland-preview-share-picker

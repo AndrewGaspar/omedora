@@ -57,6 +57,11 @@ SPECS=(
   # a Markdown writing app bound to SUPER+SHIFT+W (ships /usr/bin/omawrite). No
   # intra-stack BuildRequires, so order is flexible.
   omacut.spec omawrite.spec omacalc.spec
+  # Omarchy 4.5 additions to omarchy-base.packages: omasnap (the screenshot +
+  # annotation overlay omarchy-capture-screenshot execs; CMake/Qt6) and owe
+  # (the wallpaper engine behind owed.service and theme intros; meson/C).
+  # Plain builds with BuildRequires only, no vendoring, no intra-stack deps.
+  omasnap.spec owe.spec
   # ttfx is the native terminal-effects engine used by Quattro's screensaver
   # and first-run provisioner. Its Rust dependency set is vendored for COPR.
   ttfx.spec
