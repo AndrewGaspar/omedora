@@ -156,6 +156,9 @@ jobs:
       - name: Run hypr BuildRequires floor guard
         run: bash test/hypr-buildrequires-floor-test.sh
 
+      - name: Run session-unit drop-in guard
+        run: bash test/session-unit-dropins-test.sh
+
       - name: Validate the real fedora.toml
         run: bin/omarchy-dev-validate-fedora-packages
 

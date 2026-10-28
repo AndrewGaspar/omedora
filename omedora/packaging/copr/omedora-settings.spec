@@ -201,6 +201,14 @@ install -pm644 default/systemd/user/*.service \
 # replaces the retired notifier name. The directory watcher itself is gone.
 ln -s omarchy-migrate-notify.service \
   %{buildroot}%{_userunitdir}/omarchy-update-user-notify.service
+# Upstream's keep-shell drop-in (KillMode=mixed: start-hyprland stops the
+# compositor before its shell clients, so the wallpaper survives teardown) is
+# named for wayland-wm@hyprland.desktop.service. uwsm names the unit after the
+# main argument's basename, and omedora.desktop launches `-- start-hyprland`,
+# so Omedora's unit is wayland-wm@start\x2dhyprland.service. Vendor drop-in
+# under the user unit dir, not /etc, so an administrator can still override it.
+install -Dpm644 etc/systemd/user/wayland-wm@hyprland.desktop.service.d/10-keep-shell.conf \
+  %{buildroot}%{_userunitdir}/'wayland-wm@start\x2dhyprland.service.d'/10-keep-shell.conf
 # system-sleep hook: ONLY unmount-fuse is package-installed (per the map);
 # force-igpu / keyboard-backlight are hardware-quirk files deployed by the
 # omarchy-hw-* scripts on matching machines, not packaged globally.
@@ -333,9 +341,9 @@ install -Dpm644 etc/systemd/oomd.conf.d/10-omarchy.conf \
 # DELIBERATELY NOT INSTALLED from etc/ (Omarchy 4.5 additions): the
 # NetworkManager connectivity endpoint (Fedora configures its own), mpv's
 # system mpv.conf (generic path), the kyber I/O scheduler udev rule, systemd
-# mount-rate and binfmt drop-ins (boot policy), and the
-# wayland-wm@hyprland.desktop drop-in (Omedora's session unit is named for
-# omedora.desktop's command line, not hyprland.desktop).
+# mount-rate and binfmt drop-ins (boot policy). The
+# wayland-wm@hyprland.desktop keep-shell drop-in is installed above under
+# Omedora's own unit name (see the systemd user units section).
 # DELIBERATELY NOT INSTALLED from etc/: mkinitcpio.conf.d/, limine-entry-tool.d/,
 # sddm.conf.d/ (Arch / sddm-only), nsswitch.conf, security/faillock.conf,
 # cups/, plymouth/ (never-touch; reference copies in etc-overrides/ above),
@@ -405,6 +413,10 @@ desktop-file-validate %{buildroot}%{_datadir}/wayland-sessions/omedora.desktop
 %{_userunitdir}/omarchy-speaker-tuning.service
 %{_userunitdir}/omarchy-tailscale-receive.service
 %{_userunitdir}/omarchy-update-user-notify.service
+# Keep-shell drop-in for wayland-wm@start\x2dhyprland.service. `?` stands in
+# for the backslash, which an rpm %files glob would read as an escape.
+%dir %{_userunitdir}/wayland-wm@start?x2dhyprland.service.d/
+%{_userunitdir}/wayland-wm@start?x2dhyprland.service.d/10-keep-shell.conf
 %{_prefix}/lib/systemd/system-sleep/unmount-fuse
 %{_prefix}/lib/environment.d/10-omarchy-fcitx.conf
 # uwsm env.d (dirs co-owned with the vendored uwsm package).

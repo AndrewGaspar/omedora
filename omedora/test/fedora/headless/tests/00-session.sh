@@ -40,3 +40,16 @@ assert_layer omarchy-bar "shell bar layer present (omarchy-bar)"
 # The wallpaper service mapped its background layer too.
 wait_for_layer omarchy-background 15 || true
 assert_layer omarchy-background "shell background layer present (omarchy-background)"
+
+# The compositor unit carries upstream's keep-shell drop-in under Omedora's
+# unit name (uwsm names it for omedora.desktop's `-- start-hyprland`): on
+# logout start-hyprland stops Hyprland before its shell clients get SIGTERM,
+# so the wallpaper survives teardown.
+wm_unit=$(systemd-escape --template=wayland-wm@.service start-hyprland)
+kill_mode=$(systemctl --user show -p KillMode --value "$wm_unit" 2>/dev/null || true)
+if [[ $kill_mode == "mixed" ]]; then
+  pass "$wm_unit keeps the shell through teardown (KillMode=mixed)"
+else
+  systemctl --user show -p DropInPaths -p KillMode "$wm_unit" >"$ARTIFACTS/wm-unit.txt" 2>&1 || true
+  _fail_with_artifacts "$wm_unit keeps the shell through teardown (KillMode=$kill_mode, want mixed)"
+fi
