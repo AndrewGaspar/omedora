@@ -4,13 +4,42 @@
 # Test-time controls (env vars):
 #   MOCK_LOG              Path to append the invocation log
 #   MOCK_RPM_INSTALLED    Space-separated list of "installed" package names
-#                         (used by `rpm -q <name>` checks)
+#                         (used by `rpm -q <name>` checks; "*" matches all)
 printf 'rpm %s\n' "$*" >>"${MOCK_LOG:-/tmp/mock.log}"
+
+# Split without globbing, so "*" stays a word.
+read -r -a mock_installed <<<"${MOCK_RPM_INSTALLED:-}"
+
+# `rpm -q --qf <format> [--] <name>...`, the batched form pkg.py's `installed`
+# uses: render the format for each installed name (NAME and ARCH only), and
+# report the rest on stdout the way rpm does. MOCK_RPM_INSTALLED="*" reports
+# every name installed.
+if [[ ${1:-} == "-q" && ${2:-} == "--qf" ]]; then
+  format=$3
+  shift 3
+  [[ ${1:-} == "--" ]] && shift
+  missing=0
+  for name in "$@"; do
+    found=0
+    for pkg in "${mock_installed[@]}"; do
+      [[ $pkg == "*" || $pkg == "$name" ]] && found=1
+    done
+    if ((found)); then
+      rendered=${format//%\{NAME\}/$name}
+      rendered=${rendered//%\{ARCH\}/x86_64}
+      printf '%b' "$rendered"
+    else
+      printf 'package %s is not installed\n' "$name"
+      missing=$((missing + 1))
+    fi
+  done
+  exit "$missing"
+fi
 
 # Implement enough of `rpm -q <name>` semantics for tests to work.
 if [[ ${1:-} == "-q" && -n ${2:-} ]]; then
-  for pkg in ${MOCK_RPM_INSTALLED:-}; do
-    if [[ $pkg == "$2" ]]; then
+  for pkg in "${mock_installed[@]}"; do
+    if [[ $pkg == "*" || $pkg == "$2" ]]; then
       printf '%s-1.0-1.fc44.x86_64\n' "$2"
       exit 0
     fi

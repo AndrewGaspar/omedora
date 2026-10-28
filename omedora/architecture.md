@@ -53,6 +53,7 @@ small `pkg-install`/`pkg-remove` siblings:
 | `omarchy-pkg-missing`, `-present` | Query translated RPM names or Flatpak IDs |
 | `omarchy-pkg-drop`, `-remove` | Remove only translated installed targets |
 | `omarchy-install-and-launch` | Launch a Flathub-mapped app by its Flatpak app id (`pkg.py app-id`) instead of the Arch desktop id |
+| Menu guard batch (`shell/plugins/menu/MenuModel.js`) | Upstream shadows `omarchy-pkg-present`/`-missing` with a pacman set; a carried Fedora branch rebuilds it from one `pkg.py installed <names>` call (one `rpm -q`, one `flatpak list`) so guards agree with the real helpers |
 
 Absence from `fedora.toml` means the package name is valid unchanged through
 dnf. Explicit entries select `dnf`, an allowlisted on-demand `copr`, `flathub`,
@@ -221,6 +222,7 @@ path must fit one row below.
 | `omedora/install*`, `omedora/branding*`, `omedora/*.md`, `omedora/version`, `omedora/base-version` | New additive files | Fedora bootstrap, policy, docs, and identity |
 | `test/*-test.sh`, `test/mocks/`, `omedora/test/fedora/` | New additive files | L1 through L4 verification |
 | `test/shell.d/version-test.sh` | Additive test branch | Fedora version-banner contract; upstream assertions retained |
+| `shell/plugins/menu/MenuModel.js` (package guards) | Carried Fedora branch | `fedoraPackageGuards()` runs only when `omarchy-distro` is `fedora`; the pacman snapshot is untouched; listed in `test/byte-identity-test.sh` `CARRIED` |
 
 Adding a modified upstream path that does not fit this map requires updating the
 map in the same change. Additive RPM specs and their source manifests are

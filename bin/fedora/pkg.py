@@ -10,6 +10,8 @@ Subcommands:
   add <pkg> [<pkg>...]      Install if missing
   missing <pkg> [<pkg>...]  Exit 0 if ANY package is missing, 1 if all present
   present <pkg> [<pkg>...]  Exit 0 if ALL packages present, 1 if any missing
+  installed [<pkg>...]      Print each named package `present` would accept, one
+                            per line, from one rpm query and one flatpak listing
   drop <pkg> [<pkg>...]     Remove if installed (best-effort per source)
   aur-add <pkg> [<pkg>...]  Tier-fallback install (alias for `add` on Fedora)
 
@@ -135,7 +137,52 @@ def run(cmd: list[str], dry_run: bool, check: bool = True) -> int:
     return result.returncode
 
 
+# Answers `prefetch` gathered in bulk. The menu asks about every package it
+# guards at once, and a process per name is what it cannot afford.
+_rpm_answers: dict[str, bool] = {}
+_flatpak_ids: set[str] | None = None
+
+
+def prefetch(entries: list[Entry]) -> None:
+    """Answer every RPM and Flatpak lookup these entries need in two queries.
+
+    `rpm -q` matches a package by name, or by name.arch (the map names i686
+    libraries that way), and never by what a package provides. Queried with
+    a format printing both forms, a name counts exactly when it comes back
+    as a line of its own; one it does not find prints "package X is not
+    installed" instead. `flatpak list` covers the user and system
+    installations `flatpak info` searches. Nothing is remembered from a
+    query that cannot run, so the per-name lookups still answer.
+    """
+    global _flatpak_ids
+    rpm_names = sorted({
+        name
+        for entry in entries if entry.source != "skip"
+        for name in [*entry.satisfied_by, *(entry.names if entry.source in ("dnf", "copr") else [])]
+    })
+    if rpm_names and shutil.which("rpm") is not None:
+        result = subprocess.run(
+            ["rpm", "-q", "--qf", "%{NAME}\\n%{NAME}.%{ARCH}\\n", "--", *rpm_names],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        found = set(result.stdout.splitlines())
+        _rpm_answers.update((name, name in found) for name in rpm_names)
+    if any(entry.source == "flathub" for entry in entries) and shutil.which("flatpak") is not None:
+        result = subprocess.run(
+            ["flatpak", "list", "--columns=application"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        if result.returncode == 0:
+            _flatpak_ids = set(result.stdout.split())
+
+
 def is_installed_rpm(name: str) -> bool:
+    if name in _rpm_answers:
+        return _rpm_answers[name]
     if shutil.which("rpm") is None:
         # No rpm on PATH (e.g., dry-run smoke check from an Arch host).
         # Treat as "not installed" so dry-runs surface every install.
@@ -148,6 +195,8 @@ def is_installed_rpm(name: str) -> bool:
 
 
 def is_installed_flatpak(app_id: str) -> bool:
+    if _flatpak_ids is not None:
+        return app_id in _flatpak_ids
     if shutil.which("flatpak") is None:
         return False
     result = subprocess.run(
@@ -210,6 +259,21 @@ def cmd_present(entries: list[Entry], _: argparse.Namespace) -> int:
     for entry in entries:
         if not is_entry_installed(entry):
             return 1
+    return 0
+
+
+def cmd_installed(entries: list[Entry], _: argparse.Namespace) -> int:
+    """Print each entry `present` would accept on its own, once, in order.
+
+    The menu's guard batch builds its package set from this instead of asking
+    `present` once per row; the answers are the same by construction.
+    """
+    prefetch(entries)
+    seen: set[str] = set()
+    for entry in entries:
+        if entry.package not in seen and is_entry_installed(entry):
+            print(entry.package)
+        seen.add(entry.package)
     return 0
 
 
@@ -371,6 +435,7 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("add", "missing", "present", "drop", "aur-add", "app-id"):
         sp = subparsers.add_parser(name)
         sp.add_argument("packages", nargs="+", metavar="PKG")
+    subparsers.add_parser("installed").add_argument("packages", nargs="*", metavar="PKG")
 
     args = parser.parse_args(argv)
 
@@ -385,6 +450,7 @@ def main(argv: list[str] | None = None) -> int:
         "drop": cmd_drop,
         "aur-add": cmd_aur_add,
         "app-id": cmd_app_id,
+        "installed": cmd_installed,
     }
     return handlers[args.action](entries, args)
 

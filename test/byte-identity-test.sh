@@ -17,13 +17,14 @@
 # relocation is permitted but a NEW, undocumented deletion (e.g. someone quietly
 # dropping an upstream behavior) trips the audit.
 #
-# We keep ZERO shell/ PORT patches: the one we briefly carried (Background.qml's
-# updatesEnabled guard, for Fedora's old quickshell) was dropped once quickshell
-# 0.3.0 was vendored — vendoring fixed the root cause. What the stack does carry
-# is a small set of shell FEATURE patches (see CARRIED below): deliberate
-# behaviour changes pending upstreaming, not Fedora gating. They are exempt from
-# the additive-only rule but must be listed with a rationale so the divergence
-# stays documented; the audit still reports how many upstream lines each drops.
+# shell/ carries ONE port patch: MenuModel.js's Fedora branch of the menu's
+# package guards, which answers them through the Fedora package map instead of
+# pacman (the earlier Background.qml updatesEnabled guard was dropped once
+# quickshell 0.3.0 was vendored). The rest of CARRIED below is shell FEATURE
+# patches: deliberate behaviour changes pending upstreaming, not Fedora gating.
+# All of them are exempt from the additive-only rule but must be listed with a
+# rationale so the divergence stays documented; the audit still reports how
+# many upstream lines each drops.
 #
 # Maintenance: when you add a NEW gated relocation that deletes an upstream line,
 # add the deleted line text to ALLOW["<path>"] below with a one-line note. When
@@ -154,7 +155,7 @@ ALLOW["default/omarchy/omarchy-menu.jsonc"]='  "install.aur": {"icon":"󰣇","la
 declare -A CARRIED
 CARRIED["shell/plugins/bar/Bar.qml"]='bar keyboard navigation: a focus ring over the bar icons'
 CARRIED["shell/Ui/PanelKeyCatcher.qml"]='XF86Back handling: up one menu level, close at root'
-CARRIED["shell/plugins/menu/MenuModel.js"]='menu search tolerates dictated punctuation and filler words; XF86Back handling'
+CARRIED["shell/plugins/menu/MenuModel.js"]='menu search tolerates dictated punctuation and filler words; XF86Back handling; Fedora port: package guards resolve through pkg.py installed (fedoraPackageGuards); the upstream pacman snapshot is unchanged'
 CARRIED["shell/plugins/panels/bluetooth/Model.js"]='Bluetooth panel: rename a device, show its friendly name, match either name'
 CARRIED["shell/plugins/panels/bluetooth/Panel.qml"]='Bluetooth panel: rename a device, show its friendly name'
 CARRIED["test/shell.d/bluetooth-test.sh"]='tests for the Bluetooth rename / friendly-name feature'
