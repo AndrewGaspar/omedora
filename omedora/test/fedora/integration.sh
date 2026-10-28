@@ -302,11 +302,13 @@ else
   cat /tmp/docker-setup.out >&2
   fail "docker setup runs beside podman-docker"
 fi
-if id -nG omedora | grep -qw docker; then
-  pass "docker setup created the docker group and added the install user"
+# Since Omarchy 4.5 the docker group (root-equivalent) is an opt-in behind
+# omarchy-setup-security-sudoless-docker; setup only makes sure it exists.
+if getent group docker >/dev/null && ! id -nG omedora | grep -qw docker; then
+  pass "docker setup keeps the docker group without granting it to the install user"
 else
   id -nG omedora >&2
-  fail "docker setup created the docker group and added the install user"
+  fail "docker setup keeps the docker group without granting it to the install user"
 fi
 
 dnf -y -q remove podman-docker >/tmp/podman-docker-remove.out 2>&1 || true
