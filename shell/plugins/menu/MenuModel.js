@@ -595,6 +595,39 @@ function guardHelpers() {
     + 'omarchy-cmd-missing() { local c; for c in "$@"; do command -v "$c" &>/dev/null || return 0; done; return 1; }\n'
 }
 
+// Omedora: Fedora has no pacman, so the snapshot above comes back empty and
+// every package guard would answer "not installed", hiding each Remove row and
+// never greying out an Install one. The real helpers resolve Arch names
+// through install/packages/fedora.toml (bin/fedora/pkg.py), so on Fedora the
+// set comes from there instead: one `pkg.py installed` for every name the
+// guards spell out, which is one rpm query and one flatpak listing however
+// many rows ask. A name built at run time was never asked about, so it goes
+// to the real helper rather than reading as absent. Arch never enters this.
+function fedoraPackageGuards(guards) {
+  var names = {}
+  var calls = String(guards).match(/omarchy-pkg-(?:present|missing)(?:[ \t]+[A-Za-z0-9@_][A-Za-z0-9@._+-]*)+/g) || []
+  for (var i = 0; i < calls.length; i++) {
+    var words = calls[i].split(/[ \t]+/)
+    for (var j = 1; j < words.length; j++) names[words[j]] = true
+  }
+  var list = Object.keys(names).join(" ")
+  var lookup = list
+    ? '  if __omarchy_pkg_bin=$(type -P omarchy-pkg-present)'
+      + ' && __omarchy_pkg_found=$("${__omarchy_pkg_bin%/*}/fedora/pkg.py" installed ' + list + ' 2>/dev/null); then\n'
+      + '    for __omarchy_pkg in ' + list + '; do __omarchy_pkg_asked[$__omarchy_pkg]=1; done\n'
+      + '    for __omarchy_pkg in $__omarchy_pkg_found; do __omarchy_pkgs[$__omarchy_pkg]=1; done\n'
+      + '  fi\n'
+    : ''
+
+  return 'if [[ ${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null)} == fedora ]]; then\n'
+    + '  __omarchy_pkgs=()\n'
+    + '  declare -A __omarchy_pkg_asked=()\n'
+    + lookup
+    + '  __omarchy_pkg_has() { [[ -n ${__omarchy_pkgs[$1]-} ]] && return 0; '
+    + '[[ -n ${__omarchy_pkg_asked[$1]-} ]] && return 1; command omarchy-pkg-present "$1" &>/dev/null; }\n'
+    + 'fi\n'
+}
+
 // Substitute the captured answer into the expression rather than shadowing
 // the reader with a function. `$(reader)` and the variable holding what it
 // printed are interchangeable -- both strip trailing newlines, both split the
@@ -625,7 +658,7 @@ function guardPrelude(guards) {
       + value + "=${" + value + "%\"${" + value + "##*[!$'\\n']}\"}\n"
   }
 
-  return start + guardHelpers() + collect
+  return start + guardHelpers() + fedoraPackageGuards(guards) + collect
 }
 
 function guardReaderSlot(index) {

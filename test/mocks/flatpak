@@ -4,8 +4,17 @@
 # Test-time controls (env vars):
 #   MOCK_LOG                  Path to append the invocation log
 #   MOCK_FLATPAK_INSTALLED    Space-separated list of "installed" app IDs
-#                             (used by `flatpak info <id>` checks)
+#                             (used by `flatpak info <id>` checks and
+#                             listed by `flatpak list`)
 printf 'flatpak %s\n' "$*" >>"${MOCK_LOG:-/tmp/mock.log}"
+
+# `flatpak list --columns=application`: one installed app id per line.
+if [[ ${1:-} == "list" ]]; then
+  for app in ${MOCK_FLATPAK_INSTALLED:-}; do
+    printf '%s\n' "$app"
+  done
+  exit 0
+fi
 
 if [[ ${1:-} == "info" && -n ${2:-} ]]; then
   for app in ${MOCK_FLATPAK_INSTALLED:-}; do
