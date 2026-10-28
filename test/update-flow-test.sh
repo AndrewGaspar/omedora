@@ -85,7 +85,12 @@ stub omedora-snapshot 'printf "omedora-snapshot %s\n" "$*" >>"$MOCK_LOG"'
 stub omarchy-pkg-missing 'exit 1'
 stub gum              'exit 0'
 
+stub systemd-run      'printf "systemd-run %s\n" "$*" >>"$MOCK_LOG"; while [[ $1 == -* ]]; do shift; done; exec "$@"'
+
 export PATH="$SHIM:$ROOT/bin:$PATH"
+# The updater scopes dnf only on a systemd-booted host. Keep the default
+# fixtures host-independent; the scope contract below fakes the booted marker.
+export OMEDORA_SYSTEMD_RUNTIME_DIR="$SCRATCH/not-booted"
 
 run_fedora() { ( export OMARCHY_DISTRO=fedora; : >"$MOCK_LOG"; "$@" ); }
 
@@ -471,6 +476,56 @@ fi
 grep -q '^dnf install ' "$MOCK_LOG" \
   && fail "candidate query failure reaches no install transaction" \
   || pass "candidate query failure reaches no install transaction"
+
+# A systemd upgrade's scriptlets re-exec every user manager, which can SIGKILL a
+# dnf inside the user session. Like upstream's omarchy-update-pacman, every dnf
+# call must run as a PID 1 scope on a systemd-booted host, and only there.
+SCOPE_STATE="$SCRATCH/scope-installed"
+scope_update() {
+  printf '%s\n' 'omedora 1.0-1 test-omedora-4' 'omedora-settings 1.0-1 test-omedora-4' >"$SCOPE_STATE"
+  run_fedora env \
+    OMEDORA_SYSTEMD_RUNTIME_DIR="$1" \
+    OMARCHY_FEDORA_MAP="$UPDATE_MAP" \
+    OMARCHY_BASE_PKGS="$UPDATE_BASE" \
+    OMEDORA_BASELINE_PKGS="$UPDATE_BASELINE" \
+    OMEDORA_COPR_PROJECT="test/omedora-4" \
+    OMEDORA_COPR_REPO_ID="test-omedora-4" \
+    UPDATE_CORE_CANDIDATES=$'omedora 2.0-1 omedora-0:2.0-1.noarch test-omedora-4\nomedora-settings 2.0-1 omedora-settings-0:2.0-1.noarch test-omedora-4' \
+    UPDATE_INSTALLED_FILE="$SCOPE_STATE" \
+    UPDATE_POST_INSTALLED=$'omedora 2.0-1 test-omedora-4\nomedora-settings 2.0-1 test-omedora-4' \
+    UPDATE_MANAGED_CANDIDATES=$'base-rpm\nnew-base\nbaseline-rpm\noptional-rpm' \
+    bash "$ROOT/bin/omarchy-update-system-pkgs" >/dev/null
+}
+mkdir -p "$SCRATCH/booted"
+scope_update "$SCRATCH/booted"
+sudo_dnf_lines=$(grep -E '^sudo .*dnf ' "$MOCK_LOG" || true)
+[[ -n $sudo_dnf_lines ]] || { cat "$MOCK_LOG" >&2; fail "booted update reaches dnf through sudo"; }
+unscoped=$(grep -vE '^sudo systemd-run --scope --quiet --collect dnf ' <<<"$sudo_dnf_lines" || true)
+[[ -z $unscoped ]] \
+  && pass "every dnf call runs as a PID 1 scope on a systemd-booted host" \
+  || { printf '%s\n' "$unscoped" >&2; fail "every dnf call runs as a PID 1 scope on a systemd-booted host"; }
+for verb in "copr enable" "install --refresh" "repoquery --available"; do
+  grep -qE "^sudo systemd-run --scope --quiet --collect dnf $verb" "$MOCK_LOG" \
+    && pass "scoped dnf covers $verb" \
+    || { cat "$MOCK_LOG" >&2; fail "scoped dnf covers $verb"; }
+done
+grep -qE '^dnf install .*--allow-downgrade' "$MOCK_LOG" \
+  && pass "the scoped core transaction still reaches dnf" \
+  || { cat "$MOCK_LOG" >&2; fail "the scoped core transaction still reaches dnf"; }
+
+scope_update "$SCRATCH/not-booted"
+grep -q 'systemd-run' "$MOCK_LOG" \
+  && { cat "$MOCK_LOG" >&2; fail "a host without systemd (a container) keeps plain sudo dnf"; } \
+  || pass "a host without systemd (a container) keeps plain sudo dnf"
+grep -qE '^sudo dnf install ' "$MOCK_LOG" \
+  && pass "the unbooted update still installs through sudo dnf" \
+  || { cat "$MOCK_LOG" >&2; fail "the unbooted update still installs through sudo dnf"; }
+
+ln -s "$SCRATCH/booted" "$SCRATCH/booted-link"
+scope_update "$SCRATCH/booted-link"
+grep -q 'systemd-run' "$MOCK_LOG" \
+  && fail "a symlinked /run/systemd/system is not treated as booted (upstream's check)" \
+  || pass "a symlinked /run/systemd/system is not treated as booted (upstream's check)"
 
 run_fedora bash "$ROOT/bin/omarchy-update-aur-pkgs" >/dev/null
 grep -qE "yay|pacman" "$MOCK_LOG" \
