@@ -109,16 +109,16 @@ function menuHits(query) {
 }
 assertDeepEqual(
   menuHits('theme'),
-  ['style.theme', 'install.style.theme', 'remove.theme', 'update.themes'],
+  ['appearance.theme', 'install.style.theme', 'remove.theme', 'appearance.windows.corners.theme', 'update.themes'],
   'menu drilldown search reaches the same theme rows in the same order'
 )
-assertDeepEqual(menuHits('style'), ['install.style', 'style'], 'menu drilldown search reaches the same style rows in the same order')
+assertDeepEqual(menuHits('style'), ['install.style', 'appearance'], 'menu drilldown search reaches the same style rows in the same order')
 
 // The normalizer lives on the matching side only. filterText is what the
 // search field shows and what dmenu hands back as the answer, so a dictated
 // period has to survive in it even though the matcher ignores it.
 assert(
-  menuQml.includes('root.setFilter(root.filterText + event.text)'),
+  menuQml.includes('root.setFilter(Util.editedFilter(event, root.filterText))'),
   'typed and dictated characters still land in filterText verbatim'
 )
 assert(
