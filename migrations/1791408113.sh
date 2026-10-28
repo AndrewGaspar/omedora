@@ -1,5 +1,9 @@
 echo "Make the ASUS ProArt P14 keyboard's top row send media keys by default"
 
+# omedora: Arch-only on Fedora — kernel module options/initramfs are Fedora's
+# (omedora/AGENTS.md §6).
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # See install/hardware/asus/fix-asus-proart-p14-fkeys.sh. hid-asus loads from
 # the initramfs, so the option needs a rebuild to reach it.
 conf="${OMARCHY_HID_ASUS_CONF:-/etc/modprobe.d/hid_asus.conf}"

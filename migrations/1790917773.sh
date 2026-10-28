@@ -1,5 +1,9 @@
 echo "Boot N1x laptops quietly so Plymouth stays up from the LUKS prompt to login"
 
+# omedora: Arch-only on Fedora — kernel command line/Plymouth/initramfs are
+# Fedora's (omedora/AGENTS.md §6).
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # Early N1x installs added loglevel=7, systemd.show_status=1 and friends to the
 # default boot entry for bring-up. They come after Omarchy's quiet splash on the
 # command line and win, so kernel and systemd messages print over Plymouth after

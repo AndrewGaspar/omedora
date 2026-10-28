@@ -1,5 +1,9 @@
 echo "Rebuild the boot image so a non-Latin keyboard layout stays out of the LUKS prompt"
 
+# omedora: Arch-only on Fedora — the initramfs and the LUKS prompt keymap are
+# Fedora's (dracut; omedora/AGENTS.md §6).
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # Since 26.134.222-3, Arch's plymouth hook copies vconsole.conf into the
 # initramfs itself, although omarchy_hooks.conf leaves it out of FILES for a
 # first layout that types no Latin letters. Plymouth then asks for the LUKS

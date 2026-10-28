@@ -1,5 +1,9 @@
 echo "Turn on USB4 and Thunderbolt on the N1x"
 
+# omedora: Arch-only on Fedora — kernel parameters/initramfs are Fedora's
+# (omedora/AGENTS.md §6).
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # See install/hardware/n1x.sh: linux-omarchy-n1x drives the USB4 host routers
 # only when the USB4 resources stay powered, and docks need bus numbers set
 # aside below the unconfigured tunnel root ports.

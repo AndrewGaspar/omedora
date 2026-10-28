@@ -1,5 +1,8 @@
 echo "Drop the N1x rescue entry and pacman hook that the fallback entry replaces"
 
+# omedora: Arch-only on Fedora — Limine entries and pacman hooks are Arch-only.
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # Installs that ran the n1x-xps16 branch built the N1x rescue entry as its own
 # UKI (linux-omarchy-n1x-rescue) and rebuilt it from a pacman hook running
 # omarchy-refresh-n1x-rescue. limine-mkinitcpio-hook's fallback entry replaces

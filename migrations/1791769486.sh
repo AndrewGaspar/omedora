@@ -1,5 +1,9 @@
 echo "Remove approval for new USB and Thunderbolt devices"
 
+# omedora: Arch-only on Fedora — the USB/Thunderbolt approval feature never
+# shipped on Fedora, and its cleanup edits Limine and reads pacman state.
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # Approval for new accessories (#11874) shipped briefly to edge and dev. The
 # package update has already removed its commands, units and Polkit rules; this
 # undoes what they left on the machine so devices connect as they did before.

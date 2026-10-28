@@ -1,5 +1,9 @@
 echo "Boot the DGX Spark without a UKI to skip a 20-second firmware delay"
 
+# omedora: Arch-only on Fedora — boot entries (Limine/UKI) are Fedora's
+# (omedora/AGENTS.md §6).
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # Existing installs predate the install-time setting, which Limine only applies
 # on a rebuild. The marker stops another user's run from repeating the
 # machine-wide rebuild, while a missing marker retries an interrupted one.

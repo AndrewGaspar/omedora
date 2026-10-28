@@ -1,5 +1,9 @@
 echo "Speed up the boot menu and keep it quiet until a key is pressed"
 
+# omedora: Arch-only on Fedora — the boot menu (Limine) is Fedora's
+# (omedora/AGENTS.md §6).
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # Limine waits out its menu timeout on every boot and draws the menu while
 # it does. timeout: 1 with quiet: yes makes the boot silent and
 # near-instant; any key still shows the menu, and System > Reboot to Boot
