@@ -125,10 +125,15 @@ else
 fi
 
 # --- the L1 suite still passes on the installed system ----------------------------
+# The menu tests need node, which the install puts in the user's global mise
+# config. A login shell gets it through `mise activate`; this `su -c` shell
+# does not, so use mise's shims as a terminal would.
+l1_path="${XDG_DATA_HOME:-$HOME/.local/share}/mise/shims:$PATH"
+check "node resolves through the user's mise shims" env PATH="$l1_path" node --version
 l1_fails=0
 for t in "$REPO"/test/*.sh; do
   case "$t" in */helpers.sh) continue ;; esac
-  if ! out=$(bash "$t" 2>&1); then
+  if ! out=$(PATH="$l1_path" bash "$t" 2>&1); then
     echo "  L1 failed: $t — output tail:" >&2
     printf '%s\n' "$out" | tail -30 >&2
     l1_fails=1
