@@ -76,6 +76,12 @@ SPECS=(
   # On-demand (not in any base package set); the Fedora installer installs the
   # base only. No intra-stack BuildRequires.
   voxtype.spec
+  # openclaw: the seed Install > AI > OpenClaw and `omarchy-default-agent
+  # openclaw` set the self-updating ~/.openclaw copy up from (the npm release
+  # tarball + upstream's install-cli.sh, as Omarchy's Arch package ships). A
+  # noarch copy of files, so nothing is vendored. On-demand (not in any base
+  # package set). No intra-stack BuildRequires.
+  openclaw.spec
   # omarchy-nvim.spec is intentionally NOT built: its %build bakes the plugin
   # cache via a headless `:Lazy! sync` that fetches ~50 plugins from GitHub,
   # which fails in COPR's offline mock build. Nothing Requires it, so instead
