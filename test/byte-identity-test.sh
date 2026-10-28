@@ -142,10 +142,51 @@ if ! omarchy-cmd-browser-handoff "$browser_exec" --app="$1" "${@:2}"; then
 #  4. Setup > Defaults > Dictation > Superwhisper gains a `when` distro gate:
 #     superwhisper-bin is skip-mapped, so its installer would die running
 #     /usr/share/superwhisper/setup-user. Unwind if Fedora gets a package.
+#  5. Install and Setup > Defaults rows whose app has no Fedora source (every
+#     package they install is skip-mapped in install/packages/fedora.toml, or
+#     its installer needs one, e.g. umu-launcher, dropbox-cli, a DKMS module)
+#     gain the same distro gate (`&&`-ed onto an existing `when`). A Setup >
+#     Defaults browser/editor row stays visible on Fedora once that app's
+#     command is installed (`|| omarchy-cmd-present <cmd>`), since selecting it
+#     then installs nothing. test/menu-pkg-audit-test.sh keeps the set honest.
+#     Unwind a row when its package gets a Fedora mapping.
 ALLOW["default/omarchy/omarchy-menu.jsonc"]='  "install.aur": {"icon":"󰣇","label":"AUR","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install"},
   "update.omarchy": {"icon":"","iconFont":"omarchy","label":"Omarchy","action":"omarchy-launch-floating-terminal-with-presentation omarchy-update"},
   "install.ai.claude": {"icon":"","iconFont":"omarchy","label":"Claude Desktop","disabled":"omarchy-pkg-present claude-desktop","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-ai-claude"},
-  "setup.default.dictation.superwhisper": {"icon":"","label":"Superwhisper","checked":"[[ \"$(omarchy-default-dictation)\" == \"superwhisper\" ]]","action":"omarchy-default-dictation superwhisper"},'
+  "setup.default.dictation.superwhisper": {"icon":"","label":"Superwhisper","checked":"[[ \"$(omarchy-default-dictation)\" == \"superwhisper\" ]]","action":"omarchy-default-dictation superwhisper"},
+  "install.browser.chrome": {"icon":"","label":"Chrome","disabled":"omarchy-pkg-present google-chrome","action":"omarchy-launch-floating-terminal-with-presentation '"'"'omarchy-install-browser chrome'"'"'"},
+  "install.browser.edge": {"icon":"󰇩","label":"Edge","when":"omarchy-hw-x86","disabled":"omarchy-pkg-present microsoft-edge-stable-bin","action":"omarchy-launch-floating-terminal-with-presentation '"'"'omarchy-install-browser edge'"'"'"},
+  "install.browser.brave": {"icon":"","label":"Brave","disabled":"omarchy-pkg-present brave-bin","action":"omarchy-launch-floating-terminal-with-presentation '"'"'omarchy-install-browser brave'"'"'"},
+  "install.browser.brave-origin": {"icon":"","label":"Brave Origin","disabled":"omarchy-pkg-present brave-origin-bin","action":"omarchy-launch-floating-terminal-with-presentation '"'"'omarchy-install-browser brave-origin'"'"'"},
+  "install.browser.zen": {"icon":"󰖟","label":"Zen","disabled":"omarchy-pkg-present zen-browser-bin","action":"omarchy-launch-floating-terminal-with-presentation '"'"'omarchy-install-browser zen'"'"'"},
+  "install.service.1password": {"icon":"󰢁","label":"1Password","disabled":"omarchy-pkg-present 1password","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-service-1password"},
+  "install.service.dropbox": {"icon":"","label":"Dropbox","when":"[[ $(getconf PAGESIZE) == 4096 ]]","disabled":"omarchy-pkg-present dropbox","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-service-dropbox"},
+  "install.service.nordvpn": {"icon":"󱇱","label":"NordVPN","disabled":"omarchy-pkg-present nordvpn-bin","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-service-nordvpn"},
+  "install.service.once": {"icon":"󰏖","label":"ONCE","disabled":"omarchy-pkg-present once-bin","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-service-once"},
+  "install.editor.vscode": {"icon":"","label":"VSCode","disabled":"omarchy-pkg-present visual-studio-code-bin","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-editor-vscode"},
+  "install.editor.cursor": {"icon":"","iconFont":"omarchy","label":"Cursor","disabled":"omarchy-pkg-present cursor-bin","action":"omarchy-install-and-launch Cursor cursor-bin cursor"},
+  "install.editor.zed": {"icon":"","label":"Zed","disabled":"omarchy-pkg-present zed","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-editor-zed"},
+  "install.editor.sublime": {"icon":"","label":"Sublime Text","disabled":"omarchy-pkg-present sublime-text-4","action":"omarchy-install-and-launch '"'"'Sublime Text'"'"' sublime-text-4 sublime_text"},
+  "install.editor.emacs": {"icon":"","label":"Emacs","disabled":"omarchy-pkg-present omarchy-emacs","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-editor-emacs"},
+  "install.ai.chatgpt": {"icon":"","iconFont":"omarchy","label":"ChatGPT Desktop","disabled":"omarchy-pkg-present openai-codex-desktop","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-ai-chatgpt"},
+  "install.ai.grok-bot": {"icon":"","iconFont":"omarchy","label":"Grok Bot","disabled":"omarchy-pkg-present grok-bot","action":"omarchy-install-and-launch '"'"'Grok Bot'"'"' grok-bot grok-bot"},
+  "install.ai.hermes": {"icon":"","iconFont":"omarchy","label":"Hermes Desktop","disabled":"omarchy-pkg-present hermes-desktop","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-ai-hermes"},
+  "install.ai.lm-studio": {"icon":"","iconFont":"omarchy","label":"LM Studio","disabled":"omarchy-pkg-present lmstudio-bin","action":"omarchy-install-app '"'"'LM Studio'"'"' lmstudio-bin"},
+  "install.ai.perplexity": {"icon":"","iconFont":"omarchy","label":"Perplexity","disabled":"omarchy-pkg-present perplexity","action":"omarchy-install-and-launch Perplexity perplexity perplexity"},
+  "install.gaming.xbox-controllers": {"icon":"󰂯","label":"Xbox Controllers","disabled":"omarchy-pkg-present xpadneo-dkms","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-gaming-xbox-controllers"},
+  "install.gaming.battlenet": {"icon":"","label":"Battle.net","when":"omarchy-hw-x86","disabled":"[[ -d $HOME/Games/battlenet ]]","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-gaming-battlenet"},
+  "install.development.php.symfony": {"icon":"","label":"Symfony","disabled":"omarchy-pkg-present symfony-cli","action":"omarchy-launch-floating-terminal-with-presentation '"'"'omarchy-install-dev-env symfony'"'"'"},
+  "setup.default.agent.hermes": {"icon":"","iconFont":"omarchy","label":"Hermes","checked":"[[ \"$(omarchy-default-agent)\" == \"hermes\" ]]","action":"omarchy-default-agent hermes"},
+  "setup.default.browser.chrome": {"icon":"󰊯","label":"Chrome","checked":"[[ \"$(omarchy-default-browser)\" == \"chrome\" ]]","action":"omarchy-default-browser chrome"},
+  "setup.default.browser.edge": {"icon":"󰇩","label":"Edge","checked":"[[ \"$(omarchy-default-browser)\" == \"edge\" ]]","action":"omarchy-default-browser edge"},
+  "setup.default.browser.brave": {"icon":"󰖟","label":"Brave","checked":"[[ \"$(omarchy-default-browser)\" == \"brave\" ]]","action":"omarchy-default-browser brave"},
+  "setup.default.browser.brave-origin": {"icon":"󰖟","label":"Brave Origin","checked":"[[ \"$(omarchy-default-browser)\" == \"brave-origin\" ]]","action":"omarchy-default-browser brave-origin"},
+  "setup.default.browser.zen": {"icon":"󰖟","label":"Zen","checked":"[[ \"$(omarchy-default-browser)\" == \"zen\" ]]","action":"omarchy-default-browser zen"},
+  "setup.default.editor.vscode": {"icon":"","label":"VSCode","checked":"[[ \"$(omarchy-default-editor)\" == \"code\" ]]","action":"omarchy-default-editor code"},
+  "setup.default.editor.cursor": {"icon":"","iconFont":"omarchy","label":"Cursor","checked":"[[ \"$(omarchy-default-editor)\" == \"cursor\" ]]","action":"omarchy-default-editor cursor"},
+  "setup.default.editor.zed": {"icon":"","label":"Zed","checked":"[[ \"$(omarchy-default-editor)\" == \"zeditor\" ]]","action":"omarchy-default-editor zed"},
+  "setup.default.editor.sublime": {"icon":"","label":"Sublime Text","checked":"[[ \"$(omarchy-default-editor)\" == \"subl\" ]]","action":"omarchy-default-editor sublime_text"},
+  "setup.default.editor.emacs": {"icon":" ","label":"Emacs","checked":"[[ \"$(omarchy-default-editor)\" == \"emacs\" ]]","action":"omarchy-default-editor emacs"},'
 # --- the audit ---------------------------------------------------------------
 # Modified upstream files = files that differ from the pin AND exist on the pin
 # (so omedora-ADDED files like bin/omedora-* are out of scope — they have no
@@ -159,7 +200,7 @@ ALLOW["default/omarchy/omarchy-menu.jsonc"]='  "install.aur": {"icon":"󰣇","la
 declare -A CARRIED
 CARRIED["shell/plugins/bar/Bar.qml"]='bar keyboard navigation: a focus ring over the bar icons'
 CARRIED["shell/Ui/PanelKeyCatcher.qml"]='XF86Back handling: up one menu level, close at root'
-CARRIED["shell/plugins/menu/MenuModel.js"]='menu search tolerates dictated punctuation and filler words; XF86Back handling; Fedora port: package guards resolve through pkg.py installed (fedoraPackageGuards); the upstream pacman snapshot is unchanged'
+CARRIED["shell/plugins/menu/MenuModel.js"]='menu search tolerates dictated punctuation and filler words; XF86Back handling; Fedora port: package guards resolve through pkg.py installed (fedoraPackageGuards); the upstream pacman snapshot is unchanged; omarchy-distro is a guard reader, read once for the menu distro gates'
 CARRIED["shell/plugins/panels/bluetooth/Model.js"]='Bluetooth panel: rename a device, show its friendly name, match either name'
 CARRIED["shell/plugins/panels/bluetooth/Panel.qml"]='Bluetooth panel: rename a device, show its friendly name'
 CARRIED["test/shell.d/bluetooth-test.sh"]='tests for the Bluetooth rename / friendly-name feature'
