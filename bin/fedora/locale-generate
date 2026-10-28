@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# Fedora sibling of omarchy-locale-generate (Setup > Language). Arch generates
+# locales from /etc/locale.gen with locale-gen; Fedora ships them prebuilt in
+# glibc-langpack-<lang> packages and has neither. Same contract as the Arch
+# helper: the code only selects a locale from the packaged registry, and nothing
+# the caller passes reaches the package manager.
+#
+# omedora-settings doesn't ship upstream's passwordless sudoers grant for this
+# helper, so omarchy-language reaches it through sudo or pkexec with a prompt.
+
+set -euo pipefail
+
+if (( EUID == 0 )); then
+  export PATH=/usr/bin:/usr/sbin:/bin:/sbin
+fi
+
+registry=/usr/share/omarchy/default/i18n/locales.json
+if (( EUID != 0 )); then
+  registry=${OMARCHY_LOCALE_REGISTRY:-$registry}
+fi
+
+code=${1:-}
+if (( $# != 1 )) || [[ ! $code =~ ^[a-z]{2,3}(-[A-Za-z]{2})?$ ]]; then
+  echo "Usage: omarchy-locale-generate <code>" >&2
+  exit 1
+fi
+
+locale=$(jq -r --arg code "$code" '.[$code].locale // empty' "$registry")
+if [[ ! $locale =~ ^([a-z]{2,3})_[A-Z]{2}\.UTF-8$ ]]; then
+  echo "Unknown language code: $code" >&2
+  exit 1
+fi
+lang=${BASH_REMATCH[1]}
+
+# Already available (glibc-all-langpacks, or the langpack is installed).
+want=$(tr -cd 'a-zA-Z0-9' <<<"$locale" | tr '[:upper:]' '[:lower:]')
+if locale -a 2>/dev/null | tr -cd 'a-zA-Z0-9\n' | tr '[:upper:]' '[:lower:]' | grep -qx "$want"; then
+  exit 0
+fi
+
+# omarchy-language runs this as root (sudo or pkexec). Unprivileged runs are
+# tests and development; they go through sudo, and OMEDORA_DNF_CMD stubs dnf.
+if (( EUID == 0 )); then
+  dnf install -y "glibc-langpack-$lang" >/dev/null
+else
+  sudo "${OMEDORA_DNF_CMD:-dnf}" install -y "glibc-langpack-$lang" >/dev/null
+fi

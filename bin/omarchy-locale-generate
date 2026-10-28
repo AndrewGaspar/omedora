@@ -15,6 +15,13 @@ if (( EUID == 0 )); then
   export PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin
 fi
 
+# Fedora dispatch: locales come prebuilt in glibc-langpack packages there, so
+# there is no locale.gen or locale-gen. The sibling keeps this helper's
+# registry-only contract. The Arch body below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora) exec "$(dirname -- "${BASH_SOURCE[0]}")/fedora/locale-generate" "$@" ;;
+esac
+
 # Root reads only the packaged registry and the real locale.gen; the
 # overrides are for unprivileged tests (same convention as omarchy-language).
 registry=/usr/share/omarchy/default/i18n/locales.json
