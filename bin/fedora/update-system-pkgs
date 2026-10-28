@@ -4,7 +4,21 @@ set -euo pipefail
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 read -r -a resolver_cmd <<<"${OMEDORA_MANAGED_RESOLVER:-python3 $script_dir/managed_packages.py}"
-read -r -a dnf_cmd <<<"${OMEDORA_DNF_CMD:-sudo dnf}"
+# Mirror bin/omarchy-update-pacman: a systemd upgrade's scriptlets re-exec every
+# user manager, which can SIGKILL a dnf running inside the user session's
+# cgroup and abandon the transaction halfway. Registering dnf as a PID 1 scope
+# moves it out of the user manager's cgroups, and system scopes survive the
+# system manager's own re-exec. Only on a systemd-booted host (containers
+# without systemd keep plain sudo dnf). OMEDORA_SYSTEMD_RUNTIME_DIR is a test
+# seam for /run/systemd/system; OMEDORA_DNF_CMD replaces the whole command.
+systemd_runtime_dir=${OMEDORA_SYSTEMD_RUNTIME_DIR:-/run/systemd/system}
+if [[ -n ${OMEDORA_DNF_CMD:-} ]]; then
+  read -r -a dnf_cmd <<<"$OMEDORA_DNF_CMD"
+elif [[ -d $systemd_runtime_dir && ! -L $systemd_runtime_dir ]]; then
+  dnf_cmd=(sudo systemd-run --scope --quiet --collect dnf)
+else
+  dnf_cmd=(sudo dnf)
+fi
 
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/omedora-managed-update.XXXXXX")
 trap 'rm -rf "$work_dir"' EXIT

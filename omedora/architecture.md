@@ -172,6 +172,9 @@ in a separate scoped transaction that excludes both core names, followed by the
 same identity verification. It resolves once more from the potentially updated
 core payload and repeats only if that managed list changed. It never runs an
 unscoped `dnf upgrade`, so unrelated Fedora RPMs remain the user's responsibility.
+Like upstream's `omarchy-update-pacman`, every dnf call runs as a PID 1 scope
+(`sudo systemd-run --scope`) on a systemd-booted host, so a systemd upgrade's
+user-manager re-exec cannot kill the transaction from inside the session.
 `bin/omedora-update-pkgs` is only a compatibility wrapper to the same sibling.
 
 ## 12. Release packaging
