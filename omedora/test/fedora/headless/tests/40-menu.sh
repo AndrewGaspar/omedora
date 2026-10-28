@@ -12,6 +12,14 @@
 # (system) prove routing works, and `omarchy-menu ping` proves the plugin's
 # call surface answers.
 #
+# Then the package-gated rows: with voxtype installed through omarchy-pkg-add
+# (voxtype-bin -> the voxtype RPM), Remove must list Dictation, and Install >
+# AI must never list the skip-mapped, distro-gated Grok Bot. The menu answers
+# such guards in one batch that upstream builds from pacman; on Fedora that
+# hid every package-gated Remove row until the batch learned to ask
+# bin/fedora/pkg.py. Read off the screen with tesseract, as upstream's
+# acceptance tests do.
+#
 # This replaces the 3.8.2-era golden-image 40-menu.sh: the walker-rendered
 # menu panel is gone, and the structural signal we actually gated on — "the
 # menu opens, renders a surface, and closes" — is asserted directly via
@@ -67,3 +75,69 @@ fi
 screenshot "${TEST_NAME}-system"
 omarchy-menu close >/dev/null 2>&1
 wait_for_layer_gone "$NS" 10 || true
+
+# 5. Package-gated rows follow the Fedora package map.
+menu_text() {
+  local shot="$ARTIFACTS/${TEST_NAME}-ocr.png"
+  grim -s 2 "$shot" >/dev/null 2>&1 || return 1
+  tesseract "$shot" stdout --psm 11 2>/dev/null
+}
+
+# Opens <route> and waits (guards land asynchronously) until the screen does
+# (want=1) or does not (want=0) show <word>; the text read is kept as
+# $ARTIFACTS/<test>-<tag>.txt.
+menu_shows() {
+  local route="$1" word="$2" want="$3" tag="$4" text=""
+  omarchy-menu summon "$route" >/dev/null 2>&1
+  wait_for_layer "$NS" 10 || return 1
+  for _ in {1..10}; do
+    sleep 1
+    text=$(menu_text) || continue
+    if grep -qi "$word" <<<"$text"; then (( want == 1 )) && break; else (( want == 0 )) && break; fi
+  done
+  printf '%s\n' "$text" >"$ARTIFACTS/${TEST_NAME}-$tag.txt"
+  screenshot "${TEST_NAME}-$tag"
+  omarchy-menu close >/dev/null 2>&1
+  wait_for_layer_gone "$NS" 10 || true
+  local shown=0
+  grep -qi "$word" <<<"$text" && shown=1
+  (( shown == want ))
+}
+
+if ! command -v tesseract >/dev/null || ! command -v grim >/dev/null; then
+  _fail_with_artifacts "tesseract and grim are present to read the menu (both are base packages)"
+fi
+
+voxtype_was_installed=false
+rpm -q voxtype >/dev/null 2>&1 && voxtype_was_installed=true
+if ! $voxtype_was_installed; then
+  if menu_shows remove dictation 0 remove-0; then
+    pass "Remove lists no Dictation while voxtype is not installed"
+  else
+    _fail_with_artifacts "Remove lists no Dictation while voxtype is not installed"
+  fi
+  omarchy-pkg-add voxtype-bin >"$ARTIFACTS/${TEST_NAME}-pkg-add.log" 2>&1 ||
+    _fail_with_artifacts "omarchy-pkg-add voxtype-bin installs the voxtype RPM"
+fi
+rpm -q voxtype >/dev/null 2>&1 || _fail_with_artifacts "voxtype-bin resolves to the voxtype RPM"
+
+if menu_shows remove dictation 1 remove-1; then
+  pass "Remove lists Dictation once voxtype is installed (guard answered through pkg.py)"
+else
+  _fail_with_artifacts "Remove lists Dictation once voxtype is installed (guard answered through pkg.py)"
+fi
+
+# Ollama (shown while the ollama command is absent) proves the OCR read the
+# Install > AI list before Grok Bot's absence is taken to mean anything.
+if menu_shows install.ai ollama 1 install-ai; then
+  pass "Install > AI renders its rows (Ollama is listed)"
+else
+  _fail_with_artifacts "Install > AI renders its rows (Ollama is listed)"
+fi
+if grep -qi "grok" "$ARTIFACTS/${TEST_NAME}-install-ai.txt"; then
+  _fail_with_artifacts "Install > AI never lists the skip-mapped Grok Bot on Fedora"
+else
+  pass "Install > AI never lists the skip-mapped Grok Bot on Fedora"
+fi
+
+$voxtype_was_installed || sudo dnf remove -y voxtype >/dev/null 2>&1 || true
