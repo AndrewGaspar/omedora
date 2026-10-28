@@ -466,6 +466,10 @@ reason = "Intel Low Power Mode Daemon; not packaged on Fedora; users with Intel 
 source = "skip"
 reason = "Pacman hook for kernel module cleanup; Fedora's dnf has equivalent behavior built-in."
 
+[sunshine]
+source = "skip"
+reason = "omarchy install service sunshine (CLI only). Not in Fedora or RPM Fusion. LizardByte's own lizardbyte/stable COPR packages it (as `Sunshine`), but a third-party COPR needs allowlist approval (packages.md §7). The Flathub build (dev.lizardbyte.app.Sunshine) does not fit the command: it has no KMS capture (Wayland capture goes through the portal), no host `sunshine` binary or `sunshine` user unit for the command's systemctl enable and Hyprland autostart, no /usr/share/sunshine icon, and needs its privileged additional-install.sh for the input udev rules. bin/omarchy-install-service-sunshine exits with a message on Fedora before changing anything."
+
 # --- Omarchy 4 additions (new in install/omarchy-base.packages on the 4.x line)
 
 [networkmanager]

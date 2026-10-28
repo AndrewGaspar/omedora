@@ -3,6 +3,17 @@
 # omarchy:summary=Install Sunshine and open Moonlight streaming ports for LAN and Tailscale.
 # omarchy:requires-sudo=true
 
+# Fedora gate — no Sunshine package Omedora can install (see [sunshine] in
+# install/packages/fedora.toml). Stop before the user unit, firewall and
+# autostart steps, which need the native package.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora)
+    echo "Sunshine is not available through Omedora on Fedora; nothing was changed." >&2
+    echo "LizardByte publishes Fedora packages: https://docs.lizardbyte.dev/projects/sunshine" >&2
+    exit 1
+    ;;
+esac
+
 set -e
 
 TCP_PORTS=(47984 47989 48010)
