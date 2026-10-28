@@ -51,6 +51,9 @@ jobs:
         # shell/plugins/menu/MenuModel.js, as the menu does.
         run: bash test/menu-guard-fedora-test.sh
 
+      - name: Run menu x package-map audit
+        run: bash test/menu-pkg-audit-test.sh
+
       - name: Run adopt-user test
         run: bash test/adopt-user-test.sh
 
