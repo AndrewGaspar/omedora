@@ -299,18 +299,27 @@ The COPR SRPM step runs the same vendoring path so COPR's offline build phase ha
 
 ## 5. Local repositories in tests
 
-The local repo from [`build-repo.sh`](#build-scripts) is a test fixture: a directory of RPMs plus `createrepo_c` metadata that dnf can install from. The L4 nested-session build wires it into the install container so candidate specs can be tested before publication. Production installation, update, L3, and VM release gates use the live Omedora COPR.
+The local repo from [`build-repo.sh`](#build-scripts) is a test fixture: a directory of RPMs plus `createrepo_c` metadata that dnf can install from. The `--local-repo` mode of the L4 nested-session build (`build-session.sh`, `headless/run-tests.sh`) installs from it so candidate RPMs can be tested before publication. Production installation and update, the default L3 and L4 runs, and the VM release gates use the live Omedora COPR.
 
-`omedora/test/fedora/build-session.sh` does this in two steps:
+The repo lives at `omedora/packaging/copr/repo/` (`repo-f<N>/` for `OMEDORA_FEDORA_RELEASE` ≠ 44). It **overlays** the COPR rather than replacing it: `omedora/test/fedora/lib/local-repo-overlay.sh`, run as root in the test container before the bootstrap, writes
 
-1. **Build the repo** (step 0): if `omedora/packaging/copr/repo/repodata/repomd.xml` (`repo-f<N>/` for `OMEDORA_FEDORA_RELEASE` ≠ 44) is missing or older than a spec (or `--rebuild-repo`), it runs `build-repo.sh` first.
-2. **Inject it** (step 2.5), after the base image is booted but before `install.sh` runs:
-   ```bash
-   podman cp "$LOCAL_REPO_DIR" "$BUILD_CTR:/opt/omedora-repo"
-   podman exec "$BUILD_CTR" bash -c \
-     'printf "[omedora-local]\nname=Omedora local packages\nbaseurl=file:///opt/omedora-repo\nenabled=1\ngpgcheck=0\n" >/etc/yum.repos.d/omedora-local.repo'
-   ```
-   That drops the RPMs in `/opt/omedora-repo` and a `.repo` pointing dnf at them. From that point packages including `walker`, `elephant`, `swayosd`, `ttfx`, `omacalc`, `herdr`, and `omedora-nerd-fonts` install through ordinary dnf dependency resolution.
+```ini
+[omedora-local]
+baseurl=file:///<repo dir in the container>
+enabled=1
+gpgcheck=0
+priority=1
+```
+
+to `/etc/yum.repos.d/omedora-local.repo` and enables the COPR itself. Every package in the local repo wins over the COPR whatever its version; everything else (the Hyprland stack, Quickshell, uwsm, …) still comes from the COPR. The bootstrap sees the `.repo` file, so `plan.sh` discloses "omedora local test repo", `release.sh` skips the COPR release probe and `repos.sh` skips its own COPR enable.
+
+So building the two core specs is enough:
+
+```bash
+omedora/packaging/copr/build-repo.sh omedora-settings.spec omedora.spec
+```
+
+They package `git archive HEAD` (self-source mode), so `build-repo.sh` rebuilds them whenever HEAD has moved since their last build, and `build-session.sh --local-repo` rebuilds a local repo whose core RPMs are not HEAD's build (their Release ends in `git<HEAD sha7>`). Build any other spec by name to overlay it as well. `OMEDORA_LOCAL_REPO_ONLY=1` skips the COPR enable, for a Fedora release the COPR does not build yet; the local repo then has to hold the whole published set.
 
 This injection does not change `fedora.toml`: Omedora-owned RPMs remain `source = "dnf"` because the Omedora COPR is a first-party repository enabled by the install/update flow. `source = "copr"` is reserved for lazily enabled third-party COPRs.
 
