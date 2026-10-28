@@ -23,7 +23,8 @@ fzf_args=(
 pkg_names=$(dnf -q repoquery --userinstalled --qf '%{name}\n' 2>/dev/null | sort -u | fzf "${fzf_args[@]}")
 
 if [[ -n $pkg_names ]]; then
-  # Convert newline-separated selections to space-separated for dnf
-  echo "$pkg_names" | tr '\n' ' ' | xargs sudo dnf remove -y
+  # Like upstream's pacman -Rns, never take other installed packages with the
+  # selection: pkg.py keeps (and names) a pick something else still needs.
+  echo "$pkg_names" | tr '\n' ' ' | xargs "$(dirname -- "${BASH_SOURCE[0]}")/pkg.py" drop --rpm
   omarchy-show-done
 fi
