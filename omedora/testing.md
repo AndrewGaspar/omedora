@@ -160,10 +160,44 @@ omedora/test/fedora/run-smoke.sh
 Additional package-backed release gates include:
 
 ```bash
-omedora/test/fedora/update-verify.sh
+omedora/test/fedora/run-smoke.sh --update-verify   # runs update-verify.sh
 omedora/test/fedora/upgrade-from-beta1-verify.sh
 omedora/test/fedora/upgrade-to-4-verify.sh
 ```
+
+### Local-repo mode
+
+By default the smoke installs every package from the live COPR, so it tests
+published RPMs. To smoke-test unreleased core RPMs, use `--local-repo` (or
+`OMEDORA_LOCAL_REPO=1`), which works like `build-session.sh --local-repo`:
+
+```bash
+omedora/test/fedora/run-smoke.sh --local-repo
+omedora/test/fedora/run-smoke.sh --update-verify --local-repo
+OMEDORA_FEDORA_RELEASE=45 omedora/test/fedora/run-smoke.sh --local-repo
+```
+
+The runner uses `packaging/copr/repo` (`repo-f<N>` for
+`OMEDORA_FEDORA_RELEASE=<N>`) and builds the omedora and omedora-settings RPMs
+from HEAD first when the repo does not hold HEAD's build (`--rebuild-repo`
+forces a rebuild). Inside the container the repo overlays the COPR at
+`priority=1`. The smoke then checks that:
+
+- the plan disclosed "omedora local test repo" as the package source, instead
+  of the COPR line that the default mode requires;
+- both core RPMs came from `omedora-local` and carry HEAD's `git<sha7>` release
+  stamp;
+- Hyprland still came from the COPR.
+
+`update-verify.sh` re-checks the core RPMs after both updates.
+
+The post-install L1 run passes in both modes, because
+`test/coexistence-plan-test.sh` reads a scratch `OMEDORA_LOCAL_REPO_FILE`
+instead of the container's real repo file.
+
+`run-release-upgrade.sh` has no local-repo mode. A local repo holds packages
+for one Fedora release, so it cannot follow the upgrade to the next. Its
+default checkout mode already gates unreleased Omedora code.
 
 Some scripts are designed to run inside a prepared Fedora test image rather
 than directly on the host. Read each header and use the documented runner. A

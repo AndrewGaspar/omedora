@@ -14,16 +14,44 @@
 #      dropped into the installed payload runs and is recorded for the user
 #   5. omarchy-update-available writes the shell widget's state files
 #
-# Run: podman run --rm -v "$PWD:/repo" -v <dnf-cache>:/var/cache/libdnf5 \
+# Run: omedora/test/fedora/run-smoke.sh --update-verify [--local-repo]
+#  or: podman run --rm -v "$PWD:/repo" -v <dnf-cache>:/var/cache/libdnf5 \
 #        omedora-test:fedora44 bash /repo/omedora/test/fedora/update-verify.sh
+#
+# Local-repo mode (run-smoke.sh --update-verify --local-repo): as in smoke.sh,
+# OMEDORA_TEST_LOCAL_REPO is overlaid on the COPR before the install, and the
+# core RPMs must come from it with OMEDORA_TEST_EXPECT_TAG before and after
+# both updates (the managed update must not swap them for the COPR's).
 
 set -e
 
 REPO="${REPO:-/repo}"
+LOCAL_REPO="${OMEDORA_TEST_LOCAL_REPO:-}"
+EXPECT_TAG="${OMEDORA_TEST_EXPECT_TAG:-}"
+
+# assert_local_core <when> — local-repo mode: the core RPMs are HEAD's build
+# from the local repo.
+assert_local_core() {
+  [[ -n $LOCAL_REPO ]] || return 0
+  local pkg from_repo
+  for pkg in omedora omedora-settings; do
+    from_repo=$(dnf repoquery --installed --qf '%{from_repo}\n' "$pkg" | head -n1)
+    if [[ $from_repo != "omedora-local" ]] || ! rpm -q "$pkg" | grep -qF "$EXPECT_TAG."; then
+      echo "LOCAL CORE RPM CHECK FAILED $1: $(rpm -q "$pkg") from $from_repo (want $EXPECT_TAG from omedora-local)"
+      exit 1
+    fi
+  done
+  echo "core RPMs are the local $EXPECT_TAG build $1"
+}
+
+if [[ -n $LOCAL_REPO ]]; then
+  bash "$REPO/omedora/test/fedora/lib/local-repo-overlay.sh" "$LOCAL_REPO"
+fi
 
 su omedora -c "OMEDORA_PLAN_AUTOCONFIRM=1 bash $REPO/omedora/install-4.sh" >/tmp/install.log 2>&1 \
   || { echo "INSTALL FAILED"; tail -5 /tmp/install.log; exit 1; }
 echo "install ok ($(rpm -q omedora))"
+assert_local_core "after install"
 
 # omarchy-update re-execs itself under script(1) to log the run, so inside it
 # stdin is a pty and omarchy-update-stay-awake runs `sudo -v` to cache the
@@ -54,6 +82,7 @@ if grep -q "pacman" /tmp/up1.log; then
   exit 1
 fi
 echo "no pacman in the Fedora update path"
+assert_local_core "after both updates"
 
 # Per-user migration path. Upstream unified migrations on 2026-06-12: there is
 # no system runner any more and the omedora RPM's %post applies nothing, so
