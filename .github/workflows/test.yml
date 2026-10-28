@@ -109,6 +109,9 @@ jobs:
       - name: Run voxtype-install test
         run: bash test/voxtype-install-test.sh
 
+      - name: Run locale-generate-fedora test
+        run: bash test/locale-generate-fedora-test.sh
+
       - name: Run voxtype-spec static guard
         run: bash test/voxtype-spec-test.sh
 
