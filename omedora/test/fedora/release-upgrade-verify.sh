@@ -31,12 +31,22 @@
 #   installed the omedora RPM payload from the COPR; the post-release gate
 #
 # OMEDORA_UPGRADE_TO picks the target release (default: current + 1).
+#
+# Local-repo mode (run-release-upgrade.sh --local-repo): OMEDORA_TEST_LOCAL_REPO
+# holds one local repo per release (<dir>/<release>). The overlay is pointed at
+# <dir>/$releasever, so the install takes the core RPMs from the old release's
+# repo and the offline upgrade from the new one's. They must come from
+# omedora-local with OMEDORA_TEST_EXPECT_TAG throughout, and the updates name
+# omedora-local as the core repository (update-system-pkgs'
+# OMEDORA_COPR_REPO_ID seam), as update-verify.sh does.
 
 set -euo pipefail
 
 PHASE="${1:-}"
 REPO="${REPO:-/repo}"
 CODE_MODE="${OMEDORA_UPGRADE_CODE:-checkout}"
+LOCAL_REPO="${OMEDORA_TEST_LOCAL_REPO:-}"
+EXPECT_TAG="${OMEDORA_TEST_EXPECT_TAG:-}"
 OFFLINE_DIR=/usr/lib/sysimage/libdnf5/offline
 LOG_DIR=/var/tmp/release-upgrade
 mkdir -p "$LOG_DIR"
@@ -88,6 +98,29 @@ as_user() {
   su omedora -c "$env_prefix $*"
 }
 
+# update_as_user <log> — one `omarchy update`; in local-repo mode the managed
+# update reconciles the core RPMs to omedora-local instead of the COPR.
+update_as_user() {
+  local env_prefix=""
+  [[ -z $LOCAL_REPO ]] || env_prefix="OMEDORA_COPR_REPO_ID=omedora-local"
+  as_user "$env_prefix timeout 1800 omarchy-update -y" >"$1" 2>&1
+}
+
+# assert_local_core <when> — local-repo mode: the core RPMs are HEAD's build
+# for the running release, from omedora-local.
+assert_local_core() {
+  [[ -n $LOCAL_REPO ]] || return 0
+  local pkg from_repo dist
+  dist=".fc$(. /etc/os-release && echo "$VERSION_ID")"
+  for pkg in omedora omedora-settings; do
+    from_repo=$(dnf repoquery --installed --qf '%{from_repo}\n' "$pkg" | head -n1)
+    if [[ $from_repo != "omedora-local" ]] || ! rpm -q "$pkg" | grep -qF "$EXPECT_TAG$dist."; then
+      die "core RPMs are the local $EXPECT_TAG$dist build $1 ($(rpm -q "$pkg") from $from_repo)"
+    fi
+  done
+  ok "core RPMs are the local $EXPECT_TAG$dist build $1"
+}
+
 snapshot_checkout() {
   mkdir -p "$CHECKOUT"
   tar -C "$REPO" --exclude=./.git \
@@ -114,10 +147,22 @@ upgrade_phase() {
   printf 'Defaults:omedora !authenticate\n' >/etc/sudoers.d/zz-omedora-test-noauth
   chmod 0440 /etc/sudoers.d/zz-omedora-test-noauth
 
+  if [[ -n $LOCAL_REPO ]]; then
+    [[ -f $LOCAL_REPO/$TO_RELEASE/repodata/repomd.xml ]] \
+      || die "a local repo for Fedora $TO_RELEASE at $LOCAL_REPO/$TO_RELEASE"
+    bash "$REPO/omedora/test/fedora/lib/local-repo-overlay.sh" "$LOCAL_REPO/$FROM_RELEASE" \
+      >"$LOG_DIR/overlay.log" 2>&1 || die "overlay the local repo" "$LOG_DIR/overlay.log"
+    # Literal $releasever: dnf expands it, so the offline upgrade's
+    # --releasever picks the target release's repo.
+    sed -i "s|^baseurl=.*|baseurl=file://$LOCAL_REPO/\\\$releasever|" /etc/yum.repos.d/omedora-local.repo
+    ok "local repo overlaid on the COPR for Fedora $FROM_RELEASE and $TO_RELEASE"
+  fi
+
   # --- 1. install on the old release --------------------------------------------
   su omedora -c "OMEDORA_PLAN_AUTOCONFIRM=1 bash $REPO/omedora/install-4.sh" \
     >"$LOG_DIR/install.log" 2>&1 || die "bootstrap on Fedora $FROM_RELEASE" "$LOG_DIR/install.log"
   ok "bootstrap on Fedora $FROM_RELEASE ($(rpm -q omedora))"
+  assert_local_core "after the bootstrap"
 
   if [[ $CODE_MODE == "checkout" ]]; then
     snapshot_checkout || die "snapshot the checkout into $CHECKOUT"
@@ -128,9 +173,10 @@ upgrade_phase() {
     chmod 0440 /etc/sudoers.d/omarchy-dev-path
   fi
 
-  as_user "timeout 1800 omarchy-update -y" >"$LOG_DIR/update-before.log" 2>&1 \
+  update_as_user "$LOG_DIR/update-before.log" \
     || die "omarchy update on Fedora $FROM_RELEASE" "$LOG_DIR/update-before.log"
   ok "omarchy update on Fedora $FROM_RELEASE"
+  assert_local_core "after the update"
 
   copr_inventory >"$LOG_DIR/before.txt"
   (( $(wc -l <"$LOG_DIR/before.txt") > 10 )) \
@@ -209,13 +255,15 @@ verify_phase() {
     | grep -E '^(omedora|hypr|quickshell|uwsm|aquamarine|xdg-desktop-portal-hyprland)' || true)
   [[ -z $stale ]] || die "no Omedora-stack package still carries .fc$FROM_RELEASE: $stale"
   ok "no Omedora-stack package still carries .fc$FROM_RELEASE"
+  assert_local_core "after the upgrade"
 
   # --- 5. the updater on the new release ---------------------------------------------
   for run in 1 2; do
-    as_user "timeout 1800 omarchy-update -y" >"$LOG_DIR/update-after-$run.log" 2>&1 \
+    update_as_user "$LOG_DIR/update-after-$run.log" \
       || die "omarchy update run $run on Fedora $TO_RELEASE" "$LOG_DIR/update-after-$run.log"
     ok "omarchy update run $run on Fedora $TO_RELEASE"
   done
+  assert_local_core "after both updates"
 
   echo "# release upgrade Fedora $FROM_RELEASE -> $TO_RELEASE: ALL GREEN"
 }
