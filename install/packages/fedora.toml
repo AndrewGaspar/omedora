@@ -323,7 +323,7 @@ reason = "AUR helper; AUR doesn't exist on Fedora. omedora-pkg-aur-add on Fedora
 [hyprland]
 source = "dnf"
 names = ["hyprland-no-session"]
-reason = "Hyprland not in Fedora 44 main repos; vendored as omedora/packaging/copr/hyprland.spec (0.56.1). On the Omarchy-4 line we install the hyprland-no-session subpackage (compositor + libs, NO wayland-sessions entries): omedora-settings ships the only session entry (omedora.desktop), so plain 'Hyprland' entries never appear in GDM. Replaces the retired hyprland-omedora shim, which omedora-settings Obsoletes. (Arch still installs the real hyprland.)"
+reason = "Hyprland not in Fedora 44 main repos; vendored as omedora/packaging/copr/hyprland.spec (0.56.2). On the Omarchy-4 line we install the hyprland-no-session subpackage (compositor + libs, NO wayland-sessions entries): omedora-settings ships the only session entry (omedora.desktop), so plain 'Hyprland' entries never appear in GDM. Replaces the retired hyprland-omedora shim, which omedora-settings Obsoletes. (Arch still installs the real hyprland.)"
 
 [hyprland-no-session]
 source = "dnf"
@@ -505,3 +505,100 @@ reason = "voxtype-bin (the Arch package) maps to the single 'voxtype' RPM we bui
 source = "dnf"
 names = ["yaru-theme"]
 reason = "Fedora packages the Yaru icon set inside the yaru-theme package (no standalone yaru-icon-theme). Verify at L3 smoke."
+
+# --- Omarchy 4.5 additions --------------------------------------------------
+
+[vi]
+source = "dnf"
+names = ["vim-minimal"]
+reason = "Fedora's vi is vim-minimal, which Provides vi. pkg.py verifies installs with rpm -q <name>, so the Provides alone isn't enough; name the real package."
+
+[ffmpeg]
+source = "dnf"
+names = ["ffmpeg-free"]
+satisfied_by = ["ffmpeg"]
+reason = "Fedora ships the CLI as ffmpeg-free; RPM Fusion's full ffmpeg conflicts with the *-free libraries mpv already pulls in. A user's RPM Fusion ffmpeg counts as installed."
+
+[qt6-base]
+source = "dnf"
+names = ["qt6-qtbase-devel"]
+reason = "Migration 1790702362 adds Qt for building Omarchy-style apps (qmake6 and headers). Arch's qt6-base carries those; on Fedora they are in -devel."
+
+[qt6-declarative]
+source = "dnf"
+names = ["qt6-qtdeclarative-devel"]
+reason = "See qt6-base: development files for building Qt Quick apps."
+
+[qt6-multimedia]
+source = "dnf"
+names = ["qt6-qtmultimedia-devel"]
+reason = "See qt6-base."
+
+[qt6-svg]
+source = "dnf"
+names = ["qt6-qtsvg-devel"]
+reason = "See qt6-base."
+
+[qt6-wayland]
+source = "dnf"
+names = ["qt6-qtwayland-devel"]
+reason = "See qt6-base."
+
+[pipewire-libcamera]
+source = "dnf"
+names = ["pipewire-plugin-libcamera"]
+reason = "Fedora's name for PipeWire's libcamera backend (Qualcomm and ThinkPad T14s camera scripts)."
+
+[omarchy-power-profiles-daemon]
+source = "skip"
+reason = "Omarchy's power-profiles-daemon fork (ARM cppc profiles). Omedora keeps Fedora's tuned-ppd plus the powerprofilesctl shim (see power-profiles-daemon). The entry must exist: a skip counts as installed, which keeps migration 1791554699's pacman swap from ever being reached."
+
+[superwhisper-bin]
+source = "skip"
+reason = "Proprietary vendor tarball (tux.superwhisper.com), not redistributable through a COPR (same reasoning as claude-code). It is 4.5's default dictation backend; on Fedora dictation stays unbound until a backend is installed (Setup > Defaults > Dictation > Voxtype uses the COPR voxtype RPM)."
+
+[omasnap]
+source = "dnf"
+names = ["omasnap"]
+reason = "4.5's screenshot + annotation overlay (Qt6/C++, github.com/omacom/omasnap, MIT). omarchy-capture-screenshot execs it. Not in Fedora; built from source by omedora/packaging/copr/omasnap.spec (CMake, no vendoring). Needs a COPR build before the 4.5 release."
+
+[owe]
+source = "dnf"
+names = ["owe"]
+reason = "Omarchy's video wallpaper engine (C/meson, github.com/omacom/owe): theme intro and video backgrounds, owed.service, and the theme-set sync hook. Not in Fedora; built from source by omedora/packaging/copr/owe.spec. Needs a COPR build before the 4.5 release."
+
+[owe-lockfeed]
+source = "skip"
+reason = "owe's lock-screen QML feed plugin. 4.5's lock screen uses a still poster, not the feed, and owe.spec doesn't build the plugin yet. Only migration 1789764927 asks for it."
+
+[omarchy-hyprland-titlebars]
+source = "skip"
+reason = "Hyprland plugin (hyprbars fork) for 4.5's floating-workspace mode. It must be built against the exact hyprland-devel EVR and rebuilt with every hyprland.spec build; not packaged yet. workspace-modes.lua skips titlebars when the .so is absent."
+
+[hype]
+source = "skip"
+reason = "Markdown slides app (Qt6, github.com/omacom/hype), a removable preinstall. Not packaged yet; a qmake build like omacut.spec would do."
+
+[monologue]
+source = "skip"
+reason = "Webcam recorder (Qt6, github.com/omacom/monologue), a removable preinstall. Not packaged yet; a qmake build like omacut.spec would do."
+
+[signed]
+source = "skip"
+reason = "PDF signing/filling app (Qt6 + poppler-qt6 + qpdf, github.com/omacom/signed), a removable preinstall. Not packaged yet; a qmake build like omacut.spec would do."
+
+[gliff]
+source = "skip"
+reason = "Hyprland remote desktop over SSH (Rust, github.com/omacom/gliff). A COPR build needs vendored crates (see the Rust/COPR vendoring rule). The remote-session indicator just finds no gliff-server."
+
+[disktree-bin]
+source = "skip"
+reason = "Disk-usage treemap GUI (tobi/disktree, Rust). Not packaged yet (a binary repackage like lazygit would do). Migration 1791345484, which swaps dua-cli for it, is Fedora-gated until it is, so users keep dua."
+
+[asus-proart-p14-speaker-firmware]
+source = "skip"
+reason = "Arm (NVIDIA N1x) laptop firmware; Omedora doesn't own firmware or aarch64 platform packages."
+
+[dell-xps13-sidecar-amps]
+source = "skip"
+reason = "Dell XPS 13 speaker amplifier setup that rebuilds the boot image; boot/initramfs are Fedora's. Its migration (1787666837) is Fedora-gated."
