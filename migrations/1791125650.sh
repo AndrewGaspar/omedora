@@ -1,5 +1,10 @@
 echo "Install the fingerprint resume hook on existing fingerprint setups"
 
+# omedora: skipped on Fedora — bin/fedora/setup-lock doesn't install the
+# fprintd resume hook or stop-timeout drop-in; whether Omedora adopts them is a
+# separate review.
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # Existing enrolled machines never rerun setup. Install only missing files
 # so administrator changes survive an upgrade.
 
