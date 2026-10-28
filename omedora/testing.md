@@ -227,7 +227,11 @@ forces a rebuild). Inside the container the repo overlays the COPR at
   stamp;
 - Hyprland still came from the COPR.
 
-`update-verify.sh` re-checks the core RPMs after both updates.
+`update-verify.sh` re-checks the core RPMs after both updates. The managed
+update reconciles the core RPMs to the newest build in the Omedora repository
+(downgrading if need be), which before a release is the previous line's COPR
+build, so in this mode the updates name `omedora-local` as that repository
+through `bin/fedora/update-system-pkgs`' `OMEDORA_COPR_REPO_ID` seam.
 
 The post-install L1 run passes in both modes, because
 `test/coexistence-plan-test.sh` reads a scratch `OMEDORA_LOCAL_REPO_FILE`
