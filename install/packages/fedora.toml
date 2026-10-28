@@ -182,6 +182,11 @@ reason = "Anthropic's CLI is a proprietary self-contained Bun binary (downloads.
 source = "skip"
 reason = "Quattro exposes Grok Bot as an optional menu install, but no grok-bot RPM is available from Fedora, RPM Fusion, or Omedora's enabled repository. Skip instead of letting the menu launch a guaranteed failing dnf transaction; revisit when a redistributable package source exists."
 
+[openclaw]
+source = "dnf"
+names = ["openclaw"]
+reason = "Not in Fedora main or RPM Fusion; Flathub has no OpenClaw. Since Omarchy 4.0.6 the Arch openclaw package is the seed, not the runtime: /usr/share/openclaw holds the npm release tarball, upstream's install-cli.sh and the Control UI icon, and omarchy-install-openclaw-cli sets up the self-updating copy under ~/.openclaw from them. omedora/packaging/copr/openclaw.spec reproduces that layout file for file (noarch; nothing vendored, since npm dependencies resolve on the user's machine when the seed is set up, as on Arch), so the upstream scripts run unchanged. On-demand only (Install > AI > OpenClaw, or choosing OpenClaw as the default agent)."
+
 [omarchy-nvim]
 source = "skip"
 reason = "Not packaged as an RPM on Fedora: the omarchy-nvim build bakes its plugin cache via a headless `:Lazy! sync` that fetches ~50 plugins from GitHub, which fails in COPR's offline mock build. Nothing Requires it (it's just user-level Neovim config + a setup script). Instead install/packaging/nvim.sh bootstraps the same commit-pinned config (omacom-io/omarchy-pkgs) directly on the user's networked machine and runs Lazy sync there. The retired spec/sources remain in omedora/packaging/copr/ (dropped from build-repo.sh) for reference."
