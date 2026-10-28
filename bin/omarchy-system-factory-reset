@@ -5,6 +5,15 @@
 # omarchy:requires-sudo=true
 # omarchy:examples=sudo omarchy-system-factory-reset
 
+# Fedora: the reset swaps btrfs subvolumes for an @factory snapshot made by the
+# Arch installer and rewrites Limine; Fedora installs have neither, and the
+# bootloader and snapshot stack are Fedora's (omedora/AGENTS.md §6). Refuse
+# before self-elevating. The Arch path below is unchanged.
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  echo "Reset Computer isn't available on Omedora: Fedora installs have no factory snapshot." >&2
+  exit 1
+fi
+
 # Returns the machine to provisioning state — fully installed, no user, first-boot
 # setup pending — the state you want before selling or handing the machine on.
 #
