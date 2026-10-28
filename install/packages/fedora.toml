@@ -561,7 +561,7 @@ reason = "Omarchy's power-profiles-daemon fork (ARM cppc profiles). Omedora keep
 [slack-desktop]
 source = "flathub"
 app_id = "com.slack.Slack"
-reason = "4.5's Install > Service > Slack. Slack ships no Fedora repo package we can pull; Flathub's com.slack.Slack is the maintained Linux build. The menu's post-install gtk-launch names Arch's slack.desktop, so the app installs and appears in the launcher but isn't opened automatically."
+reason = "4.5's Install > Service > Slack. Slack ships no Fedora repo package we can pull; Flathub's com.slack.Slack is the maintained Linux build. omarchy-install-and-launch launches it by its Flatpak app id on Fedora."
 
 [superwhisper-bin]
 source = "skip"

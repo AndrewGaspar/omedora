@@ -4,6 +4,19 @@
 # omarchy:args=<display-name> <packages> <desktop-id>
 # omarchy:examples=omarchy install and launch Cursor cursor-bin cursor
 
+# Fedora dispatch — see omedora/architecture.md §3. A package the Fedora map
+# installs from Flathub registers its launcher as <app-id>.desktop, so launch
+# that instead of the Arch desktop id. Arch path below is unchanged.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora)
+    read -r -a fedora_packages <<<"${2-}"
+    if (( ${#fedora_packages[@]} )) &&
+      fedora_app_id=$("$(dirname -- "${BASH_SOURCE[0]}")/fedora/pkg.py" app-id "${fedora_packages[@]}"); then
+      set -- "${1-}" "${2-}" "$fedora_app_id"
+    fi
+    ;;
+esac
+
 name="${1-}"
 packages="${2-}"
 desktop_id="${3-}"
