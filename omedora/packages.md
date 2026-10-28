@@ -299,7 +299,7 @@ The COPR SRPM step runs the same vendoring path so COPR's offline build phase ha
 
 ## 5. Local repositories in tests
 
-The local repo from [`build-repo.sh`](#build-scripts) is a test fixture: a directory of RPMs plus `createrepo_c` metadata that dnf can install from. The `--local-repo` mode of the L4 nested-session build (`build-session.sh`, `headless/run-tests.sh`) installs from it so candidate RPMs can be tested before publication. Production installation and update, the default L3 and L4 runs, and the VM release gates use the live Omedora COPR.
+The local repo from [`build-repo.sh`](#build-scripts) is a test fixture: a directory of RPMs plus `createrepo_c` metadata that dnf can install from. The `--local-repo` modes of the L3 smoke (`run-smoke.sh`, including `--update-verify`) and the L4 nested-session build (`build-session.sh`, `headless/run-tests.sh`) install from it so candidate RPMs can be tested before publication. Production installation and update, the default L3 and L4 runs, and the VM release gates use the live Omedora COPR.
 
 The repo lives at `omedora/packaging/copr/repo/` (`repo-f<N>/` for `OMEDORA_FEDORA_RELEASE` ≠ 44). It **overlays** the COPR rather than replacing it: `omedora/test/fedora/lib/local-repo-overlay.sh`, run as root in the test container before the bootstrap, writes
 
@@ -319,7 +319,7 @@ So building the two core specs is enough:
 omedora/packaging/copr/build-repo.sh omedora-settings.spec omedora.spec
 ```
 
-They package `git archive HEAD` (self-source mode), so `build-repo.sh` rebuilds them whenever HEAD has moved since their last build, and `build-session.sh --local-repo` rebuilds a local repo whose core RPMs are not HEAD's build (their Release ends in `git<HEAD sha7>`). Build any other spec by name to overlay it as well. `OMEDORA_LOCAL_REPO_ONLY=1` skips the COPR enable, for a Fedora release the COPR does not build yet; the local repo then has to hold the whole published set.
+They package `git archive HEAD` (self-source mode), so `build-repo.sh` rebuilds them whenever HEAD has moved since their last build, and both runners rebuild them when the local repo's core RPMs are not HEAD's build (their Release ends in `git<HEAD sha7>`). Build any other spec by name to overlay it as well. `OMEDORA_LOCAL_REPO_ONLY=1` skips the COPR enable, for a Fedora release the COPR does not build yet; the local repo then has to hold the whole published set.
 
 This injection does not change `fedora.toml`: Omedora-owned RPMs remain `source = "dnf"` because the Omedora COPR is a first-party repository enabled by the install/update flow. `source = "copr"` is reserved for lazily enabled third-party COPRs.
 

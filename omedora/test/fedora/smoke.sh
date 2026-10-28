@@ -15,6 +15,14 @@
 #
 # Invoked by run-smoke.sh (or CI) as container root; re-execs as the uid-1000
 # `omedora` user (wheel, NOPASSWD sudo) because the installer refuses root.
+#
+# Local-repo mode (run-smoke.sh --local-repo): OMEDORA_TEST_LOCAL_REPO names a
+# locally built RPM repo inside the container. As root, before the re-exec,
+# lib/local-repo-overlay.sh overlays it on the live COPR (priority=1), so the
+# bootstrap installs omedora + omedora-settings from it and everything else
+# from the COPR. The disclosure check then expects the plan's "omedora local
+# test repo" line instead of the COPR line, and the core RPMs must come from
+# omedora-local carrying OMEDORA_TEST_EXPECT_TAG (git<HEAD sha7>).
 
 set -uo pipefail
 
@@ -24,10 +32,17 @@ if [[ ! -d $REPO/bin ]]; then
   exit 1
 fi
 
+LOCAL_REPO="${OMEDORA_TEST_LOCAL_REPO:-}"
+EXPECT_TAG="${OMEDORA_TEST_EXPECT_TAG:-}"
+
 # --- re-exec as the test user -------------------------------------------------
 if (( EUID == 0 )); then
+  if [[ -n $LOCAL_REPO ]]; then
+    echo "==> smoke: local-repo mode, overlaying $LOCAL_REPO on the COPR"
+    bash "$REPO/omedora/test/fedora/lib/local-repo-overlay.sh" "$LOCAL_REPO" || exit 1
+  fi
   echo "==> smoke: re-running as the omedora user"
-  exec su omedora -c "REPO=$REPO bash $REPO/omedora/test/fedora/smoke.sh"
+  exec su omedora -c "REPO=$REPO OMEDORA_TEST_LOCAL_REPO=$LOCAL_REPO OMEDORA_TEST_EXPECT_TAG=$EXPECT_TAG bash $REPO/omedora/test/fedora/smoke.sh"
 fi
 
 cd "$REPO"
@@ -40,9 +55,15 @@ check() { # check <desc> <cmd...>
   if "$@" >/dev/null 2>&1; then ok "$desc"; else bad "$desc"; fi
 }
 
+from_repo() { dnf repoquery --installed --qf '%{from_repo}\n' "$1" 2>/dev/null | head -n1; }
+copr_project=$(OMARCHY_PATH='' "$REPO/bin/omedora-copr")
+copr_repo_id=$(OMARCHY_PATH='' "$REPO/bin/omedora-copr" --repo-id)
+
 # --- the full bootstrap ---------------------------------------------------------
 echo "==> smoke: running the omedora bootstrap (plan autoconfirmed)"
-if OMEDORA_PLAN_AUTOCONFIRM=1 bash "$REPO/omedora/install-4.sh"; then
+INSTALL_LOG=$(mktemp)
+OMEDORA_PLAN_AUTOCONFIRM=1 bash "$REPO/omedora/install-4.sh" 2>&1 | tee "$INSTALL_LOG"
+if (( PIPESTATUS[0] == 0 )); then
   ok "omedora/install-4.sh completed end-to-end"
 else
   bad "omedora/install-4.sh completed end-to-end"
@@ -50,10 +71,29 @@ else
   exit 1
 fi
 
+# --- package source: disclosed at the plan gate, then actually used ------------
+if [[ -n $LOCAL_REPO ]]; then
+  check "plan disclosed the omedora package source (the local test repo)" \
+    grep -qF "omedora local test repo already present" "$INSTALL_LOG"
+  for pkg in omedora omedora-settings; do
+    check "$pkg installed from the local repo" \
+      test "$(from_repo "$pkg")" == "omedora-local"
+    check "$pkg is HEAD's build ($EXPECT_TAG)" \
+      bash -c "rpm -q $pkg | grep -qF '$EXPECT_TAG.'"
+  done
+else
+  check "plan disclosed the omedora package source ($copr_project)" \
+    grep -qF "enable the omedora COPR: $copr_project" "$INSTALL_LOG"
+  check "omedora installed from the omedora COPR" test "$(from_repo omedora)" == "$copr_repo_id"
+fi
+
 # --- package layer ---------------------------------------------------------------
 check "omedora RPM installed" rpm -q omedora
 check "omedora-settings RPM installed" rpm -q omedora-settings
-check "hyprland compositor installed from the omedora COPR" rpm -q hyprland-no-session
+# (In local-repo mode a hyprland built into the local repo overlays the COPR's.)
+hypr_repo=$(from_repo hyprland-no-session)
+[[ -n $LOCAL_REPO && $hypr_repo == "omedora-local" ]] && hypr_repo=$copr_repo_id
+check "hyprland compositor installed from the omedora COPR" test "$hypr_repo" == "$copr_repo_id"
 check "quickshell installed" rpm -q quickshell
 check "foot installed" rpm -q foot
 check "uwsm installed" rpm -q uwsm
@@ -96,6 +136,7 @@ for t in "$REPO"/test/*.sh; do
 done
 [[ $l1_fails == 0 ]] && ok "full L1 suite green post-install" || bad "full L1 suite green post-install"
 
+rm -f "$INSTALL_LOG"
 if [[ $fails == 0 ]]; then
   echo "# L3 smoke: ALL GREEN"
 else
