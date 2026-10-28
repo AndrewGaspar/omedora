@@ -142,6 +142,9 @@ jobs:
       - name: Run mise-spec static guard
         run: bash test/mise-spec-test.sh
 
+      - name: Run openclaw-spec static guard
+        run: bash test/openclaw-spec-test.sh
+
       - name: Run hypr BuildRequires floor guard
         run: bash test/hypr-buildrequires-floor-test.sh
 
