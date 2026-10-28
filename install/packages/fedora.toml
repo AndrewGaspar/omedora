@@ -616,3 +616,187 @@ reason = "Arm (NVIDIA N1x) laptop firmware; Omedora doesn't own firmware or aarc
 [dell-xps13-sidecar-amps]
 source = "skip"
 reason = "Dell XPS 13 speaker amplifier setup that rebuilds the boot image; boot/initramfs are Fedora's. Its migration (1787666837) is Fedora-gated."
+
+# --- Menu installers (Install / Setup > Defaults rows; test/menu-pkg-audit-test.sh)
+# Every package a menu row checks or installs is mapped here, listed in the
+# audit's reviewed same-name allowlist, or reached only from a row with a
+# Fedora `when` gate. Availability checked against Fedora 44 + RPM Fusion
+# (`dnf repoquery`) and flathub.org on 2026-10-27.
+
+[bitwarden]
+source = "flathub"
+app_id = "com.bitwarden.desktop"
+reason = "Install > Service > Bitwarden. Not in Fedora or RPM Fusion; Flathub's com.bitwarden.desktop is published and verified by Bitwarden Inc. omarchy-install-and-launch launches it by its app id on Fedora."
+
+[bitwarden-cli]
+source = "skip"
+reason = "Bitwarden's CLI ships through npm/snap only; no Fedora, RPM Fusion or Flathub package (the Flathub desktop app carries no CLI). Install > Service > Bitwarden still installs the desktop app; it only reports this skip."
+
+[minecraft-launcher]
+source = "flathub"
+app_id = "com.mojang.Minecraft"
+reason = "Install > Gaming > Minecraft. Mojang ships no Fedora package; Flathub's com.mojang.Minecraft is the long-maintained wrapper of the official launcher. omarchy-install-and-launch launches it by its app id; Remove uninstalls the Flatpak."
+
+[heroic-games-launcher-bin]
+source = "flathub"
+app_id = "com.heroicgameslauncher.hgl"
+reason = "Install > Gaming > Heroic. Not in Fedora or RPM Fusion; Flathub's com.heroicgameslauncher.hgl is verified by the Heroic team. The installer's trailing `gtk-launch heroic` misses the Flatpak's desktop id, so it opens from the launcher instead."
+
+[ollama-cuda]
+source = "dnf"
+names = ["ollama"]
+reason = "Install > AI > Ollama picks ollama-cuda when nvidia-smi exists. Fedora ships no CUDA build (CUDA is not redistributable in Fedora); its ollama runs the CPU and ROCm backends, which is what an NVIDIA machine gets until a CUDA variant exists."
+
+[ollama-rocm]
+source = "dnf"
+names = ["ollama"]
+reason = "Install > AI > Ollama picks ollama-rocm when rocminfo exists. Fedora's single ollama RPM already ships the ROCm backend (/usr/lib/ollama/libggml-hip.so)."
+
+[vim]
+source = "dnf"
+names = ["vim-enhanced"]
+reason = "Install > Editor > Vim and Setup > Defaults > Editor > Vim. Fedora's vim is vim-enhanced, which Provides vim; pkg.py verifies installs with rpm -q <name>, so the Provides alone made `omarchy-pkg-add vim` report a failed install (same as [vi])."
+
+[lib32-vulkan-intel]
+source = "dnf"
+names = ["mesa-vulkan-drivers.i686"]
+reason = "omarchy-install-gaming-gpu-lib32 (Steam, Lutris, Heroic, Battle.net). Fedora's 32-bit Mesa Vulkan drivers (Intel and AMD alike) are the i686 build of mesa-vulkan-drivers; there is no lib32- package."
+
+[lib32-vulkan-radeon]
+source = "dnf"
+names = ["mesa-vulkan-drivers.i686"]
+reason = "See [lib32-vulkan-intel]: the same i686 mesa-vulkan-drivers serves AMD."
+
+[lib32-nvidia-utils]
+source = "skip"
+reason = "NVIDIA's 32-bit userspace on Fedora is RPM Fusion's xorg-x11-drv-nvidia-libs.i686, which pulls the akmod driver stack; kernel drivers are the user's (omedora/AGENTS.md §6). Users on RPM Fusion's driver install it with the driver."
+
+[lib32-nvidia-580xx-utils]
+source = "skip"
+reason = "See [lib32-nvidia-utils]: the legacy-branch NVIDIA userspace is likewise part of the user's driver install."
+
+[wine-staging]
+source = "dnf"
+names = ["wine"]
+reason = "omarchy-install-gaming-lutris. Fedora ships upstream Wine (wine), with no staging build; Lutris downloads its own Wine runners for games that need one."
+
+[wine-gecko]
+source = "dnf"
+names = ["mingw32-wine-gecko", "mingw64-wine-gecko"]
+reason = "omarchy-install-gaming-lutris. Fedora splits Wine's Gecko into the mingw32/mingw64 builds."
+
+[python-protobuf]
+source = "dnf"
+names = ["python3-protobuf"]
+reason = "omarchy-install-gaming-lutris. Fedora's Python 3 module naming."
+
+[umu-launcher]
+source = "skip"
+reason = "Not in Fedora, RPM Fusion or Flathub. Lutris works without it (it fetches its own runtimes), so Install > Gaming > Lutris only reports this skip; Install > Gaming > Battle.net, which runs through umu, is hidden on Fedora. Packaging candidate (Python + zipapp, no compiled parts)."
+
+[openbsd-netcat]
+source = "dnf"
+names = ["netcat"]
+satisfied_by = ["nmap-ncat"]
+reason = "Install > Windows (omarchy-windows-vm). Fedora's netcat is the OpenBSD netcat; nmap-ncat (the usual /usr/bin/nc on Fedora) serves the same purpose and is kept when present."
+
+[dropbox-cli]
+source = "skip"
+reason = "No dropbox-cli on Fedora: RPM Fusion's dropbox ships the same control script as /usr/bin/dropbox, but the Dropbox panel and installer call dropbox-cli, so Install > Service > Dropbox is hidden on Fedora. Follow-up: a Fedora installer with a dropbox-cli shim."
+
+[python-gpgme]
+source = "dnf"
+names = ["python3-gpg"]
+reason = "Dropbox's signature check. Fedora's Python GPGME bindings are python3-gpg."
+
+[t3code-bin]
+source = "skip"
+reason = "AUR-only. Install > AI > T3 Code installs the upstream AppImage on every distro, which Remove > AI > T3 Code already finds by path."
+
+[t3code-nightly-bin]
+source = "skip"
+reason = "See [t3code-bin]."
+
+[claude-desktop]
+source = "skip"
+reason = "Not in Fedora, RPM Fusion or Flathub. Install > AI > Claude Desktop is hidden on Fedora (its row's distro gate), so only Remove's guard asks for it."
+
+[openai-codex-desktop]
+source = "skip"
+reason = "ChatGPT/Codex desktop is AUR-only; not in Fedora, RPM Fusion or Flathub. Install > AI > ChatGPT Desktop is hidden on Fedora."
+
+[hermes-desktop]
+source = "skip"
+reason = "Hermes Desktop: omarchy-install-hermes-cli needs the Arch package's /usr/share/hermes-desktop/install.sh and /opt/hermes-desktop install stamp to set up in-app updates. Not in Fedora, RPM Fusion or Flathub. Install > AI > Hermes and Setup > Defaults > Agent > Hermes are hidden on Fedora. Packaging candidate: an RPM reproducing that layout, like the openclaw seed."
+
+[lmstudio-bin]
+source = "skip"
+reason = "LM Studio ships an AppImage only; not in Fedora, RPM Fusion or Flathub. Install > AI > LM Studio is hidden on Fedora."
+
+[perplexity]
+source = "skip"
+reason = "Perplexity's desktop app is AUR-only; not in Fedora, RPM Fusion or Flathub. Install > AI > Perplexity is hidden on Fedora."
+
+[cursor-bin]
+source = "skip"
+reason = "Cursor publishes no repository or Flathub app (AppImage and one-off .rpm downloads). Install > Editor > Cursor is hidden on Fedora, and Setup > Defaults > Editor > Cursor shows only once `cursor` is installed."
+
+[visual-studio-code-bin]
+source = "skip"
+reason = "Microsoft's VS Code RPM comes from Microsoft's own repo (a third-party repo needs approval, packages.md §7); Flathub's com.visualstudio.code is an unofficial, sandboxed wrapper with no `code` on PATH. Install > Editor > VSCode is hidden on Fedora; Setup > Defaults shows VSCode once `code` is installed."
+
+[zed]
+source = "skip"
+reason = "Zed is not in Fedora or RPM Fusion; Flathub's dev.zed.Zed puts no `zeditor` on PATH, which the Omarchy defaults need. Install > Editor > Zed is hidden on Fedora; Setup > Defaults shows Zed once `zeditor` is installed. Packaging candidate (Rust, large)."
+
+[omazed]
+source = "skip"
+reason = "Omarchy's Zed theme integration, installed with zed; see [zed]."
+
+[sublime-text-4]
+source = "skip"
+reason = "Sublime HQ's RPM comes from its own repo (a third-party repo needs approval, packages.md §7). Install > Editor > Sublime Text is hidden on Fedora; Setup > Defaults shows it once `subl` is installed."
+
+[omarchy-emacs]
+source = "skip"
+reason = "Omarchy's packaged Emacs configuration (omarchy-pkgs); not packaged for Fedora. Install > Editor > Emacs is hidden on Fedora; Setup > Defaults > Editor > Emacs shows once `emacs` (Fedora's own package) is installed."
+
+[google-chrome]
+source = "skip"
+reason = "Chrome comes from Google's own repo (google-chrome-stable; a third-party repo needs approval, packages.md §7), and omarchy-install-browser configures /opt and /etc paths a Flatpak doesn't have. Install > Browser > Chrome is hidden on Fedora; Setup > Defaults shows Chrome once google-chrome-stable is installed."
+
+[microsoft-edge-stable-bin]
+source = "skip"
+reason = "Edge comes from Microsoft's own repo; see [google-chrome]. Setup > Defaults shows Edge once microsoft-edge-stable is installed."
+
+[brave-bin]
+source = "skip"
+reason = "Brave comes from Brave's own repo, and omarchy-install-browser configures /opt/brave.com paths and the `brave` command, which Brave's RPM (brave-browser) and Flathub's com.brave.Browser don't provide. Install > Browser > Brave is hidden on Fedora."
+
+[brave-origin-bin]
+source = "skip"
+reason = "See [brave-bin]."
+
+[zen-browser-bin]
+source = "skip"
+reason = "Zen ships a tarball, AppImage and Flathub app (app.zen_browser.zen) but no Fedora package; omarchy-install-browser expects the `zen-browser` command and zen.desktop. Install > Browser > Zen is hidden on Fedora; Setup > Defaults shows Zen once `zen-browser` is installed."
+
+[1password]
+source = "skip"
+reason = "1Password's RPM comes from its own repo (a third-party repo needs approval, packages.md §7); Flathub's com.onepassword.OnePassword has no `1password` command or browser integration, which the installer uses. Install > Service > 1Password is hidden on Fedora."
+
+[nordvpn-bin]
+source = "skip"
+reason = "NordVPN's RPM comes from its own repo (a third-party repo needs approval). Install > Service > NordVPN is hidden on Fedora."
+
+[once-bin]
+source = "skip"
+reason = "37signals ONCE CLI, AUR-only. Install > Service > ONCE is hidden on Fedora."
+
+[symfony-cli]
+source = "skip"
+reason = "Symfony's CLI comes from Symfony's own Cloudsmith repo (third-party). Install > Development > PHP > Symfony is hidden on Fedora."
+
+[xpadneo-dkms]
+source = "skip"
+reason = "A DKMS kernel module; kernel modules are out of omedora's scope on Fedora (omedora/AGENTS.md §6). Install > Gaming > Xbox Controllers is hidden on Fedora."
