@@ -1,3 +1,9 @@
+# omedora: the system locale is Fedora's (anaconda/localectl, glibc langpacks);
+# there is no /etc/locale.gen or locale-gen. The Arch path below is unchanged.
+if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
+
 # An image built from a distribution's root tarball rather than the ISO (Arch
 # Linux ARM's ships LANG=C) never went through the ISO's locale step, so it
 # runs non-UTF-8: byte-wise sorting, ASCII-only \u escapes, and any tool that
