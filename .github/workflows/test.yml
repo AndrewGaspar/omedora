@@ -114,6 +114,9 @@ jobs:
       - name: Run lock-pam-migration test
         run: bash test/lock-pam-migration-test.sh
 
+      - name: Run auth-removers-fedora test
+        run: bash test/auth-removers-fedora-test.sh
+
       - name: Run voxtype-install test
         run: bash test/voxtype-install-test.sh
 
