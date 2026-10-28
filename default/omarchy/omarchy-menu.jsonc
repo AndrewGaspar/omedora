@@ -228,7 +228,7 @@
   "setup.default.browser.firefox": {"icon":"","label":"Firefox","checked":"[[ \"$(omarchy-default-browser)\" == \"firefox\" ]]","action":"omarchy-default-browser firefox"},
   "setup.default.browser.zen": {"icon":"󰖟","label":"Zen","checked":"[[ \"$(omarchy-default-browser)\" == \"zen\" ]]","action":"omarchy-default-browser zen"},
   "setup.default.dictation": {"icon":"","label":"Dictation","title":"Default Dictation"},
-  "setup.default.dictation.superwhisper": {"icon":"","label":"Superwhisper","checked":"[[ \"$(omarchy-default-dictation)\" == \"superwhisper\" ]]","action":"omarchy-default-dictation superwhisper"},
+  "setup.default.dictation.superwhisper": {"icon":"","label":"Superwhisper","when":"[[ \"$(omarchy-distro)\" != \"fedora\" ]]","checked":"[[ \"$(omarchy-default-dictation)\" == \"superwhisper\" ]]","action":"omarchy-default-dictation superwhisper"},
   "setup.default.dictation.voxtype": {"icon":"","label":"Voxtype","checked":"[[ \"$(omarchy-default-dictation)\" == \"voxtype\" ]]","action":"omarchy-default-dictation voxtype"},
   "setup.default.terminal": {"icon":"","label":"Terminal","title":"Default Terminal"},
   "setup.default.terminal.alacritty": {"icon":"","label":"Alacritty","checked":"[[ \"$(omarchy-default-terminal)\" == \"alacritty\" ]]","action":"omarchy-default-terminal alacritty"},

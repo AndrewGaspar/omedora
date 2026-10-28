@@ -17,6 +17,9 @@
 #            setup and selects voxtype as the dictation backend.
 #   PART 3 — omarchy-remove-dictation-voxtype drops `voxtype-bin` through
 #            omarchy-pkg-drop on both distros and never shells out to dnf.
+#   PART 4 — Voxtype is the seeded default dictation backend on Fedora.
+#   PART 5 — Setup > Defaults > Dictation > Superwhisper is distro-gated, so
+#            Fedora never runs the skip-mapped Superwhisper installer.
 #
 # Everything external is stubbed on PATH; no network, no real dnf. A voxtype the
 # host has installed must never run: the PATH is the stubs plus system
@@ -134,5 +137,36 @@ for dest in '%{buildroot}%{_datadir}/omarchy/config/omarchy/defaults/dictation' 
     && pass "omedora-settings seeds voxtype at $dest" \
     || fail "omedora-settings seeds voxtype at $dest"
 done
+
+# ===========================================================================
+echo "# --- PART 5: Setup > Defaults > Dictation offers only what Fedora can install ---"
+# ===========================================================================
+# superwhisper-bin is skip-mapped, so on Fedora omarchy-pkg-add succeeds without
+# installing anything and omarchy-install-dictation-superwhisper then dies on
+# `bash /usr/share/superwhisper/setup-user`. The menu row carries a distro gate;
+# evaluate it the way the menu does, through guardScript().
+if command -v node >/dev/null; then
+  dictation_guards=$(ROOT="$ROOT" node -e '
+    const fs = require("fs"), path = require("path")
+    const menu = require(path.join(process.env.ROOT, "shell/plugins/menu/MenuModel.js"))
+    const items = menu.parseMenuJsonc(fs.readFileSync(path.join(process.env.ROOT, "default/omarchy/omarchy-menu.jsonc"), "utf8"))
+    const picked = {}
+    for (const id of ["setup.default.dictation.superwhisper", "setup.default.dictation.voxtype"])
+      picked[id] = items.find(item => item.id === id)
+    process.stdout.write(menu.guardScript(picked))
+  ')
+  for distro in fedora arch; do
+    answers=$(OMARCHY_DISTRO=$distro XDG_RUNTIME_DIR="" PATH="$ROOT/bin:$PATH" bash -c "$dictation_guards" 2>/dev/null | sort | tr '\n' ' ')
+    expected=$([[ $distro == fedora ]] && echo 0 || echo 1)
+    [[ $answers == *"setup.default.dictation.superwhisper:w:$expected"* ]] \
+      && pass "$distro: Setup > Defaults > Dictation > Superwhisper when-gate answers $expected" \
+      || fail "$distro: Setup > Defaults > Dictation > Superwhisper when-gate answers $expected (got: $answers)"
+  done
+  [[ $answers != *"setup.default.dictation.voxtype:w:"* ]] \
+    && pass "Setup > Defaults > Dictation > Voxtype stays ungated" \
+    || fail "Setup > Defaults > Dictation > Voxtype stays ungated"
+else
+  pass "# SKIP superwhisper menu gate: node not available"
+fi
 
 echo "# all voxtype-install tests passed"
