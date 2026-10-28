@@ -122,7 +122,7 @@ for pkg, entry in data.items():
     satisfied_by = entry.get("satisfied_by")
     if satisfied_by is not None:
         if source == "skip":
-            err(pkg, "'satisfied_by' is meaningless with source='skip' (skip entries always count as installed)")
+            err(pkg, "'satisfied_by' is meaningless with source='skip' (nothing is installed for a skip entry)")
         if not isinstance(satisfied_by, list) or not satisfied_by:
             err(pkg, "'satisfied_by' must be a non-empty array of RPM names")
         elif not all(isinstance(n, str) and n for n in satisfied_by):

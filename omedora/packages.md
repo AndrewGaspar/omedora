@@ -217,9 +217,15 @@ Notes:
   session bus also skips Flatpaks with a warning; rerun from a desktop session.
   This differs from dnf failures, which abort immediately.
 - There is no `source` case: per-package source installers are [retired](#1-the-package-source-tiers). Packages that aren't in Fedora/RPM Fusion/a vetted COPR/Flathub are either built as omedora-repo RPMs (`source = "dnf"`) or `source = "skip"`.
+- A `skip` entry is never installed, so `present` fails and `missing`
+  succeeds for it (they stay exact complements, as upstream's helpers and the
+  menu's guard shadows assume). A guard such as `omarchy-pkg-present
+  superwhisper-bin` therefore never shows a Remove row or calls a tool Fedora
+  never got, and `if omarchy-pkg-missing X; then omarchy-pkg-add X; fi`
+  reaches `add`, which logs the skip and installs nothing.
 - An inactive `since`/`until` table never falls through to the unchanged Arch
-  name. `add` and `drop` skip it, `present` succeeds, `missing` returns false,
-  and managed-update and ownership resolution omit it. The current schema uses
+  name. It resolves as a skip: `add` and `drop` skip it, `present` fails,
+  `missing` succeeds, and managed-update and ownership resolution omit it. The current schema uses
   version bounds only for conditional omission; it cannot express a different
   fallback mapping outside the range.
 - Resolution is identical whether a `dnf` name lives in Fedora main or the Omedora COPR. The Omedora COPR only has to be *enabled* for the second case to work — see [§4](#4-the-rpmcopr-tier-omedorapackagingcopr) and [§5](#5-local-repositories-in-tests).

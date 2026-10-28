@@ -133,14 +133,16 @@ else
   fail "pkg-add ufw → unexpectedly tried to install"
 fi
 
-# --- omarchy-pkg-missing: skip entry is always "present" ---
+# --- omarchy-pkg-missing: nothing is installed for a skip entry ---
+# Even with every RPM reporting installed: a skip never reaches rpm, so a guard
+# can't mistake whatever answers to the Arch name for the skipped package.
 
 reset_log
 set +e
-"$ROOT/bin/omarchy-pkg-missing" ufw >/dev/null 2>&1
+MOCK_RPM_INSTALLED="*" "$ROOT/bin/omarchy-pkg-missing" ufw >/dev/null 2>&1
 exit_code=$?
 set -e
-assert_equals "pkg-missing ufw (skip) → exit 1 (not missing)" "$exit_code" "1"
+assert_equals "pkg-missing ufw (skip) → exit 0 (missing)" "$exit_code" "0"
 
 # --- omarchy-pkg-missing: returns 0 (missing) for unknown package on empty mock ---
 
@@ -164,10 +166,21 @@ assert_equals "pkg-missing installed-pkg → exit 1 (all present)" "$exit_code" 
 
 reset_log
 set +e
-"$ROOT/bin/omarchy-pkg-present" ufw >/dev/null 2>&1
+MOCK_RPM_INSTALLED="*" "$ROOT/bin/omarchy-pkg-present" ufw >/dev/null 2>&1
 exit_code=$?
 set -e
-assert_equals "pkg-present ufw (skip) → exit 0 (present)" "$exit_code" "0"
+assert_equals "pkg-present ufw (skip) → exit 1 (never present)" "$exit_code" "1"
+
+# A skip among installed packages fails present and satisfies missing, as one
+# absent package does on Arch.
+set +e
+MOCK_RPM_INSTALLED="jq" "$ROOT/bin/omarchy-pkg-present" jq ufw >/dev/null 2>&1
+present_rc=$?
+MOCK_RPM_INSTALLED="jq" "$ROOT/bin/omarchy-pkg-missing" jq ufw >/dev/null 2>&1
+missing_rc=$?
+set -e
+assert_equals "pkg-present jq ufw → exit 1 (the skip is absent)" "$present_rc" "1"
+assert_equals "pkg-missing jq ufw → exit 0 (the skip is absent)" "$missing_rc" "0"
 
 reset_log
 set +e
@@ -196,8 +209,8 @@ present_rc=$?
 OMEDORA_FEDORA_VERSION=44 "$ROOT/bin/omarchy-pkg-missing" future-name >/dev/null 2>&1
 missing_rc=$?
 set -e
-assert_equals "inactive mapping is present for guard semantics" "$present_rc" "0"
-assert_equals "inactive mapping is not missing for guard semantics" "$missing_rc" "1"
+assert_equals "inactive mapping is never present (resolves as a skip)" "$present_rc" "1"
+assert_equals "inactive mapping is missing (resolves as a skip)" "$missing_rc" "0"
 reset_log
 OMEDORA_FEDORA_VERSION=44 "$ROOT/bin/omarchy-pkg-drop" future-name >/dev/null 2>&1
 log_lacks "dnf remove" && pass "inactive mapping removal is a no-op" \
