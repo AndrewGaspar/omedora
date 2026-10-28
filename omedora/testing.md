@@ -98,7 +98,7 @@ For a rebase, run byte identity against the candidate commit when the prepared
 pin tag has not been created yet:
 
 ```bash
-OMEDORA_BASE_TAG=f0020448ca87329199de7cb12f2015ebc4a3e5e7 \
+OMEDORA_BASE_TAG=5978d93ae7da0a325b7493501911e3f1266cadd3 \
   bash test/byte-identity-test.sh
 ```
 
@@ -198,8 +198,8 @@ usable DRM render node and is not available on standard GitHub-hosted runners.
 
 Never update `30-visual-reference.png` solely because a rebase changed pixels.
 Capture the candidate, inspect the difference, identify the intended upstream
-change, and accept a new golden only after human visual review. The official
-4.0.0 Tokyo Night background renumbering therefore remains an explicit L4 item.
+change, and accept a new golden only after human visual review. The 4.5 visual
+changes (theme intros, backgrounds, bar) therefore remain an explicit L4 item.
 
 ## 6. L4 VM
 

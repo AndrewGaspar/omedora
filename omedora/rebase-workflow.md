@@ -11,9 +11,9 @@ a git checkout.
 | Ref | Purpose |
 | --- | --- |
 | `omarchy` remote | `omacom/omarchy` upstream |
-| upstream `v4.0.5` | Official release at `94a8fbc2d67eec5673c7f16b8c5e8a9c8452ffdc` |
+| upstream `v4.5.0-rc2` | Release candidate at `5978d93ae7da0a325b7493501911e3f1266cadd3` |
 | `origin/omedora-4` | Omedora patch stack |
-| `omedora-base-20261018-omarchy4-94a8fbc2` | Immutable pin for this rebase |
+| `omedora-base-20261027-omarchy4-5978d93a` | Immutable pin for this rebase |
 
 The pin label is recorded at the top of [`architecture.md`](architecture.md).
 `test/byte-identity-test.sh` reads it there. During delegated review, before the
@@ -25,7 +25,7 @@ Never rebase a maintainer worktree in place. Fetch the selected upstream object
 without creating a local upstream release tag, then create an isolated branch:
 
 ```bash
-git fetch --no-tags omarchy 94a8fbc2d67eec5673c7f16b8c5e8a9c8452ffdc
+git fetch --no-tags omarchy 5978d93ae7da0a325b7493501911e3f1266cadd3
 git worktree add -b agent/quattro-rebase \
   /home/ajg/code/omedora-quattro-rebase origin/omedora-4
 ```
@@ -34,13 +34,16 @@ Replay only Omedora commits above the previous immutable base:
 
 ```bash
 git rebase --onto \
-  94a8fbc2d67eec5673c7f16b8c5e8a9c8452ffdc \
-  0534987009061cbe2dacdde4ad564092ab698d12
+  5978d93ae7da0a325b7493501911e3f1266cadd3 \
+  94a8fbc2d67eec5673c7f16b8c5e8a9c8452ffdc
 ```
 
 Using explicit `--onto <new-base> <old-base>` is mandatory. Upstream branches
 may be rewritten; a merge-base-derived rebase can accidentally replay upstream
-history as Omedora work.
+history as Omedora work. The 4.5 rebase is the sharp case: `v4.0.5` sits on the
+4.0.x release branch and is not an ancestor of `v4.5.0-rc2` (their merge base
+is `f0020448`), so only the explicit old base replays exactly the Omedora
+commits.
 
 ## 3. Conflict and semantic review
 
@@ -64,6 +67,19 @@ Common cases:
 | Changed help/menu output | Reapply only the narrow branding or availability adaptation |
 | Changed wallpaper/default | Require L4 visual review; do not blindly update the golden |
 
+Hazards the 4.5 rebase added to the list:
+
+| Upstream change | Omedora response |
+| --- | --- |
+| New `etc/` drop-in | `omedora-settings.spec` installs by name; classify each new file as shipped, reference copy, or not installed, and record it in the spec |
+| `#!/bin/bash -p` security entrypoint (`omarchy-security-functions`) | Put the Fedora dispatch at the very top; tests can't drive the Arch body with plain `bash script` |
+| New omacom tool in the base set | Map it: dnf name, a new COPR spec, or a reasoned skip. A skip counts as *installed* for `omarchy-pkg-present`, so check menu `disabled`/`when` and migration conditions that test it |
+| Migration that swaps a tool (`pkg-add new && pkg-drop old`) | If the new one is skip-mapped, gate the migration so users keep the old tool |
+| Lint passes but a migration sources an `install/hardware/*` script | Read it: hardware fixes often rebuild the boot image or install DKMS |
+
+`test/migration-gating-test.sh` stops at its first failure, so list every
+ungated hard-token migration with its regex before fixing them one by one.
+
 Migration files are an explicit exception to the general preference for leaving
 upstream history untouched: an ungated Arch migration blocks the package-backed
 Fedora migration pipeline, so it is patched in place and tested.
@@ -73,14 +89,14 @@ Fedora migration pipeline, so it is patched in place and tested.
 Prepare the label from the rebase date and upstream SHA:
 
 ```bash
-NEWPIN=omedora-base-20261018-omarchy4-94a8fbc2
+NEWPIN=omedora-base-20261027-omarchy4-5978d93a
 ```
 
 After parent review, create the annotated tag at the upstream commit:
 
 ```bash
-git tag -a "$NEWPIN" 94a8fbc2d67eec5673c7f16b8c5e8a9c8452ffdc \
-  -m "Omedora base pin: Omarchy v4.0.5 @ 94a8fbc2"
+git tag -a "$NEWPIN" 5978d93ae7da0a325b7493501911e3f1266cadd3 \
+  -m "Omedora base pin: Omarchy v4.5.0-rc2 @ 5978d93a"
 ```
 
 Do not create or push the tag from delegated implementation work. Existing pin
@@ -91,7 +107,7 @@ tags are immutable and are never moved or deleted.
 Run before and after authored fixes:
 
 ```bash
-OMEDORA_BASE_TAG=94a8fbc2d67eec5673c7f16b8c5e8a9c8452ffdc \
+OMEDORA_BASE_TAG=5978d93ae7da0a325b7493501911e3f1266cadd3 \
   bash test/byte-identity-test.sh
 ```
 
@@ -127,7 +143,7 @@ docker run --rm -v "$PWD:/repo" -w /repo archlinux:latest bash -c '
 Run the fresh-install/update/upgrade gates and both nested-session and VM visual
 gates described in [`testing.md`](testing.md). Report unavailable tiers as
 unavailable. A candidate is not release-ready until new core RPMs exist for L3
-and the official 4.0.5 visual changes have been reviewed at L4.
+and the 4.5 visual changes have been reviewed at L4.
 
 ## 7. Package impact
 
@@ -142,8 +158,11 @@ Determine rebuilds from payload changes, not from the rebase itself:
 - HypXR is a separate package stream. Do not fold another agent's HypXR refresh
   into a Quattro rebase commit.
 
-For the official 4.0.5 rebase, rebuild `omedora` and `omedora-settings`; no
-rebase-driven HypXR ABI rebuild is required.
+For the 4.5 rebase, rebuild `omedora` and `omedora-settings`, and build the
+new `omasnap` and `owe` specs (register both COPR packages first). No Hyprland
+stack bump or HypXR ABI rebuild is required: 4.5 still targets Hyprland 0.56.2.
+Recommended but not blocking: quickshell at upstream `2b4501a28` plus
+Omarchy's `load_qtquick_611.patch`, before Fedora moves to Qt 6.12.
 
 ## 8. Promotion
 
