@@ -237,9 +237,24 @@ The post-install L1 run passes in both modes, because
 `test/coexistence-plan-test.sh` reads a scratch `OMEDORA_LOCAL_REPO_FILE`
 instead of the container's real repo file.
 
-`run-release-upgrade.sh` has no local-repo mode. A local repo holds packages
-for one Fedora release, so it cannot follow the upgrade to the next. Its
-default checkout mode already gates unreleased Omedora code.
+`run-release-upgrade.sh --local-repo` follows the upgrade across two local
+repos. It builds HEAD's core RPMs into both releases' repos (`repo[-f<from>]`
+and `repo-f<to>`), mounts them at `/opt/omedora-repo/<release>`, and points
+the overlay's baseurl at `/opt/omedora-repo/$releasever`, so the install takes
+the old release's build and the offline upgrade the new one's. The core RPMs
+must come from `omedora-local` with HEAD's stamp and the running release's
+dist tag after the install, the first update, the upgrade and the last update.
+
+Checkout mode alone drives the checkout's code against the COPR's core RPMs,
+which is enough while both are from the same Omarchy line. On a new line
+before its first release, the checkout's migrations wait for a settings
+payload the COPR does not serve yet: on the 4.5 line, migration 1791382872
+stays pending until `/etc/mise/conf.d/omarchy-tools.toml` exists, so the
+first `omarchy update` fails. Use `--local-repo` there:
+
+```bash
+omedora/test/fedora/run-release-upgrade.sh --local-repo
+```
 
 Some scripts are designed to run inside a prepared Fedora test image rather
 than directly on the host. Read each header and use the documented runner. A
