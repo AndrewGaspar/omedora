@@ -52,6 +52,7 @@ small `pkg-install`/`pkg-remove` siblings:
 | `omarchy-pkg-add`, `-install`, `-aur-add` | Resolve `install/packages/fedora.toml`; install RPMs or Flatpaks, or skip with a reason |
 | `omarchy-pkg-missing`, `-present` | Query translated RPM names or Flatpak IDs |
 | `omarchy-pkg-drop`, `-remove` | Remove only translated installed targets |
+| `omarchy-install-and-launch` | Launch a Flathub-mapped app by its Flatpak app id (`pkg.py app-id`) instead of the Arch desktop id |
 
 Absence from `fedora.toml` means the package name is valid unchanged through
 dnf. Explicit entries select `dnf`, an allowlisted on-demand `copr`, `flathub`,
