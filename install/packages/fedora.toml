@@ -553,6 +553,11 @@ reason = "Fedora's name for PipeWire's libcamera backend (Qualcomm and ThinkPad 
 source = "skip"
 reason = "Omarchy's power-profiles-daemon fork (ARM cppc profiles). Omedora keeps Fedora's tuned-ppd plus the powerprofilesctl shim (see power-profiles-daemon). The entry must exist: a skip counts as installed, which keeps migration 1791554699's pacman swap from ever being reached."
 
+[slack-desktop]
+source = "flathub"
+app_id = "com.slack.Slack"
+reason = "4.5's Install > Service > Slack. Slack ships no Fedora repo package we can pull; Flathub's com.slack.Slack is the maintained Linux build. The menu's post-install gtk-launch names Arch's slack.desktop, so the app installs and appears in the launcher but isn't opened automatically."
+
 [superwhisper-bin]
 source = "skip"
 reason = "Proprietary vendor tarball (tux.superwhisper.com), not redistributable through a COPR (same reasoning as claude-code). It is 4.5's default dictation backend; on Fedora dictation stays unbound until a backend is installed (Setup > Defaults > Dictation > Voxtype uses the COPR voxtype RPM)."

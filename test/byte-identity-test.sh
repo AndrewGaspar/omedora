@@ -136,8 +136,11 @@ if ! omarchy-cmd-browser-handoff "$browser_exec" --app="$1" "${@:2}"; then
 #  2. The Menu > Update entry is rebranded Omarchy -> Omedora (user-facing
 #     label). learn.omarchy keeps "Omarchy" (it is the actual Omarchy manual).
 #     Unwind if the pin ever ships an Omedora-branded menu.
+#  3. Menu > Install > AI > Claude Desktop (4.5) gains a `when` distro gate:
+#     claude-desktop has no Fedora package. Unwind if one appears.
 ALLOW["default/omarchy/omarchy-menu.jsonc"]='  "install.aur": {"icon":"󰣇","label":"AUR","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install"},
-  "update.omarchy": {"icon":"","iconFont":"omarchy","label":"Omarchy","action":"omarchy-launch-floating-terminal-with-presentation omarchy-update"},'
+  "update.omarchy": {"icon":"","iconFont":"omarchy","label":"Omarchy","action":"omarchy-launch-floating-terminal-with-presentation omarchy-update"},
+  "install.ai.claude": {"icon":"","iconFont":"omarchy","label":"Claude Desktop","disabled":"omarchy-pkg-present claude-desktop","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-ai-claude"},'
 # --- the audit ---------------------------------------------------------------
 # Modified upstream files = files that differ from the pin AND exist on the pin
 # (so omedora-ADDED files like bin/omedora-* are out of scope — they have no
