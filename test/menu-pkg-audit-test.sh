@@ -27,7 +27,14 @@ set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 . "$ROOT/test/helpers.sh"
 
-command -v node >/dev/null || fail "node is required to parse the menu"
+# node parses the menu through MenuModel.js. It is not an Omarchy base package,
+# so an installed system (the L3 smoke reruns this suite there) may lack it:
+# skip there, but never in CI, where it is preinstalled.
+if ! command -v node >/dev/null; then
+  [[ -z ${CI:-} ]] || fail "node is required to parse the menu"
+  echo "ok - # SKIP node is not installed; parsing the menu needs it"
+  exit 0
+fi
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
