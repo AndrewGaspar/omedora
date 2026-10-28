@@ -13,6 +13,8 @@
 #      libavcodec (ffmpeg, the same library libmpv uses) and with mpv itself,
 #      so a codec stack that can't decode them fails here instead of showing a
 #      blank intro.
+#   4. Video thumbnails: the lock poster frame and the image picker's video
+#      thumbnails come from ffmpegthumbnailer.
 #
 # Convention: source ../lib.sh, attach to the session, then assert via TAP.
 source "$(dirname -- "${BASH_SOURCE[0]}")/../lib.sh"
@@ -74,4 +76,34 @@ else
   else
     _fail_with_artifacts "mpv (libmpv's decoder stack) plays an intro"
   fi
+fi
+
+# --- 4. video thumbnails through ffmpegthumbnailer ------------------------------
+# The lock screen's poster frame (shell/plugins/lock/poster.sh) and the image
+# picker's video thumbnails (shell/plugins/image-picker/list.sh) both shell out
+# to ffmpegthumbnailer, which on Fedora links the same libavcodec as above.
+is_jpeg() { [[ -s $1 && $(head -c 3 "$1" | od -An -tx1 | tr -d ' \n') == "ffd8ff" ]]; }
+if (( ${#intros[@]} > 0 )); then
+  thumbs=$(mktemp -d)
+  poster=$(XDG_CACHE_HOME="$thumbs/cache" timeout 20 \
+    "$OMARCHY_PATH/shell/plugins/lock/poster.sh" "${intros[0]}" 2>"$ARTIFACTS/poster.log") || true
+  if [[ -n $poster ]] && is_jpeg "$poster"; then
+    cp "$poster" "$ARTIFACTS/lock-poster.jpg" 2>/dev/null || true
+    pass "lock/poster.sh renders a JPEG poster frame from an intro"
+  else
+    _fail_with_artifacts "lock/poster.sh renders a JPEG poster frame from an intro (got '${poster}')"
+  fi
+
+  mkdir -p "$thumbs/videos"
+  cp "${intros[0]}" "$thumbs/videos/intro.mp4"
+  listing=$(XDG_CACHE_HOME="$thumbs/cache" timeout 60 \
+    "$OMARCHY_PATH/shell/plugins/image-picker/list.sh" "$thumbs/videos" 2>"$ARTIFACTS/image-picker.log") || true
+  printf '%s\n' "$listing" >"$ARTIFACTS/image-picker.tsv"
+  thumb=$(awk -F '\t' -v v="$thumbs/videos/intro.mp4" '$1 == v {print $2; exit}' <<<"$listing")
+  if [[ -n $thumb && $thumb != "$thumbs/videos/intro.mp4" ]] && is_jpeg "$thumb"; then
+    pass "image-picker/list.sh thumbnails a video as a JPEG"
+  else
+    _fail_with_artifacts "image-picker/list.sh thumbnails a video as a JPEG (got '${thumb}')"
+  fi
+  rm -rf "$thumbs"
 fi

@@ -229,11 +229,17 @@ core RPMs do not contain the candidate source, record L3 as blocked on rebuild.
 real PID 1 systemd. `omedora/test/fedora/headless/run-tests.sh` launches a full
 headless session and runs:
 
-- `00-session.sh`: session and IPC health.
+- `00-session.sh`: session and IPC health, and the compositor unit's
+  keep-shell `KillMode=mixed`.
 - `10-launcher.sh`: Quickshell launcher behavior.
 - `20-portals.sh`: portal services and D-Bus ownership.
 - `30-visual.sh`: screenshot comparison against the reviewed reference.
 - `40-menu.sh`: menu behavior.
+- `50-media.sh`: omasnap, owe, intro decoding and ffmpegthumbnailer thumbnails.
+- `60-shell45.sh`: startup cursor restore, notification-server ownership, a
+  toast from `omarchy-notification-send`, and the Shift+Caps compose option.
+- `70-integration45.sh`: dock pins resolve to desktop entries, Chromium's
+  window maps to its pin, and the fcitx5 Qt 6 plugin and theme glyphs exist.
 - `90-workstation.sh`: Fedora Workstation coexistence when selected.
 
 The Workstation variant exercises GNOME coexistence and tuned-ppd. L4 needs a
