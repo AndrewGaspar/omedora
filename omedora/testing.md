@@ -133,6 +133,15 @@ The runner builds `omedora-test:fedora44` (`omedora-test:fedora45` with
 This validates package-map behavior and Fedora-specific setup with real dnf/rpm
 tools. Use `--rebuild` after changing the test image.
 
+It also runs three Omarchy 4.5 system suites that need real Fedora tooling and
+network access:
+
+| Suite | Contract |
+| --- | --- |
+| `xkb-compose-integration.sh` | libxkbcommon reads the shipped `/etc/xkb` files and `omarchy:shift_caps_compose` puts `Multi_key` on Shift+Caps |
+| `name-resolution-integration.sh` | Every base, baseline and Fedora-run hardware name resolves through dnf; installer names that would fail are reported as a TAP TODO; every registry language has a `glibc-langpack`; `omarchy-locale-generate` works under a pkexec-style clean environment |
+| `mise-confd-integration.sh` | The COPR mise lists `/etc/mise/conf.d/omarchy*.toml`, reports no unknown field, applies the settings and creates lazy shims |
+
 ### Arch contract
 
 ```bash

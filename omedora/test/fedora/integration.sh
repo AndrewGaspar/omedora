@@ -396,4 +396,17 @@ else
   fail "real dnf5 core selection/provenance integration"
 fi
 
+# Omarchy 4.5 system surfaces with real Fedora tooling: the Shift+Caps compose
+# option through libxkbcommon, package and langpack names through dnf, and
+# the mise conf.d files through the COPR mise.
+for suite in xkb-compose-integration.sh name-resolution-integration.sh mise-confd-integration.sh; do
+  echo "=== ${suite%.sh} ==="
+  if bash "$REPO/omedora/test/fedora/$suite" >"/tmp/$suite.out" 2>&1; then
+    cat "/tmp/$suite.out"
+  else
+    cat "/tmp/$suite.out" >&2
+    fail "$suite"
+  fi
+done
+
 echo "=== All Fedora L2 integration tests passed ==="
