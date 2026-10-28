@@ -18,7 +18,7 @@ export OMARCHY_PATH="$REPO"
 echo "=== Fedora identity and L1 portability ==="
 assert_equals "omarchy-distro returns fedora" "$(omarchy-distro)" "fedora"
 
-for test in distro-test.sh pkg-map-test.sh pkg-helper-test.sh migration-gating-test.sh update-flow-test.sh; do
+for test in distro-test.sh pkg-map-test.sh pkg-helper-test.sh migration-gating-test.sh update-flow-test.sh auth-removers-fedora-test.sh; do
   if bash "$REPO/test/$test" >"/tmp/$test.out" 2>&1; then
     pass "$test passes on Fedora"
   else
@@ -160,6 +160,17 @@ else
 fi
 omarchy-pkg-drop fd >/tmp/pkg-drop-translated.out 2>&1
 assert_dnf_not_installed "omarchy-pkg-drop removes translated fd-find" fd-find
+
+echo "=== Security removers keep what Fedora needs (fingerprint, FIDO2) ==="
+# omarchy-pkg-drop never cascades (libfido2 stays for openssh-clients), and
+# the removers undo authselect's with-fingerprint and upstream's FIDO2 lines.
+if bash "$REPO/omedora/test/fedora/auth-removers-integration.sh" \
+  >/tmp/auth-removers-integration.out 2>&1; then
+  cat /tmp/auth-removers-integration.out
+else
+  cat /tmp/auth-removers-integration.out >&2
+  fail "security removers on real Fedora rpm/dnf/authselect"
+fi
 
 # sof-firmware has no Fedora package of that name; migrations/1784401744.sh
 # reaches it through omarchy-pkg-add on Intel audio hardware and used to abort

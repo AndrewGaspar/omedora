@@ -3,6 +3,14 @@
 # omarchy:summary=Remove FIDO2 authentication from sudo and polkit
 # omarchy:requires-sudo=true
 
+# Fedora dispatch — the sibling takes out only the exact lines and file
+# Omarchy's setup wrote, never other pam_u2f lines in Fedora-owned PAM files,
+# and keeps pam-u2f while PAM still loads it. The Arch body below is unchanged.
+# See omedora/architecture.md.
+case "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" in
+  fedora) exec "$(dirname -- "${BASH_SOURCE[0]}")/fedora/remove-security-fido2" "$@" ;;
+esac
+
 set -e
 
 
