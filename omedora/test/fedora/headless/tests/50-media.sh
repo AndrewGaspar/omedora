@@ -36,7 +36,7 @@ else
 fi
 if [[ -n $shot ]] && command -v identify >/dev/null; then
   geometry=$(identify -format '%wx%h' "$shot" 2>/dev/null)
-  monitor=$(hyprctl monitors -j | python3 -c 'import sys,json; m=json.load(sys.stdin)[0]; print(f"{m[\"width\"]}x{m[\"height\"]}")')
+  monitor=$(hyprctl monitors -j | jq -r '.[0] | "\(.width)x\(.height)"')
   [[ $geometry == "$monitor" ]] \
     && pass "the omasnap capture covers the whole output ($geometry)" \
     || _fail_with_artifacts "the omasnap capture covers the whole output (got $geometry, output $monitor)"
