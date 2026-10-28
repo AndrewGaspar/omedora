@@ -515,9 +515,9 @@ reason = "Fedora's vi is vim-minimal, which Provides vi. pkg.py verifies install
 
 [ffmpeg]
 source = "dnf"
-names = ["ffmpeg-free"]
-satisfied_by = ["ffmpeg"]
-reason = "Fedora ships the CLI as ffmpeg-free; RPM Fusion's full ffmpeg conflicts with the *-free libraries mpv already pulls in. A user's RPM Fusion ffmpeg counts as installed."
+names = ["ffmpeg"]
+satisfied_by = ["ffmpeg-free"]
+reason = "RPM Fusion's full ffmpeg CLI. Omedora enables RPM Fusion, and with it dnf resolves the omedora payload's libavcodec dependency to RPM Fusion's ffmpeg-libs (newer than Fedora's *-free libs), which conflicts with ffmpeg-free, so the matching CLI is RPM Fusion's. The full libraries also decode the H.264 theme intros owe plays. A user already on Fedora's ffmpeg-free stack keeps it (it counts as installed)."
 
 [qt6-base]
 source = "dnf"
