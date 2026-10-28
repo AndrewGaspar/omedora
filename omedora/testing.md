@@ -60,7 +60,9 @@ at reboot. Each tier then proves the result from its own angle:
 
 - **L3** (`run-release-upgrade.sh`, ~25 min): every package that came from the
   COPR is still installed, still from the COPR, a `.fc45` build and not
-  downgraded; `omarchy update` passes twice on Fedora 45.
+  downgraded; `omarchy update` passes twice on Fedora 45. It runs in a PID 1
+  systemd container (see §4), so the offline transaction's reboot stops it and
+  starting it again boots Fedora 45 for the checks.
 - **L4** (`build-upgraded-session.sh --run`): upgrades the Fedora 44 session
   image under systemd, boots the result (the offline transaction's reboot
   stops the container; starting it boots Fedora 45), runs `omarchy update`,
@@ -173,6 +175,33 @@ omedora/test/fedora/run-smoke.sh --update-verify   # runs update-verify.sh
 omedora/test/fedora/upgrade-from-beta1-verify.sh
 omedora/test/fedora/upgrade-to-4-verify.sh
 ```
+
+### Update gates run under systemd
+
+Since Omarchy 4.5, `omarchy update` holds a logind sleep inhibitor for the
+whole run (`omarchy-update-stay-awake` through `systemd-inhibit`) and aborts
+when it cannot get one. The plain L3 image has no system bus, so the gates that
+run `omarchy update` boot a real PID 1 systemd container instead:
+`run-smoke.sh --update-verify` and `run-release-upgrade.sh` start the L4 base
+image (`omedora-test:fedora<N>-session-4-sysbase`, built from
+`omedora-session/Dockerfile.base` when missing) with `podman run
+--systemd=always`, as `build-session.sh` does, and `podman exec` their
+in-container script with the repo bind-mounted at `/repo`
+(`lib/systemd-container.sh`). The container has dbus-broker, logind and
+polkit, and `su omedora` gets a logind session with `/run/user/1000`.
+`update-verify.sh` asserts that the first update held the inhibitor and that
+neither update left it behind. Both runners remove their container afterwards;
+`--keep` leaves it for inspection.
+
+The fresh-install smoke (`run-smoke.sh` without `--update-verify`) still uses
+the cheaper plain image, under docker, and needs no bus.
+
+`run-release-upgrade.sh` runs `release-upgrade-verify.sh` twice:
+`upgrade` (install, one update, the preflight, the download and
+`dnf5 offline _execute`, whose reboot request stops the container), then, after
+`podman start` boots the new release, `verify` (the package checks and two
+updates). State the second phase reads is kept in `/var/tmp/release-upgrade`,
+since `/tmp` is a tmpfs under systemd.
 
 ### Local-repo mode
 

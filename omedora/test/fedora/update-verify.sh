@@ -1,6 +1,7 @@
 #!/bin/bash
 #
-# P5 update-pipeline verification — runs INSIDE the fedora:44 test image.
+# P5 update-pipeline verification — runs as root INSIDE a Fedora container
+# booted with PID 1 systemd (the L4 base image, omedora-test:fedora<N>-session-4-sysbase).
 #
 # Proves the dnf-backed update path on a REAL installed system (not a
 # checkout):
@@ -13,10 +14,14 @@
 #      runner and the RPM %post applies nothing), so a pending migration
 #      dropped into the installed payload runs and is recorded for the user
 #   5. omarchy-update-available writes the shell widget's state files
+#   6. the update held its logind sleep inhibitor and released it
+#
+# Since Omarchy 4.5, `omarchy update` holds a sleep:idle inhibitor through
+# systemd-inhibit for the whole run and aborts when it cannot (no system bus or
+# logind), so this needs a real systemd container, not the plain L3 image.
 #
 # Run: omedora/test/fedora/run-smoke.sh --update-verify [--local-repo]
-#  or: podman run --rm -v "$PWD:/repo" -v <dnf-cache>:/var/cache/libdnf5 \
-#        omedora-test:fedora44 bash /repo/omedora/test/fedora/update-verify.sh
+#  (boots the container and podman-execs this script; see lib/systemd-container.sh)
 #
 # Local-repo mode (run-smoke.sh --update-verify --local-repo): as in smoke.sh,
 # OMEDORA_TEST_LOCAL_REPO is overlaid on the COPR before the install, and the
@@ -28,6 +33,17 @@ set -e
 REPO="${REPO:-/repo}"
 LOCAL_REPO="${OMEDORA_TEST_LOCAL_REPO:-}"
 EXPECT_TAG="${OMEDORA_TEST_EXPECT_TAG:-}"
+
+if [[ ! -d /run/systemd/system || ! -S /run/dbus/system_bus_socket ]]; then
+  echo "update-verify.sh needs PID 1 systemd and a system bus (omarchy update's sleep"
+  echo "inhibitor uses logind); run it through omedora/test/fedora/run-smoke.sh --update-verify"
+  exit 1
+fi
+
+# omarchy_inhibitors — logind inhibitors omarchy-update holds right now.
+omarchy_inhibitors() {
+  systemd-inhibit --list --no-legend --no-pager 2>/dev/null | grep -F omarchy-update || true
+}
 
 # assert_local_core <when> — local-repo mode: the core RPMs are HEAD's build
 # from the local repo.
@@ -69,12 +85,37 @@ chmod 0440 /etc/sudoers.d/zz-omedora-test-noauth
 # OMARCHY_PATH names the code it runs from; a session or terminal always has it.
 OMARCHY_ENV="OMARCHY_PATH=/usr/share/omarchy"
 
+# Watch logind while the first update runs: the inhibitor must be held.
+rm -f /tmp/inhibit-seen
+( while :; do
+    [[ -n $(omarchy_inhibitors) ]] && { omarchy_inhibitors >/tmp/inhibit-seen; exit 0; }
+    sleep 0.5
+  done ) &
+watcher=$!
 su omedora -c "$OMARCHY_ENV timeout 900 omarchy-update -y" >/tmp/up1.log 2>&1 \
   && echo "update run 1 ok" \
-  || { echo "UPDATE 1 FAILED rc=$?"; tail -20 /tmp/up1.log; exit 1; }
+  || { echo "UPDATE 1 FAILED rc=$?"; tail -20 /tmp/up1.log; kill "$watcher" 2>/dev/null; exit 1; }
+kill "$watcher" 2>/dev/null || true
+wait "$watcher" 2>/dev/null || true
+if [[ ! -s /tmp/inhibit-seen ]]; then
+  echo "UPDATE 1 NEVER HELD THE LOGIND SLEEP INHIBITOR"
+  exit 1
+fi
+echo "update run 1 held the logind inhibitor: $(tr -s ' ' </tmp/inhibit-seen | head -n1)"
+if [[ -n $(omarchy_inhibitors) ]]; then
+  echo "UPDATE 1 LEFT ITS SLEEP INHIBITOR BEHIND"
+  omarchy_inhibitors
+  exit 1
+fi
+echo "update run 1 released the inhibitor"
 su omedora -c "$OMARCHY_ENV timeout 900 omarchy-update -y" >/tmp/up2.log 2>&1 \
   && echo "update run 2 ok" \
   || { echo "UPDATE 2 FAILED rc=$?"; tail -20 /tmp/up2.log; exit 1; }
+if [[ -n $(omarchy_inhibitors) ]]; then
+  echo "UPDATE 2 LEFT ITS SLEEP INHIBITOR BEHIND"
+  omarchy_inhibitors
+  exit 1
+fi
 
 if grep -q "pacman" /tmp/up1.log; then
   echo "PACMAN LEAKED INTO THE FEDORA UPDATE PATH"
