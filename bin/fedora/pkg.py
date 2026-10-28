@@ -182,9 +182,12 @@ def targets_installed(entry: Entry) -> bool:
 
 def is_entry_installed(entry: Entry) -> bool:
     if entry.source == "skip":
-        # Skip entries are treated as "always installed" so they don't trip
-        # missing-checks. They're effectively no-ops.
-        return True
+        # Nothing is installed for a skip entry, so it is never present: a
+        # guard like `omarchy-pkg-present superwhisper-bin` must not offer to
+        # remove, or call, what Fedora never got. `missing` stays its exact
+        # complement, as upstream's helpers and the menu's shadows of them
+        # assume; `add` reports the skip and installs nothing.
+        return False
     if installed_provider(entry) is not None:
         return True
     return targets_installed(entry)
