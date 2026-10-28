@@ -139,9 +139,13 @@ if ! omarchy-cmd-browser-handoff "$browser_exec" --app="$1" "${@:2}"; then
 #     Unwind if the pin ever ships an Omedora-branded menu.
 #  3. Menu > Install > AI > Claude Desktop (4.5) gains a `when` distro gate:
 #     claude-desktop has no Fedora package. Unwind if one appears.
+#  4. Setup > Defaults > Dictation > Superwhisper gains a `when` distro gate:
+#     superwhisper-bin is skip-mapped, so its installer would die running
+#     /usr/share/superwhisper/setup-user. Unwind if Fedora gets a package.
 ALLOW["default/omarchy/omarchy-menu.jsonc"]='  "install.aur": {"icon":"󰣇","label":"AUR","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install"},
   "update.omarchy": {"icon":"","iconFont":"omarchy","label":"Omarchy","action":"omarchy-launch-floating-terminal-with-presentation omarchy-update"},
-  "install.ai.claude": {"icon":"","iconFont":"omarchy","label":"Claude Desktop","disabled":"omarchy-pkg-present claude-desktop","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-ai-claude"},'
+  "install.ai.claude": {"icon":"","iconFont":"omarchy","label":"Claude Desktop","disabled":"omarchy-pkg-present claude-desktop","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-ai-claude"},
+  "setup.default.dictation.superwhisper": {"icon":"","label":"Superwhisper","checked":"[[ \"$(omarchy-default-dictation)\" == \"superwhisper\" ]]","action":"omarchy-default-dictation superwhisper"},'
 # --- the audit ---------------------------------------------------------------
 # Modified upstream files = files that differ from the pin AND exist on the pin
 # (so omedora-ADDED files like bin/omedora-* are out of scope — they have no
