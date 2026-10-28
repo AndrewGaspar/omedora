@@ -1,5 +1,10 @@
 echo "Let Neovim's current line and status line show the terminal background"
 
+# omedora: Arch-only on Fedora — omarchy-nvim isn't RPM-packaged;
+# install/user/nvim-fedora.sh bootstraps the config, like
+# migrations/1781587663.sh and 1788996284.sh.
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # ~/.config/nvim is copied once from omarchy-nvim, so it misses the package's
 # later changes. Bring in the transparency file and lualine spec it now ships.
 config="$HOME/.config/nvim"

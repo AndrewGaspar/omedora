@@ -1,5 +1,9 @@
 echo "Replace the YT6801 vendor DKMS driver with the upstream kernel driver"
 
+# omedora: kernel drivers and DKMS packages are Fedora/RPM Fusion territory
+# (omedora/AGENTS.md §6), and pacman is Arch-only.
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 if ! yt6801_pci=$(lspci -Dn -d 1f0a:6801); then
   echo "Unable to discover YT6801 adapters; rerun omarchy-migrate." >&2
   exit 1

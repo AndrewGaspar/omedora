@@ -1,5 +1,10 @@
 echo "Switch to Omarchy's power-profiles-daemon build with CPPC support for ARM laptops"
 
+# omedora: Arch-only on Fedora — Omedora keeps Fedora's tuned-ppd plus a
+# powerprofilesctl shim; it must not swap in a power-profiles-daemon build (see
+# install/packages/fedora.toml [power-profiles-daemon]).
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # Stock power-profiles-daemon has no driver for cppc_cpufreq, so ARM laptops
 # only get placeholder profiles that change nothing. pacman -Q also answers for
 # the provided name, so check for the Omarchy build itself.

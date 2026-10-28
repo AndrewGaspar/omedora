@@ -1,5 +1,9 @@
 echo "Give the Dell XPS 16 (NVIDIA N1x) the RAM its firmware reserves for Windows' GPU"
 
+# omedora: Arch-only on Fedora — boot entries/kernel parameters are Fedora's
+# (omedora/AGENTS.md §6).
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # See install/hardware/fix-n1x-gpu-memory.sh. The kernel option takes effect
 # with linux-omarchy-n1x; older N1x kernels ignore it.
 dropin="${OMARCHY_N1X_GPU_MEMORY_CONF:-/etc/limine-entry-tool.d/omarchy-n1x-gpu-memory.conf}"

@@ -1,5 +1,8 @@
 echo "List Omarchy's aarch64 repository ahead of Arch Linux ARM's on the N1x"
 
+# omedora: Arch-only on Fedora — pacman repository ordering is Arch-only.
+[[ "$(omarchy-distro)" == "fedora" ]] && exit 0
+
 # default/pacman/aarch64/pacman-edge.conf puts [omarchy] first so Omarchy's builds
 # (its NVIDIA driver among them) win over Arch Linux ARM's. Installs from
 # earlier N1x images list it last, where an Arch Linux ARM update could replace
