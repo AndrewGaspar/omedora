@@ -1,3 +1,8 @@
+# Fedora: mkinitcpio/Limine boot-image rebuilds are Arch-only; Fedora builds
+# its initramfs with dracut and Omedora ships no mkinitcpio drop-ins. Skip on
+# Omedora (the limine-mkinitcpio presence check below would also no-op).
+[[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" == "fedora" ]] && exit 0
+
 echo "Rebuild the boot image so a non-Latin keyboard layout stays out of the LUKS prompt"
 
 # Since 26.134.222-3, Arch's plymouth hook copies vconsole.conf into the
