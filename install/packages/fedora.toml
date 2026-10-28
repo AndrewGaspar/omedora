@@ -800,3 +800,23 @@ reason = "Symfony's CLI comes from Symfony's own Cloudsmith repo (third-party). 
 [xpadneo-dkms]
 source = "skip"
 reason = "A DKMS kernel module; kernel modules are out of omedora's scope on Fedora (omedora/AGENTS.md §6). Install > Gaming > Xbox Controllers is hidden on Fedora."
+
+[ttf-meslo-nerd]
+source = "skip"
+reason = "Install > Style > Font > Meslo LG Mono. Fedora packages no Nerd Fonts; omedora-nerd-fonts carries only JetBrains Mono and Cascadia (the base fonts). The row is hidden on Fedora. Packaging candidate: add the family to omedora-nerd-fonts.spec (a release-tarball repackage)."
+
+[ttf-firacode-nerd]
+source = "skip"
+reason = "Install > Style > Font > Fira Code; see [ttf-meslo-nerd]."
+
+[ttf-victor-mono-nerd]
+source = "skip"
+reason = "Install > Style > Font > Victor Code; see [ttf-meslo-nerd]."
+
+[ttf-bitstream-vera-mono-nerd]
+source = "skip"
+reason = "Install > Style > Font > Bitstream Vera Mono; see [ttf-meslo-nerd]."
+
+[ttf-iosevka-nerd]
+source = "skip"
+reason = "Install > Style > Font > Iosevka; see [ttf-meslo-nerd]."
