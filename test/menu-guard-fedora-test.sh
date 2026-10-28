@@ -20,7 +20,14 @@ set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 . "$ROOT/test/helpers.sh"
 
-command -v node >/dev/null || fail "node is required to build the menu guard batch"
+# node builds the batch from MenuModel.js, as the menu does. It is not an
+# Omarchy base package, so an installed system (the L3 smoke reruns this suite
+# there) may lack it: skip there, but never in CI, where it is preinstalled.
+if ! command -v node >/dev/null; then
+  [[ -z ${CI:-} ]] || fail "node is required to build the menu guard batch"
+  echo "ok - # SKIP node is not installed; the menu guard batch needs it"
+  exit 0
+fi
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
