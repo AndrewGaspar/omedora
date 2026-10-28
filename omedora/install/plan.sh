@@ -47,7 +47,8 @@
 # OMEDORA_PLAN_FORCE_NONINTERACTIVE force the branch; OMEDORA_PLAN_SOURCE /
 # OMEDORA_PLAN_DEST override the config trees; OMEDORA_PLAN_SKIP_PKGS=1 skips
 # the package dry-run (hermetic L1 runs); OMEDORA_REPOQUERY_CMD mocks the
-# doctor; gum/findmnt are shimmable on PATH.
+# doctor; OMEDORA_LOCAL_REPO_FILE overrides the harness local repo path (as in
+# release.sh and repos.sh); gum/findmnt are shimmable on PATH.
 #
 # NOTE: deliberately no `set -e` here — this is sourced into install-4.sh's
 # `set -eEo pipefail` shell, so every command below is written to not abort
@@ -65,7 +66,7 @@ plan_dest="${OMEDORA_PLAN_DEST:-$HOME/.config}"
 # --- 1. repos ---------------------------------------------------------------
 copr_project="$("$OMEDORA_REPO_ROOT/bin/omedora-copr" 2>/dev/null || echo 'agaspar/omedora-?')"
 repo_lines=()
-if [[ -f /etc/yum.repos.d/omedora-local.repo ]]; then
+if [[ -f ${OMEDORA_LOCAL_REPO_FILE:-/etc/yum.repos.d/omedora-local.repo} ]]; then
   repo_lines+=("omedora local test repo already present (COPR enable will be skipped)")
 else
   repo_lines+=("enable the omedora COPR: $copr_project")
