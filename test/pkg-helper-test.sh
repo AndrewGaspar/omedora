@@ -400,6 +400,71 @@ else
   fail "pkg-drop not-installed → unexpectedly tried to remove"
 fi
 
+# --- omarchy-pkg-drop: never cascades into installed dependents (pacman -R) ---
+# The FIDO2 remover's drop on Fedora 44: libfido2's soname is needed by
+# openssh-clients and libssh, which `dnf remove` would take down with it.
+
+fido2_needs="libfido2|libfido2.so.1()(64bit)|openssh-clients libfido2|libfido2.so.1()(64bit)|libssh libfido2|libfido2.so.1()(64bit)|pam-u2f"
+reset_log
+set +e
+output=$(MOCK_RPM_INSTALLED="libfido2 pam-u2f openssh-clients libssh" MOCK_RPM_NEEDS="$fido2_needs" \
+  "$ROOT/bin/omarchy-pkg-drop" libfido2 pam-u2f 2>&1)
+drop_rc=$?
+set -e
+assert_equals "pkg-drop keeping a needed package still exits 0" "$drop_rc" "0"
+log_contains "rpm -e --test --allmatches -- libfido2 pam-u2f" \
+  && pass "pkg-drop tests the removal with rpm before dnf runs" \
+  || { cat "$MOCK_LOG" >&2; fail "pkg-drop tests the removal with rpm before dnf runs"; }
+if log_contains "sudo dnf remove -y pam-u2f" && ! grep 'dnf remove' "$MOCK_LOG" | grep -q libfido2; then
+  pass "pkg-drop removes the unneeded target and never hands dnf the needed one"
+else
+  cat "$MOCK_LOG" >&2
+  fail "pkg-drop libfido2 pam-u2f → expected dnf remove of pam-u2f only"
+fi
+assert_output_contains "pkg-drop names what keeps a package" "$output" "Kept libfido2: needed by libssh, openssh-clients"
+
+# Every target needed: nothing reaches dnf, and the exit status is still 0.
+reset_log
+set +e
+output=$(MOCK_RPM_INSTALLED="libfido2 openssh-clients" MOCK_RPM_NEEDS="libfido2|libfido2.so.1()(64bit)|openssh-clients" \
+  "$ROOT/bin/omarchy-pkg-drop" libfido2 2>&1)
+drop_rc=$?
+set -e
+assert_equals "pkg-drop of only needed packages exits 0" "$drop_rc" "0"
+log_lacks "dnf remove" && pass "pkg-drop of only needed packages runs no dnf remove" \
+  || { cat "$MOCK_LOG" >&2; fail "pkg-drop of only needed packages runs no dnf remove"; }
+
+# A dependent inside the removal set is removed with it (fprintd-pam needs
+# fprintd), as pacman removes a package together with its dependent target.
+reset_log
+MOCK_RPM_INSTALLED="fprintd fprintd-pam libfprint" \
+  MOCK_RPM_NEEDS="fprintd|fprintd|fprintd-pam libfprint|libfprint-2.so.2()(64bit)|fprintd" \
+  "$ROOT/bin/omarchy-pkg-drop" fprintd fprintd-pam libfprint >/dev/null 2>&1
+log_contains "sudo dnf remove -y fprintd fprintd-pam libfprint" \
+  && pass "pkg-drop removes targets whose dependents are all in the removal set" \
+  || { cat "$MOCK_LOG" >&2; fail "pkg-drop removes targets whose dependents are all in the removal set"; }
+
+# Without its dependent in the set, the same package is kept, and keeping it
+# strands libfprint, which it needs: a second round keeps that too.
+reset_log
+output=$(MOCK_RPM_INSTALLED="fprintd fprintd-pam libfprint" \
+  MOCK_RPM_NEEDS="fprintd|fprintd|fprintd-pam libfprint|libfprint-2.so.2()(64bit)|fprintd" \
+  "$ROOT/bin/omarchy-pkg-drop" fprintd libfprint 2>&1)
+log_lacks "dnf remove" && pass "pkg-drop keeps a package whose dependent stays installed" \
+  || { cat "$MOCK_LOG" >&2; fail "pkg-drop keeps a package whose dependent stays installed"; }
+assert_output_contains "pkg-drop keeps fprintd for fprintd-pam" "$output" "Kept fprintd: needed by fprintd-pam"
+assert_output_contains "pkg-drop keeps what a kept package needs" "$output" "Kept libfprint: needed by fprintd"
+
+# Flathub removal is unchanged and never consults rpm.
+reset_log
+MOCK_FLATPAK_INSTALLED="md.obsidian.Obsidian" "$ROOT/bin/omarchy-pkg-drop" obsidian >/dev/null 2>&1
+if log_contains "flatpak uninstall --user -y md.obsidian.Obsidian" && log_lacks "rpm -e"; then
+  pass "pkg-drop obsidian → flatpak uninstall, no rpm dependency check"
+else
+  cat "$MOCK_LOG" >&2
+  fail "pkg-drop obsidian → expected an unchanged flatpak uninstall"
+fi
+
 # --- omarchy-pkg-aur-add: behaves identically to pkg-add on Fedora ---
 
 reset_log
