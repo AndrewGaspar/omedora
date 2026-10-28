@@ -36,10 +36,15 @@ echo "install ok ($(rpm -q omedora))"
 printf 'Defaults:omedora !authenticate\n' >/etc/sudoers.d/zz-omedora-test-noauth
 chmod 0440 /etc/sudoers.d/zz-omedora-test-noauth
 
-su omedora -c "timeout 900 omarchy-update -y" >/tmp/up1.log 2>&1 \
+# `su -c` starts a non-login, non-interactive shell, so /etc/profile.d/omarchy.sh
+# never sets OMARCHY_PATH. Since 4.5 omarchy-update refuses to run unless
+# OMARCHY_PATH names the code it runs from; a session or terminal always has it.
+OMARCHY_ENV="OMARCHY_PATH=/usr/share/omarchy"
+
+su omedora -c "$OMARCHY_ENV timeout 900 omarchy-update -y" >/tmp/up1.log 2>&1 \
   && echo "update run 1 ok" \
   || { echo "UPDATE 1 FAILED rc=$?"; tail -20 /tmp/up1.log; exit 1; }
-su omedora -c "timeout 900 omarchy-update -y" >/tmp/up2.log 2>&1 \
+su omedora -c "$OMARCHY_ENV timeout 900 omarchy-update -y" >/tmp/up2.log 2>&1 \
   && echo "update run 2 ok" \
   || { echo "UPDATE 2 FAILED rc=$?"; tail -20 /tmp/up2.log; exit 1; }
 
@@ -60,7 +65,7 @@ echo "L3 marker migration"
 mkdir -p "$HOME/.local/state/omarchy"
 touch "$HOME/.local/state/omarchy/migration-ran-marker"
 EOF
-su omedora -c "omarchy-migrate" >/tmp/migrate.log 2>&1 \
+su omedora -c "$OMARCHY_ENV omarchy-migrate" >/tmp/migrate.log 2>&1 \
   || { echo "MIGRATE FAILED"; tail -20 /tmp/migrate.log; exit 1; }
 if su omedora -c 'test -f ~/.local/state/omarchy/migration-ran-marker && test -f ~/.local/state/omarchy/migrations/9999999999.sh'; then
   echo "omarchy-migrate applied the pending migration and recorded it for the user"

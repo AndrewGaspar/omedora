@@ -62,7 +62,9 @@ chmod 0440 /etc/sudoers.d/zz-omedora-test-noauth
 CHECKOUT=/opt/omedora-checkout
 
 as_user() {
-  local env_prefix=""
+  # `su -c` gets no login environment, and 4.5's omarchy-update refuses to run
+  # unless OMARCHY_PATH names the code it runs from.
+  local env_prefix="OMARCHY_PATH=/usr/share/omarchy"
   if [[ $CODE_MODE == "checkout" ]]; then
     env_prefix="OMARCHY_PATH=$CHECKOUT PATH=$CHECKOUT/bin:\$PATH"
   fi
