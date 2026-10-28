@@ -196,6 +196,43 @@ headless session and runs:
 The Workstation variant exercises GNOME coexistence and tuned-ppd. L4 needs a
 usable DRM render node and is not available on standard GitHub-hosted runners.
 
+The session image is built in three layers, and only the first is shared
+across checkouts:
+
+| Image | Contents | Rebuilt when |
+| --- | --- | --- |
+| `omedora-test:fedora<N>-session-4-sysbase` | Fedora, systemd, test deps, the `omedora` user; no checkout | missing, or `--rebuild` |
+| `…-session-4-pkgs` | the packages phase (plan, repos, package payload) | `--rebuild`, or its `omedora.pkgs-key` label no longer matches: base image, package source, or a packages-phase file changed |
+| `…-session-4` | the config phase (system setup, adopt, finalize, first-run) | every build |
+
+`build-session.sh` copies the current checkout (tracked and untracked
+non-ignored files, uncommitted edits included) into the build container right
+before each install phase, so a build always runs this checkout's install
+scripts. Images it commits carry an `omedora.tree` label with the commit
+(`-dirty-<hash>` for uncommitted changes); `run-session.sh`,
+`headless/run-tests.sh` and `build-upgraded-session.sh` warn when an existing
+image was built from a different tree. The `-sysbase` images replace the old
+`-session-4-base` ones, which baked a checkout in and silently ran its install
+scripts in every later build.
+
+### Local-repo mode
+
+To test unpublished core RPMs, build them from HEAD and use the `-local` image
+lineage:
+
+```bash
+omedora/packaging/copr/build-repo.sh omedora-settings.spec omedora.spec
+omedora/test/fedora/build-session.sh --local-repo
+omedora/test/fedora/headless/run-tests.sh --local-repo
+```
+
+The local repo (`packaging/copr/repo[-f<N>]`) overlays the live COPR at
+`priority=1` (see [`packages.md` §5](packages.md#5-local-repositories-in-tests)),
+so the core RPMs come from it and the rest of the stack from the COPR.
+`build-session.sh --local-repo` rebuilds the core RPMs itself when the repo
+does not hold HEAD's build. They package `git archive HEAD`: commit before
+building, or the run tests the previous commit's payload.
+
 Never update `30-visual-reference.png` solely because a rebase changed pixels.
 Capture the candidate, inspect the difference, identify the intended upstream
 change, and accept a new golden only after human visual review. The 4.5 visual

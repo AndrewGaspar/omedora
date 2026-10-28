@@ -9,13 +9,13 @@
 #
 # This is the second tier of a two-tier build: it FROMs the standard base image
 # (built from Dockerfile.base) so it reuses ALL of that setup (systemd tuning, the
-# omedora user, the baked tree, labwc) with zero drift. omedora/test/fedora/
+# omedora user, labwc) with zero drift. omedora/test/fedora/
 # build-session.sh --workstation builds the standard base first, then this layer
 # on top, then runs the normal packages+config install phases against it.
 
-# build-session.sh always passes BASE (omedora-test:fedora<N>-session-4-base for
+# build-session.sh always passes BASE (omedora-test:fedora<N>-session-4-sysbase for
 # the selected OMEDORA_FEDORA_RELEASE); the default only serves a manual build.
-ARG BASE=omedora-test:fedora44-session-4-base
+ARG BASE=omedora-test:fedora44-session-4-sysbase
 FROM ${BASE}
 
 # The actual Fedora Workstation environment group: GNOME, GDM, NetworkManager,

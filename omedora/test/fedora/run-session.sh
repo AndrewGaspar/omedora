@@ -48,6 +48,7 @@ set -euo pipefail
 
 REPO=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
 . "$REPO/omedora/test/fedora/lib/release.sh"
+. "$REPO/omedora/test/fedora/lib/checkout.sh"
 # SESSION_IMAGE / RUN_CTR are resolved after arg parsing so --workstation can pick
 # the "-workstation" image lineage + a distinct container name.
 LAUNCH_DIR_IN_IMAGE=/home/omedora/.local/share/omarchy/omedora/test/fedora/omedora-session
@@ -94,6 +95,10 @@ if $rebuild || ! podman image exists "$SESSION_IMAGE"; then
   $local_repo && build_flags+=(--local-repo)
   "$REPO/omedora/test/fedora/build-session.sh" "${build_flags[@]}"
 fi
+rebuild_hint="omedora/test/fedora/build-session.sh"
+$workstation && rebuild_hint+=" --workstation"
+$local_repo && rebuild_hint+=" --local-repo"
+checkout_image_check "$SESSION_IMAGE" "$rebuild_hint"
 
 # --- widen the host socket (host-nested only); clean up on exit --------------
 if ! $headless; then

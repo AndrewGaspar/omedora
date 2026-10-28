@@ -8,13 +8,20 @@
 # systemctl shim, no uwsm-app shim, no dbus-run-session wrapper.
 #
 # This Dockerfile builds only the BASE (Fedora + systemd + deps + the omedora
-# tree). The install does NOT run here — a Dockerfile RUN has no PID-1 systemd.
-# Instead omedora/test/fedora/build-session.sh boots this image, runs the v4
-# bootstrap (omedora/install-4.sh's steps, via staged-install-4.sh) inside the
-# live logind session, and commits the result. See omedora/testing.md §6.
+# user). The install does NOT run here — a Dockerfile RUN has no PID-1 systemd.
+# Instead omedora/test/fedora/build-session.sh boots this image, copies the
+# current checkout in, runs the v4 bootstrap (omedora/install-4.sh's steps, via
+# staged-install-4.sh) inside the live logind session, and commits the result.
+# See omedora/testing.md §5.
+#
+# The checkout is deliberately NOT copied in here: a base image is reused for
+# many builds, so a baked tree would make later builds run the install scripts
+# of whatever commit first built the base. build-session.sh copies the tree in
+# right before every install phase instead. The build context is this
+# directory; nothing from it is copied.
 #
 # Built and run entirely under podman (--systemd=always); independent of the
-# docker-based L1/L2/L3 images. Build product: omedora-test:fedora<N>-session-4-base,
+# docker-based L1/L2/L3 images. Build product: omedora-test:fedora<N>-session-4-sysbase,
 # where FEDORA_RELEASE (default 44) is passed by build-session.sh from
 # OMEDORA_FEDORA_RELEASE (see omedora/test/fedora/lib/release.sh).
 
@@ -112,9 +119,9 @@ RUN useradd --create-home --uid 1000 --shell /bin/bash --groups wheel omedora &&
 RUN install -d -m 0755 /var/lib/systemd/linger && \
     touch /var/lib/systemd/linger/omedora
 
-# --- the omedora tree --------------------------------------------------------
-# The v4 bootstrap runs from a checkout (OMEDORA_REPO_ROOT); bake this repo at
-# ~/.local/share/omarchy so the build-via-commit step is reproducible.
+# --- the omedora user's XDG dirs ----------------------------------------------
+# The v4 bootstrap runs from a checkout (OMEDORA_REPO_ROOT) that build-session.sh
+# copies to ~/.local/share/omarchy before each install phase.
 #
 # Create the XDG dirs omedora-owned. NOTE: `install -d -o omedora` only chowns
 # the leaf it's told to create, NOT intermediate parents — so a bare
@@ -123,7 +130,6 @@ RUN install -d -m 0755 /var/lib/systemd/linger && \
 # denied). Chown `.local` explicitly so the whole XDG tree is writable.
 RUN install -d -o omedora -g omedora /home/omedora/.local/share && \
     chown omedora:omedora /home/omedora/.local
-COPY --chown=omedora:omedora . /home/omedora/.local/share/omarchy
 
 # staged-install-4.sh tees its output to /var/log/omarchy-install.log so
 # build-session.sh can copy a clean log out. Pre-create it owned by omedora so
