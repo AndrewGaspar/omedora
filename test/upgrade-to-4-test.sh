@@ -628,8 +628,9 @@ kept_names=$(sed -n '/^v4_kept_packages=(/,/^)/p' "$ROOT/bin/omedora-upgrade-to-
 # On-demand specs the COPR serves but the upgrade must NOT force-install: they
 # are installed only when the user opts in (e.g. clicking Install Dictation), so
 # they are intentionally absent from v4_kept_packages. voxtype (single
-# from-source RPM) is the dictation engine — on-demand.
-on_demand_specs=" voxtype "
+# from-source RPM) is the dictation engine — on-demand. openclaw is the seed
+# Install > AI > OpenClaw and the OpenClaw default agent install — on-demand.
+on_demand_specs=" voxtype openclaw "
 missing=""
 for s in $spec_names; do
   [[ $on_demand_specs == *" $s "* ]] && continue
