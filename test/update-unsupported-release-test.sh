@@ -28,6 +28,9 @@ SHIM="$SCRATCH/shim"
 mkdir -p "$SHIM"
 MOCK_LOG="$SCRATCH/mock.log"
 export MOCK_LOG
+# The updater scopes dnf with systemd-run on a systemd-booted host; keep these
+# fixtures host-independent (update-flow-test.sh covers the scope contract).
+export OMEDORA_SYSTEMD_RUNTIME_DIR="$SCRATCH/not-booted"
 
 stub() { printf '#!/bin/bash\n%s\n' "$2" >"$SHIM/$1"; chmod +x "$SHIM/$1"; }
 
