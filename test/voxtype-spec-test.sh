@@ -120,7 +120,7 @@ fi
 FILES="$(awk '/^%files([[:space:]]|$)/ {cur=1; next} /^%changelog/ {cur=0} cur {print}' "$SPEC")"
 [[ -n $FILES ]] || fail "could not locate the %files section"
 for tier in avx2 avx512 vulkan; do
-  grep -qE "voxtype/voxtype-$tier\b" <<<"$FILES" \
+  grep -qE "(voxtype|voxtype_libdir\})/voxtype-$tier\b" <<<"$FILES" \
     && pass "%files owns the voxtype-$tier whisper binary" \
     || fail "%files owns the voxtype-$tier whisper binary"
 done
@@ -153,15 +153,22 @@ else
 fi
 
 # --- install/files path + shell hygiene (local-build lessons) -------------------
-# %install stages the tiers under %{_libdir} (/usr/lib64); %files must name the
-# SAME dir (%{_prefix}/lib = /usr/lib there — a different directory).
-grep -qE '%\{_libdir\}/voxtype/voxtype-avx2' "$SPEC" \
-  && pass "%files tiers live under %{_libdir} (matches %install)" \
-  || fail "%files tiers live under %{_libdir} (matches %install)"
-if grep -qE '%\{_prefix\}/lib/voxtype' "$SPEC"; then
-  fail "%files must NOT use %{_prefix}/lib/voxtype (/usr/lib != /usr/lib64)"
+# The tiers live in /usr/lib/voxtype (%{voxtype_libdir}): Omarchy 4.5's
+# omarchy-install-dictation-voxtype only enables GPU inference when
+# /usr/lib/voxtype/voxtype-vulkan exists. %install, %post and %files must all
+# use the macro, never %{_libdir} (/usr/lib64).
+grep -qE '^%global voxtype_libdir %\{_prefix\}/lib/voxtype$' "$SPEC" \
+  && pass "voxtype_libdir is /usr/lib/voxtype" \
+  || fail "voxtype_libdir is /usr/lib/voxtype"
+for where in '%{buildroot}%{voxtype_libdir}/voxtype-vulkan' '^%{voxtype_libdir}/voxtype-avx2$' 'ln -sf %{voxtype_libdir}/voxtype-avx2'; do
+  grep -qE "${where//[\{\}]/.}" "$SPEC" \
+    && pass "tiers use voxtype_libdir: $where" \
+    || fail "tiers use voxtype_libdir: $where"
+done
+if grep -vE '^[[:space:]]*#' "$SPEC" | grep -qE '%\{_libdir\}/voxtype'; then
+  fail "no tier path uses %{_libdir} (/usr/lib64)"
 else
-  pass "%files has no %{_prefix}/lib/voxtype mismatch"
+  pass "no tier path uses %{_libdir} (/usr/lib64)"
 fi
 # No `$$` shell vars in CODE: rpm expands $$ to its own PID, so `$$m` in a
 # scriptlet silently tests/installs garbage (this shipped zero man pages

@@ -71,9 +71,15 @@
 # (omacut/starship/mise): a dictation tool needs no debug subpackages.
 %global debug_package %{nil}
 
+
+# The whisper tiers live in /usr/lib/voxtype on every arch, as upstream's own
+# packaging and Omarchy expect: omarchy-install-dictation-voxtype enables GPU
+# inference only when /usr/lib/voxtype/voxtype-vulkan exists. %%{_libdir}
+# (/usr/lib64) hid the Vulkan tier from it.
+%global voxtype_libdir %{_prefix}/lib/voxtype
 Name:           voxtype
 Version:        1.0.1
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Voice dictation for Linux (whisper.cpp; CPU + Vulkan)
 
 License:        MIT
@@ -203,10 +209,10 @@ cargo build --release --offline --locked \
 
 %install
 # Tiered whisper binaries to /usr/lib/voxtype/.
-install -D -m 755 %{_builddir}/voxtype-avx2 %{buildroot}%{_libdir}/voxtype/voxtype-avx2
-install -D -m 755 %{_builddir}/voxtype-avx512 %{buildroot}%{_libdir}/voxtype/voxtype-avx512
+install -D -m 755 %{_builddir}/voxtype-avx2 %{buildroot}%{voxtype_libdir}/voxtype-avx2
+install -D -m 755 %{_builddir}/voxtype-avx512 %{buildroot}%{voxtype_libdir}/voxtype-avx512
 %if %{with vulkan}
-install -D -m 755 %{_builddir}/voxtype-vulkan %{buildroot}%{_libdir}/voxtype/voxtype-vulkan
+install -D -m 755 %{_builddir}/voxtype-vulkan %{buildroot}%{voxtype_libdir}/voxtype-vulkan
 %endif
 
 # Helper binaries to /usr/bin/.
@@ -284,10 +290,10 @@ rm -f %{_bindir}/voxtype
 # Check for AVX-512 support (Linux-specific, falls back to AVX2)
 if [ -f /proc/cpuinfo ] && grep -q avx512f /proc/cpuinfo 2>/dev/null; then
     VARIANT="avx512"
-    ln -sf %{_libdir}/voxtype/voxtype-avx512 %{_bindir}/voxtype
+    ln -sf %{voxtype_libdir}/voxtype-avx512 %{_bindir}/voxtype
 else
     VARIANT="avx2"
-    ln -sf %{_libdir}/voxtype/voxtype-avx2 %{_bindir}/voxtype
+    ln -sf %{voxtype_libdir}/voxtype-avx2 %{_bindir}/voxtype
 fi
 
 # Restore SELinux context if available
@@ -356,14 +362,12 @@ rm -f %{_bindir}/voxtype
 %license cargo-vendor.txt
 %doc %{_docdir}/%{name}/README.md
 %doc %{_docdir}/%{name}/INSTALL.md
-# NOTE: %%{_libdir} here MUST match the %install destination above (/usr/lib64
-# on x86_64 Fedora). The fork's own spec writes %%{_prefix}/lib/... which
-# resolves to /usr/lib — a different directory — and fails %files.
-%dir %{_libdir}/voxtype
-%{_libdir}/voxtype/voxtype-avx2
-%{_libdir}/voxtype/voxtype-avx512
+# NOTE: %%{voxtype_libdir} here MUST match the %install destination above.
+%dir %{voxtype_libdir}
+%{voxtype_libdir}/voxtype-avx2
+%{voxtype_libdir}/voxtype-avx512
 %if %{with vulkan}
-%{_libdir}/voxtype/voxtype-vulkan
+%{voxtype_libdir}/voxtype-vulkan
 %endif
 # The /usr/bin/voxtype symlink is created by %post, mark as ghost.
 %ghost %{_bindir}/voxtype
@@ -386,6 +390,11 @@ rm -f %{_bindir}/voxtype
 %{_bindir}/voxtype-configure-launcher
 
 %changelog
+* Tue Oct 27 2026 omedora <noreply@omedora> - 1.0.1-2
+- Install the whisper tiers under /usr/lib/voxtype (was /usr/lib64), where
+  Omarchy 4.5's dictation installer looks for the Vulkan tier to enable GPU
+  inference.
+
 * Tue Sep 08 2026 omedora <noreply@omedora> - 1.0.1-1
 - Switch from binary-repackage of upstream 0.7.5 to a from-source build of
   the AndrewGaspar/voxtype fork branch feat/muse-stack-v1.0.1 (pinned commit
