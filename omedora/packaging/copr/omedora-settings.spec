@@ -259,11 +259,38 @@ install -Dpm644 etc/fastfetch/config.jsonc %{buildroot}%{_sysconfdir}/fastfetch/
 # Env bootstrap for system login shells (sources OMARCHY_PATH/PATH setup).
 install -Dpm644 etc/profile.d/omarchy.sh %{buildroot}%{_sysconfdir}/profile.d/omarchy.sh
 # sudoers drop-ins (0440 per sudoers convention; /etc/sudoers.d owned by sudo).
+# Listed by name, not globbed, so a new upstream grant is reviewed before it
+# ships. omarchy-locale-generate's passwordless grant (Omarchy 4.5) stays a
+# reference copy: on Fedora the helper installs a glibc langpack through dnf,
+# and omarchy-language falls back to a polkit prompt without the grant.
 install -d %{buildroot}%{_sysconfdir}/sudoers.d
-install -pm440 etc/sudoers.d/omarchy-* %{buildroot}%{_sysconfdir}/sudoers.d/
-# sysctl / modprobe drop-ins. Quattro beta retired the old udev rules.
+for f in omarchy-dns omarchy-passwd-tries omarchy-theme-browser omarchy-tzupdate; do
+  install -pm440 "etc/sudoers.d/$f" "%{buildroot}%{_sysconfdir}/sudoers.d/$f"
+done
+install -Dpm644 etc/sudoers.d/omarchy-locale-generate \
+  %{buildroot}%{_datadir}/omarchy/etc-overrides/sudoers.d/omarchy-locale-generate
+# sysctl / modprobe drop-ins, listed by name for the same reason. Quattro beta
+# retired the old udev rules. 4.5's ARP policy (90-omarchy-arp.conf) is
+# machine-wide network behavior and stays reference material.
 install -d %{buildroot}%{_sysconfdir}/sysctl.d
-install -pm644 etc/sysctl.d/*.conf %{buildroot}%{_sysconfdir}/sysctl.d/
+for f in 90-omarchy-file-watchers.conf 99-omarchy-sysctl.conf; do
+  install -pm644 "etc/sysctl.d/$f" "%{buildroot}%{_sysconfdir}/sysctl.d/$f"
+done
+install -Dpm644 etc/sysctl.d/90-omarchy-arp.conf \
+  %{buildroot}%{_datadir}/omarchy/etc-overrides/sysctl.d/90-omarchy-arp.conf
+# mise system config (Omarchy 4.5): the default tools as lazy shims, the
+# agent-account wrappers, and the upgrade.auto_prune setting. Omarchy-named
+# drop-ins in mise's system config directory; our COPR mise reads them.
+# install/user/mise.sh and the lazy-tools migrations require them.
+install -d %{buildroot}%{_sysconfdir}/mise/conf.d
+for f in omarchy.toml omarchy-tools.toml omarchy-agent-accounts.toml; do
+  install -pm644 "etc/mise/conf.d/$f" "%{buildroot}%{_sysconfdir}/mise/conf.d/$f"
+done
+# Omarchy's XKB option (Shift + Caps Lock = Compose), which default/hypr/input.lua
+# selects. libxkbcommon reads /etc/xkb ahead of the system rules; the rules file
+# only includes the system evdev rules and adds the omarchy option.
+install -Dpm644 etc/xkb/rules/evdev %{buildroot}%{_sysconfdir}/xkb/rules/evdev
+install -Dpm644 etc/xkb/symbols/omarchy %{buildroot}%{_sysconfdir}/xkb/symbols/omarchy
 install -Dpm644 etc/modprobe.d/omarchy-usb-autosuspend.conf \
   %{buildroot}%{_sysconfdir}/modprobe.d/omarchy-usb-autosuspend.conf
 # Keep the already-reviewed systemd manager/logind/resolved drop-ins. New beta
@@ -297,6 +324,12 @@ install -Dpm644 etc/systemd/logind.conf.d/20-inhibit-delay.conf \
   %{buildroot}%{_datadir}/omarchy/etc-overrides/systemd/logind.conf.d/20-inhibit-delay.conf
 install -Dpm644 etc/systemd/oomd.conf.d/10-omarchy.conf \
   %{buildroot}%{_datadir}/omarchy/etc-overrides/systemd/oomd.conf.d/10-omarchy.conf
+# DELIBERATELY NOT INSTALLED from etc/ (Omarchy 4.5 additions): the
+# NetworkManager connectivity endpoint (Fedora configures its own), mpv's
+# system mpv.conf (generic path), the kyber I/O scheduler udev rule, systemd
+# mount-rate and binfmt drop-ins (boot policy), and the
+# wayland-wm@hyprland.desktop drop-in (Omedora's session unit is named for
+# omedora.desktop's command line, not hyprland.desktop).
 # DELIBERATELY NOT INSTALLED from etc/: mkinitcpio.conf.d/, limine-entry-tool.d/,
 # sddm.conf.d/ (Arch / sddm-only), nsswitch.conf, security/faillock.conf,
 # cups/, plymouth/ (never-touch; reference copies in etc-overrides/ above),
@@ -391,6 +424,16 @@ desktop-file-validate %{buildroot}%{_datadir}/wayland-sessions/omedora.desktop
 %config(noreplace) %{_sysconfdir}/sudoers.d/omarchy-tzupdate
 %config(noreplace) %{_sysconfdir}/sysctl.d/90-omarchy-file-watchers.conf
 %config(noreplace) %{_sysconfdir}/sysctl.d/99-omarchy-sysctl.conf
+%dir %{_sysconfdir}/mise
+%dir %{_sysconfdir}/mise/conf.d
+%config(noreplace) %{_sysconfdir}/mise/conf.d/omarchy.toml
+%config(noreplace) %{_sysconfdir}/mise/conf.d/omarchy-tools.toml
+%config(noreplace) %{_sysconfdir}/mise/conf.d/omarchy-agent-accounts.toml
+%dir %{_sysconfdir}/xkb
+%dir %{_sysconfdir}/xkb/rules
+%dir %{_sysconfdir}/xkb/symbols
+%config(noreplace) %{_sysconfdir}/xkb/rules/evdev
+%config(noreplace) %{_sysconfdir}/xkb/symbols/omarchy
 %config(noreplace) %{_sysconfdir}/modprobe.d/omarchy-usb-autosuspend.conf
 %dir %{_sysconfdir}/systemd/logind.conf.d
 %config(noreplace) %{_sysconfdir}/systemd/logind.conf.d/10-ignore-power-button.conf

@@ -4,10 +4,12 @@
 #
 # mise is Omedora's binary-repackage of the upstream linux-x64 release tarball
 # (Arch Omarchy ships the same release as mise-bin). Upstream Omarchy's
-# install/user/mise.sh and migrations/1787215483.sh both run
-# `mise settings set upgrade.auto_prune false`; that setting exists from mise
-# 2026.8.10, and an older mise rejects it as an unknown setting, which aborts
-# fresh installs and every `omedora update` on Fedora. This guard keeps the
+# migrations/1787215483.sh runs `mise settings set upgrade.auto_prune false`,
+# and since 4.5 etc/mise/conf.d/omarchy.toml (shipped by omedora-settings) sets
+# it system-wide; that setting exists from mise 2026.8.10, and an older mise
+# rejects it as an unknown setting, which aborts fresh installs and every
+# `omedora update` on Fedora. 4.5's lazy default tools
+# (etc/mise/conf.d/omarchy-tools.toml, `mise reshim --system`) need 2026.10.11. This guard keeps the
 # packaged version at or above that floor and keeps the source pin in sync with
 # the spec. Pure bash + grep; no build.
 
@@ -18,7 +20,7 @@ ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 
 SPEC="$ROOT/omedora/packaging/copr/mise.spec"
 SOURCES="$ROOT/omedora/packaging/copr/mise.spec.sources"
-MIN_VERSION="2026.8.10"
+MIN_VERSION="2026.10.11"
 
 assert_file_exists "mise.spec exists" "$SPEC"
 assert_file_exists "mise.spec.sources exists" "$SOURCES"
@@ -28,16 +30,16 @@ rel="$(grep -E '^Release:' "$SPEC" | head -1 | awk '{print $2}')"
 [[ -n $ver ]] || fail "spec declares Version:"
 assert_equals "Release is 1%{?dist}" "$rel" '1%{?dist}'
 
-# --- version floor: the setting install/user/mise.sh and the migration write ---
+# --- version floor: the setting the system config and the migration write ---
 if [[ "$(printf '%s\n%s\n' "$MIN_VERSION" "$ver" | sort -V | head -1)" == "$MIN_VERSION" ]]; then
   pass "Version $ver >= $MIN_VERSION (upgrade.auto_prune is a known setting)"
 else
   fail "Version $ver is older than $MIN_VERSION: 'mise settings set upgrade.auto_prune' would abort the install"
 fi
 
-# The floor exists because these two upstream files use the setting; if they
+# The floor exists because these upstream files use the setting; if they
 # stop, the floor can be revisited (the guard says so rather than rotting).
-for f in install/user/mise.sh migrations/1787215483.sh; do
+for f in etc/mise/conf.d/omarchy.toml migrations/1787215483.sh; do
   if grep -q 'upgrade.auto_prune' "$ROOT/$f"; then
     pass "$f still sets upgrade.auto_prune (floor is load-bearing)"
   else

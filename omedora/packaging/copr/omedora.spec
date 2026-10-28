@@ -65,13 +65,15 @@ Requires:       uwsm
 Requires:       quickshell
 Requires:       foot
 Requires:       fzf
-# The payload's own scripts set mise settings that only exist from 2026.8.10
-# (install/user/mise.sh and migrations/1787215483.sh: upgrade.auto_prune). A
-# stale mise aborts fresh installs and every update at that migration, so pull
+# The payload needs mise 2026.10.11: 4.5's lazy default tools (install/user/mise.sh
+# and migration 1791382872 run `mise reshim --system` over the
+# /etc/mise/conf.d/omarchy-tools.toml omedora-settings ships), and
+# upgrade.auto_prune (2026.8.10). A stale mise aborts fresh installs and every
+# update at those migrations, so pull
 # the mise this payload needs in the same dnf transaction, independent of the
 # managed updater's view. test/mise-spec-test.sh keeps this floor and
 # mise.spec's Version in agreement.
-Requires:       mise >= 2026.8.10
+Requires:       mise >= 2026.10.11
 
 # Auto-requires are suppressed for the /usr/share/omarchy and /etc/skel payload
 # (installer/migration/theme scripts run inside the fully-provisioned install,
