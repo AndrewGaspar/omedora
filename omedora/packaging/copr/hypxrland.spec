@@ -22,8 +22,8 @@
 # 0.56.x requires 5.5.
 
 %global base_version 0.56.2
-%global snapshot 20261016.1
-%global commit 9097b3c02bc996d8aa4ac348700727877ac4aa39
+%global snapshot 20261102.1
+%global commit e3a89bc8c16690cb6b69c27350c18a80b51f68b5
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 %global udis86_commit 5336633af70f3917760a6d441ff02d93477b0c86
 %global lua_version 5.5.0
@@ -179,10 +179,10 @@ export PKG_CONFIG_PATH="%{_builddir}/hypxrland-lua-prefix/lib/pkgconfig${PKG_CON
 export GIT_COMMIT_HASH=%{commit}
 export GIT_BRANCH=hypxrland
 export GIT_COMMIT_MESSAGE="packaged HypXRland snapshot %{shortcommit}"
-export GIT_COMMIT_DATE=2026-08-21
+export GIT_COMMIT_DATE=2026-11-02
 export GIT_DIRTY=clean
-export GIT_TAG=v%{base_version}-373-g%{shortcommit}
-export GIT_COMMITS=8034
+export GIT_TAG=v%{base_version}-455-g%{shortcommit}
+export GIT_COMMITS=8116
 
 %cmake \
   -GNinja \
@@ -226,6 +226,15 @@ XDG_RUNTIME_DIR="$runtime_dir" %{__cmake_builddir}/Hyprland --version |
 %{_bindir}/hypxrland-session
 
 %changelog
+* Mon Nov 02 2026 omedora <noreply@omedora> - 0.56.2^20261102.1.gite3a89bc8c-1
+- Refresh to the current public hypxrland tip: XR surfaces (carried
+  monitors snap onto detected tables and other horizontal planes through
+  XR_EXT_plane_detection), damage-gated XR frame pacing (static XR monitors
+  stop presenting), and the matching Monado submodule bump. Other submodule
+  pins are unchanged.
+- Report the real commit date, describe tag and commit count in the
+  embedded version information; they were still the August values.
+
 * Fri Oct 16 2026 omedora <noreply@omedora> - 0.56.2^20261016.1.git9097b3c02-1
 - Refresh to the current public hypxrland tip: per-HMD xr_defaults and
   profiles with auto-named create, don/doff intent with settle/hide/fade,

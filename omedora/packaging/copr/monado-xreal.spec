@@ -1,12 +1,12 @@
 # monado-xreal.spec — private XREAL Air runtime for HypXRland.
 
-%global snapshot 20261016.2
-%global commit 613d8eeb1e29be2b208a3b0eff2f5826f4bef983
+%global snapshot 20261102.1
+%global commit 76c63baca9771d77c3455c3eff81a3cd3fd20402
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 
 Name:           monado-xreal
 Version:        25.1.0^%{snapshot}.git%{shortcommit}
-Release:        5%{?dist}
+Release:        1%{?dist}
 Summary:        HypXRland Monado runtime for XREAL Air displays
 
 License:        BSL-1.0 AND Apache-2.0 AND BSD-3-Clause AND MIT
@@ -21,6 +21,7 @@ Source5:        monado-xreal-avoid-power-saver
 
 ExclusiveArch:  x86_64
 
+BuildRequires:  binutils
 BuildRequires:  cmake
 BuildRequires:  cmake(OpenCV)
 BuildRequires:  cjson-devel
@@ -42,6 +43,8 @@ BuildRequires:  pkgconfig(egl)
 BuildRequires:  pkgconfig(glesv2)
 BuildRequires:  pkgconfig(hidapi-hidraw)
 BuildRequires:  pkgconfig(libdrm)
+# sd-bus, for asking rtkit for the render thread's real-time priority.
+BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libudev)
 BuildRequires:  pkgconfig(vulkan)
 BuildRequires:  pkgconfig(wayland-client)
@@ -66,6 +69,9 @@ Requires:       basalt-xreal >= 0^20261015.gite3dec7b44
 # The power-saver helper reads and sets the PowerProfiles daemon's profile
 # (tuned-ppd on Fedora) with busctl.
 Requires:       /usr/bin/busctl
+# The unit turns on real-time priority for the compositor's render thread,
+# which Monado asks rtkit for; without rtkit it logs why and runs normally.
+Requires:       rtkit
 
 %description
 This package builds the HypXRland-pinned Monado fork as an XREAL Air runtime:
@@ -82,7 +88,9 @@ privately under %{_libexecdir}/monado-xreal. See README.package.md.
 
 The service binary deliberately has no file capabilities. A file capability
 puts the Vulkan loader into secure-execution mode and prevents the per-machine
-GPU ICD selection required by hybrid-GPU XREAL systems.
+GPU ICD selection required by hybrid-GPU XREAL systems. The compositor's
+render thread gets real-time priority from rtkit instead: SCHED_RR at a
+bounded priority (10), with rtkit's watchdog demoting a runaway thread.
 
 While the runtime runs, monado-xreal-avoid-power-saver.service switches the
 "power-saver" power profile, which turns turbo off, to "balanced", and
@@ -142,7 +150,7 @@ export CXXFLAGS="%{build_cxxflags} -include cstdint"
   -DXRT_HAVE_LIBUDEV=ON \
   -DXRT_HAVE_OPENCV=ON \
   -DXRT_HAVE_SYSTEM_CJSON=ON \
-  -DXRT_HAVE_SYSTEMD=OFF \
+  -DXRT_HAVE_SYSTEMD=ON \
   -DXRT_HAVE_WAYLAND=ON \
   -DXRT_HAVE_WAYLAND_DIRECT=ON \
   -DXRT_INSTALL_SYSTEMD_UNIT_FILES=OFF \
@@ -191,6 +199,18 @@ grep -q '^XRT_FEATURE_SLAM:BOOL=ON$' \
   %{__cmake_builddir}/CMakeCache.txt
 grep -q '^XRT_FEATURE_OPENXR_PLANE_DETECTION:BOOL=ON$' \
   %{__cmake_builddir}/CMakeCache.txt
+# rtkit support is compiled in (sd-bus), without socket activation, and
+# libsystemd stays out of the runtime library loaded into every OpenXR app.
+grep -q '^XRT_HAVE_SYSTEMD:BOOL=ON$' \
+  %{__cmake_builddir}/CMakeCache.txt
+grep -q '^XRT_FEATURE_SERVICE_SYSTEMD:BOOL=OFF$' \
+  %{__cmake_builddir}/CMakeCache.txt
+readelf -d %{buildroot}%{_libexecdir}/monado-xreal/monado-service |
+  grep -q 'NEEDED.*\[libsystemd\.so'
+if readelf -d %{buildroot}%{_libdir}/monado-xreal/libopenxr_monado_xreal.so |
+  grep -q 'NEEDED.*\[libsystemd\.so'; then
+  exit 1
+fi
 # 6DoF: the unit points at basalt-xreal's library and settings (both must
 # exist as installed by the BuildRequires'd package) and never enables SLAM or
 # planes itself.
@@ -206,6 +226,7 @@ if grep -qE '^Environment=XREAL_AIR_(SLAM|PLANES)=' "$unit"; then
 fi
 # The runtime stays out of app.slice, where uresourced resets CPUWeight=.
 [[ $(sed -n 's/^Slice=//p' "$unit") == session.slice ]]
+grep -qx 'Environment=XRT_COMPOSITOR_THREAD_REALTIME=true' "$unit"
 %{buildroot}%{_libexecdir}/monado-xreal/monado-cli 2>&1 | grep -q xreal-slam-replay
 grep -F '%{_libdir}/monado-xreal/libopenxr_monado_xreal.so' %{SOURCE2}
 # No file capabilities: they would put the Vulkan loader in secure-execution
@@ -250,6 +271,16 @@ done
 %{_datadir}/openxr/1/openxr_monado-xreal.json
 
 %changelog
+* Mon Nov 02 2026 omedora <noreply@omedora> - 25.1.0^20261102.1.git76c63baca-1
+- Refresh to HypXRland's Monado submodule pin 76c63ba: bounded, rtkit-first
+  real-time priority for the compositor render thread
+  (XRT_COMPOSITOR_THREAD_RT_PRIORITY, default 10), opt-in
+  XREAL_AIR_SLAM_CPUS to pin the SLAM tracker, and SLAM_TIMING_STAT.
+- Turn that real-time priority on (#11): build with XRT_HAVE_SYSTEMD for
+  sd-bus, require rtkit, and set XRT_COMPOSITOR_THREAD_REALTIME=true in the
+  unit. Socket activation stays off and the service still has no file
+  capabilities. %%check keeps libsystemd out of the OpenXR runtime library.
+
 * Mon Nov 02 2026 omedora <noreply@omedora> - 25.1.0^20261016.2.git613d8eeb1-5
 - Replace the "performance" hold with monado-xreal-avoid-power-saver.service:
   on a laptop whose CPU and GPU share one power limit, performance pinned

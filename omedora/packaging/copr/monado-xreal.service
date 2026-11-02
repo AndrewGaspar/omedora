@@ -37,6 +37,11 @@ CPUWeight=1000
 # unit's cgroup has the same owner as the slice it watches. It is ignored only
 # for root-owned slices.
 ManagedOOMPreference=avoid
+# Real-time priority for the compositor's render thread: Monado asks rtkit for
+# SCHED_RR at a bounded priority (XRT_COMPOSITOR_THREAD_RT_PRIORITY, default
+# 10), so no file capabilities are needed. The SLAM tracker stays normal. If
+# rtkit refuses, Monado logs one warning saying why and runs normally.
+Environment=XRT_COMPOSITOR_THREAD_REALTIME=true
 ExecStart=/usr/libexec/monado-xreal/monado-service
 Restart=no
 KillSignal=SIGKILL

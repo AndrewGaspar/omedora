@@ -23,12 +23,12 @@ done
 
 grep -qE '^Version:[[:space:]]+0\.56\.2$' "$COPR/hyprland.spec" \
   && pass "stable Hyprland is 0.56.2" || fail "stable Hyprland is 0.56.2"
-grep -qE '^%global commit 9097b3c02bc996d8aa4ac348700727877ac4aa39$' "$HYPXR" \
+grep -qE '^%global commit e3a89bc8c16690cb6b69c27350c18a80b51f68b5$' "$HYPXR" \
   && pass "HypXRland current branch tip is pinned" || fail "HypXRland current branch tip is pinned"
-grep -qE '^%global snapshot 20261016\.1$' "$HYPXR" \
-  && pass "HypXRland uses the Oct 16 snapshot revision" \
-  || fail "HypXRland uses the Oct 16 snapshot revision"
-grep -qF 'fc3041fd892c8a4ec88c7fd9fd1e5394201d5a3f2076c773a4bb576745666cf0  hypxrland-9097b3c02bc996d8aa4ac348700727877ac4aa39.tar.gz' \
+grep -qE '^%global snapshot 20261102\.1$' "$HYPXR" \
+  && pass "HypXRland uses the Nov 2 snapshot revision" \
+  || fail "HypXRland uses the Nov 2 snapshot revision"
+grep -qF 'fdfaaaefe5d386a62ab95a2fe62c7f0d97f7e03442ec6cdbdd58cee3a5a147f7  hypxrland-e3a89bc8c16690cb6b69c27350c18a80b51f68b5.tar.gz' \
   "$COPR/hypxrland.spec.sources" \
   && pass "HypXRland current archive checksum is pinned" \
   || fail "HypXRland current archive checksum is pinned"
@@ -165,13 +165,13 @@ grep -qx 'Slice=session.slice' "$MONADO_UNIT" \
   || fail "monado-xreal unit runs in session.slice, out of uresourced's app.slice"
 
 MONADO="$COPR/monado-xreal.spec"
-grep -qx '%global commit 613d8eeb1e29be2b208a3b0eff2f5826f4bef983' "$MONADO" \
+grep -qx '%global commit 76c63baca9771d77c3455c3eff81a3cd3fd20402' "$MONADO" \
   && pass "monado-xreal pins the fork's hypxrland tip" \
   || fail "monado-xreal pins the fork's hypxrland tip"
-grep -qx '%global snapshot 20261016.2' "$MONADO" \
-  && pass "monado-xreal snapshot sorts above the previous Oct 16 pin" \
-  || fail "monado-xreal snapshot sorts above the previous Oct 16 pin"
-grep -qF '9d170f5b20fdab8c89d5a527b3155b311544cb24ce77e86b0c163099bf05476a  monado-xreal-613d8eeb1e29be2b208a3b0eff2f5826f4bef983.tar.gz' \
+grep -qx '%global snapshot 20261102.1' "$MONADO" \
+  && pass "monado-xreal uses the Nov 2 snapshot" \
+  || fail "monado-xreal uses the Nov 2 snapshot"
+grep -qF '6c4cfa27ab0b3dfe9edeeee2a927661bf29de6341ca3314e51c042813f0d1f69  monado-xreal-76c63baca9771d77c3455c3eff81a3cd3fd20402.tar.gz' \
   "$COPR/monado-xreal.spec.sources" \
   && pass "monado-xreal archive checksum is pinned" \
   || fail "monado-xreal archive checksum is pinned"
@@ -192,6 +192,19 @@ grep -qF -- '-DXRT_FEATURE_SLAM=ON' "$MONADO" \
   && grep -qF -- '-DXRT_FEATURE_OPENXR_PLANE_DETECTION=ON' "$MONADO" \
   && pass "monado-xreal builds the SLAM and plane detection paths" \
   || fail "monado-xreal builds the SLAM and plane detection paths"
+# Real-time render thread (#11, AndrewGaspar/monado#1): rtkit through sd-bus,
+# no socket activation, and still no file capabilities.
+grep -qF -- '-DXRT_HAVE_SYSTEMD=ON' "$MONADO" \
+  && grep -qF -- '-DXRT_FEATURE_SERVICE_SYSTEMD=OFF' "$MONADO" \
+  && grep -qE '^BuildRequires:[[:space:]]+pkgconfig\(libsystemd\)$' "$MONADO" \
+  && pass "monado-xreal builds rtkit support without socket activation" \
+  || fail "monado-xreal builds rtkit support without socket activation"
+grep -qE '^Requires:[[:space:]]+rtkit$' "$MONADO" \
+  && pass "monado-xreal requires rtkit (weak deps are off)" \
+  || fail "monado-xreal requires rtkit (weak deps are off)"
+grep -qx 'Environment=XRT_COMPOSITOR_THREAD_REALTIME=true' "$MONADO_UNIT" \
+  && pass "monado-xreal unit turns on the real-time render thread" \
+  || fail "monado-xreal unit turns on the real-time render thread"
 grep -qF '%{buildroot}%{_libexecdir}/monado-xreal/monado-cli' "$MONADO" \
   && pass "monado-xreal installs monado-cli privately" \
   || fail "monado-xreal installs monado-cli privately"

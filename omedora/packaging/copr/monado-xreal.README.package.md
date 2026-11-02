@@ -61,6 +61,25 @@ other apps first. Both apply only inside your own session: system services
 still share the CPU with your session as a whole. Override either one in a
 drop-in, for example `CPUWeight=` (empty) to go back to the default.
 
+## Real-time priority
+
+The compositor's render thread runs real-time (`SCHED_RR`, priority 10), so
+frames keep coming when the CPU is busy. Monado gets that from rtkit, which
+this package pulls in; the service needs no file capabilities and no
+`limits.conf` changes, and rtkit's watchdog demotes a thread that runs away.
+The SLAM tracker stays at normal priority: it uses most of a core and would
+starve the desktop.
+
+The journal has one line with the outcome:
+
+```bash
+journalctl --user -u monado-xreal.service | grep 'real-time priority'
+```
+
+To change the priority, set `XRT_COMPOSITOR_THREAD_RT_PRIORITY` in a drop-in
+(rtkit caps it at its `MaxRealtimePriority`, 20 by default). To turn it off,
+set `Environment=XRT_COMPOSITOR_THREAD_REALTIME=false`.
+
 ## Power profile
 
 6DoF tracking needs turbo, and the `power-saver` profile turns it off. So
