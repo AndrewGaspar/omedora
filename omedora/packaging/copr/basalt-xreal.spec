@@ -180,9 +180,14 @@ objdump -p "$lib" | grep -qE 'SONAME[[:space:]]+libbasalt\.so\.%{vit_major}$'
 nm -D --defined-only "$lib" | grep -qw vit_api_get_version
 nm -D --defined-only "$lib" | grep -qw vit_tracker_create
 nm -D --defined-only "$lib" | grep -qw basalt_vit_restartable
-! nm -D --defined-only "$lib" | grep -v -E ' (vit_|basalt_vit_|BASALT_)' | grep -q ' T '
+# (`! cmd` never trips rpm's `sh -e`, so negative checks exit by hand.)
+if nm -D --defined-only "$lib" | grep -v -E ' (vit_|basalt_vit_|BASALT_)' | grep -q ' T '; then
+  exit 1
+fi
 # No GUI stack leaked in (visualization is off).
-! objdump -p "$lib" | grep -E 'NEEDED' | grep -qiE 'pangolin|libGL|epoxy|wayland'
+if objdump -p "$lib" | grep -E 'NEEDED' | grep -qiE 'pangolin|libGL|epoxy|wayland'; then
+  exit 1
+fi
 # The settings point at the installed json, use the float pipeline, take the
 # calibration from the driver, and keep the GUI off.
 toml=%{buildroot}%{_datadir}/basalt-xreal/xreal_air.toml

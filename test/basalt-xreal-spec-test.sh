@@ -139,6 +139,12 @@ grep -qF "grep -qx 'config-path=\"%{_datadir}/basalt-xreal/xreal_air_config.json
   || fail "%check verifies the rewritten config-path"
 grep -qF 'data/xreal/xreal_air_config.json' "$SPEC" \
   && pass "ships the XREAL pipeline json" || fail "ships the XREAL pipeline json"
+# rpm runs %check under `sh -e`, which never fails on a `! cmd` line.
+if sed -n '/^%check/,/^%files/p' "$SPEC" | grep -qE '^[[:space:]]*! '; then
+  fail "%check has no bare negated commands (they never fail the build)"
+else
+  pass "%check has no bare negated commands (they never fail the build)"
+fi
 for check in vit_api_get_version basalt_vit_restartable './vit-smoke'; do
   grep -qF "$check" "$SPEC" && pass "%check covers $check" || fail "%check covers $check"
 done
