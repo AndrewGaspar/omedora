@@ -13,6 +13,12 @@ Environment=XRT_NO_STDIN=1
 # it on stop, which also clears the socket the SIGKILL stop leaves behind.
 RuntimeDirectory=monado-xreal
 RuntimeDirectoryMode=0700
+# 6DoF (visual-inertial SLAM) stays off until XREAL_AIR_SLAM=1 is set in a
+# drop-in. When it is on, Monado loads the Basalt tracker from basalt-xreal's
+# private libdir and its XREAL pipeline settings (Monado's own default looks in
+# <libdir>/../share/basalt, which the private layout does not have).
+Environment=VIT_SYSTEM_LIBRARY_PATH=/usr/lib64/basalt-xreal/libbasalt.so.2
+Environment=XREAL_AIR_SLAM_CONFIG=/usr/share/basalt-xreal/xreal_air.toml
 ExecStart=/usr/libexec/monado-xreal/monado-service
 Restart=no
 KillSignal=SIGKILL

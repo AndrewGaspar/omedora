@@ -72,4 +72,5 @@ XREAL Air users can additionally install monado-xreal. Its runtime manifest is
 monado-xreal.service. GPU selection and direct-mode connector settings remain
 machine-specific systemd user drop-ins. The RPM requires Fedora's xr-hardware
 udev rules; reconnect the glasses after first installation so seat access is
-applied.
+applied. Tracking is 3DoF until you opt into 6DoF (and plane detection) with a
+drop-in, as described in /usr/share/doc/monado-xreal/README.package.md.
