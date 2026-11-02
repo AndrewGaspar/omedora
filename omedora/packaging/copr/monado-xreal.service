@@ -22,14 +22,20 @@ RuntimeDirectoryMode=0700
 # <libdir>/../share/basalt, which the private layout does not have).
 Environment=VIT_SYSTEM_LIBRARY_PATH=/usr/lib64/basalt-xreal/libbasalt.so.2
 Environment=XREAL_AIR_SLAM_CONFIG=/usr/share/basalt-xreal/xreal_air.toml
-# Win CPU against the other apps in the session. 6DoF tracking takes more than
-# a core and stutters under background load. The user manager has the cpu
+# Run beside the compositor in session.slice (uwsm puts it there), not in
+# app.slice. Fedora's uresourced manages every unit in app.slice: it resets
+# CPUWeight= and IOWeight= to its own defaults, and with ManagedOOMPreference=
+# set it did so thousands of times a second. It leaves session.slice alone.
+Slice=session.slice
+# Win CPU against the rest of the session. 6DoF tracking takes more than a
+# core and stutters under background load. The user manager has the cpu
 # controller delegated, so the weight applies. There is no IOWeight=: Fedora's
 # user@.service delegates only pids, memory and cpu, so it would do nothing.
 CPUWeight=1000
-# Fedora's oomd defaults kill on memory pressure in every user slice. oomd
-# honors this preference there, because the unit's cgroup has the same owner
-# as the slice it watches. It is ignored only for root-owned slices.
+# Fedora's oomd defaults kill on memory pressure in every user slice,
+# session.slice included. oomd honors this preference there, because the
+# unit's cgroup has the same owner as the slice it watches. It is ignored only
+# for root-owned slices.
 ManagedOOMPreference=avoid
 ExecStart=/usr/libexec/monado-xreal/monado-service
 Restart=no

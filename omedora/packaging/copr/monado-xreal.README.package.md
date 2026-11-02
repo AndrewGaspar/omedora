@@ -52,8 +52,10 @@ in the fork's `src/xrt/drivers/xreal_air/xreal_air_slam.h`.
 
 ## CPU priority
 
-The unit sets `CPUWeight=1000`, ten times the default, so the runtime gets the
-CPU it needs when other apps in your session are busy. It also sets
+The unit runs in `session.slice`, beside the compositor, and sets
+`CPUWeight=1000`, ten times the default, so the runtime gets the CPU it needs
+when other apps in your session are busy. It stays out of `app.slice` because
+Fedora's `uresourced` manages every unit there and resets its CPU weight. It also sets
 `ManagedOOMPreference=avoid`, so under memory pressure `systemd-oomd` stops
 other apps first. Both apply only inside your own session: system services
 still share the CPU with your session as a whole. Override either one in a

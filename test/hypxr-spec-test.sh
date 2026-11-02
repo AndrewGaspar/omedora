@@ -156,6 +156,13 @@ if grep -qE '^IOWeight=' "$MONADO_UNIT"; then
 else
   pass "monado-xreal unit carries no no-op IOWeight="
 fi
+# #15: uresourced manages every unit in app.slice and resets CPUWeight= there,
+# so the runtime must run elsewhere: session.slice, beside the compositor.
+assert_equals "monado-xreal unit picks exactly one slice" \
+  "$(grep -c '^Slice=' "$MONADO_UNIT")" "1"
+grep -qx 'Slice=session.slice' "$MONADO_UNIT" \
+  && pass "monado-xreal unit runs in session.slice, out of uresourced's app.slice" \
+  || fail "monado-xreal unit runs in session.slice, out of uresourced's app.slice"
 
 MONADO="$COPR/monado-xreal.spec"
 grep -qx '%global commit 613d8eeb1e29be2b208a3b0eff2f5826f4bef983' "$MONADO" \

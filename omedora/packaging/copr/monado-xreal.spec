@@ -204,6 +204,8 @@ test -f "$slam_config"
 if grep -qE '^Environment=XREAL_AIR_(SLAM|PLANES)=' "$unit"; then
   exit 1
 fi
+# The runtime stays out of app.slice, where uresourced resets CPUWeight=.
+[[ $(sed -n 's/^Slice=//p' "$unit") == session.slice ]]
 %{buildroot}%{_libexecdir}/monado-xreal/monado-cli 2>&1 | grep -q xreal-slam-replay
 grep -F '%{_libdir}/monado-xreal/libopenxr_monado_xreal.so' %{SOURCE2}
 # No file capabilities: they would put the Vulkan loader in secure-execution
@@ -259,6 +261,11 @@ done
   left alone. The helper is a busctl shell script, so the package no longer
   requires python3-gobject-base. The unit also stops a -4 hold left running
   by an upgrade. Mask the unit to turn it off.
+- Run the runtime in session.slice, beside the compositor, instead of
+  app.slice. Fedora's uresourced manages every unit in app.slice: it reset
+  CPUWeight=1000 to 100, and because systemd rewrites the cgroup's
+  user.oomd_avoid xattr on each change, its own writes retriggered it
+  thousands of times a second (#15). %%check keeps the unit out of app.slice.
 
 * Mon Nov 02 2026 omedora <noreply@omedora> - 25.1.0^20261016.2.git613d8eeb1-4
 - Hold the "performance" power profile while the runtime runs, a stopgap until
