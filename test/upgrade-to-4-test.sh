@@ -630,7 +630,9 @@ kept_names=$(sed -n '/^v4_kept_packages=(/,/^)/p' "$ROOT/bin/omedora-upgrade-to-
 # they are intentionally absent from v4_kept_packages. voxtype (single
 # from-source RPM) is the dictation engine — on-demand. openclaw is the seed
 # Install > AI > OpenClaw and the OpenClaw default agent install — on-demand.
-on_demand_specs=" voxtype openclaw "
+# hyprpad (Steam Controller / gamepad driver) is opt-in hardware support —
+# on-demand.
+on_demand_specs=" voxtype openclaw hyprpad "
 missing=""
 for s in $spec_names; do
   [[ $on_demand_specs == *" $s "* ]] && continue

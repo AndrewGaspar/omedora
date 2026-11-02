@@ -156,6 +156,36 @@ grep -iE '^Source[0-9]*:' "$spec_dir/$spec_base" | sed -E 's/^[^:]+:[[:space:]]*
   esac
 done
 
+# A SECOND standalone crate deps bundle (hyprpad osk subdir, own Cargo.lock,
+# deliberately not a workspace member). `cargo vendor` syncs its target dir to
+# exactly one resolve set, so the osk deps cannot be merged into the root
+# vendor/ above — a `*-osk-deps.tar.*` Source requests its own deterministic
+# tarball (unpacks to osk-vendor/), sealed offline by the second
+# .cargo/config.toml in the spec. Generic + guarded like the vendor step above;
+# non-matching specs are untouched. Mirrors
+# omedora/packaging/copr/build-local.sh — keep the two in sync.
+grep -iE '^Source[0-9]*:' "$spec_dir/$spec_base" | sed -E 's/^[^:]+:[[:space:]]*//' | while read -r src; do
+  case "$src" in
+    *-osk-deps.tar.*)
+      command -v cargo >/dev/null 2>&1 || \
+        dnf install -y --setopt=keepcache=1 --setopt=install_weak_deps=False cargo >/dev/null
+      read -r nv_name nv_version < <(rpmspec -q --srpm --qf '%{name} %{version}\n' "$spec_dir/$spec_base")
+      osk_tar="$TOPDIR/SOURCES/${nv_name}-${nv_version}-osk-deps.tar.zst"
+      [[ -f "$osk_tar" ]] && continue   # already present
+      echo "==> Generating OSK vendor tarball: $(basename "$osk_tar")"
+      work=$(mktemp -d)
+      src0=$(rpmspec -P "$spec_dir/$spec_base" | sed -nE 's/^Source0:[[:space:]]*//p' | head -n1)
+      src0_file="$TOPDIR/SOURCES/$(basename "$src0")"
+      tar -C "$work" -xf "$src0_file"
+      crate_top=$(find "$work" -mindepth 1 -maxdepth 1 -type d | head -n1)
+      ( cd "$crate_top/osk" && cargo vendor --locked osk-vendor >/dev/null )
+      tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner \
+        -C "$crate_top/osk" -caf "$osk_tar" osk-vendor
+      rm -rf "$work"
+      ;;
+  esac
+done
+
 # Herdr's vendored libghostty-vt uses Zig's package manager. Seal its global
 # dependency cache in the networked SRPM phase when requested by Source3, using
 # the exact Zig Source2 declared and checksum-pinned by the spec.

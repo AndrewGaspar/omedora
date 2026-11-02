@@ -222,6 +222,35 @@ EOF
       esac
     done
 
+    # A SECOND standalone crate deps bundle (hyprpad osk subdir, own Cargo.lock,
+    # deliberately not a workspace member). `cargo vendor` syncs its target dir
+    # to exactly one resolve set, so the osk deps cannot be merged into the
+    # root vendor/ above — a `*-osk-deps.tar.*` Source requests its own
+    # deterministic tarball (unpacks to osk-vendor/), sealed offline by the
+    # second .cargo/config.toml in the spec. Generic + guarded like the vendor
+    # step above; non-matching specs are untouched. Mirrors .copr/srpm.sh —
+    # keep the two in sync. NOTE: no apostrophes in this block — it lives
+    # inside the single-quoted bash -c string of the container below.
+    grep -iE "^Source[0-9]*:" "/copr/$OMEDORA_BUILD_SPEC" | sed -E "s/^[^:]+:[[:space:]]*//" | while read -r src; do
+      case "$src" in
+        *-osk-deps.tar.*)
+          read -r nv_name nv_version < <(rpmspec -q --srpm --qf "%{name} %{version}\n" "/copr/$OMEDORA_BUILD_SPEC")
+          osk_tar="$HOME/rpmbuild/SOURCES/${nv_name}-${nv_version}-osk-deps.tar.zst"
+          [[ -f "$osk_tar" ]] && continue   # already present — nothing to do
+          echo "==> Generating OSK vendor tarball: $(basename "$osk_tar")"
+          work=$(mktemp -d)
+          src0=$(rpmspec -P "/copr/$OMEDORA_BUILD_SPEC" | sed -nE "s/^Source0:[[:space:]]*//p" | head -n1)
+          src0_file="$HOME/rpmbuild/SOURCES/$(basename "$src0")"
+          tar -C "$work" -xf "$src0_file"
+          topdir=$(find "$work" -mindepth 1 -maxdepth 1 -type d | head -n1)
+          ( cd "$topdir/osk" && cargo vendor --locked osk-vendor >/dev/null )
+          tar --sort=name --mtime="@0" --owner=0 --group=0 --numeric-owner \
+            -C "$topdir/osk" -caf "$osk_tar" osk-vendor
+          rm -rf "$work"
+          ;;
+      esac
+    done
+
     # Herdr embeds libghostty-vt, whose Zig package manager must also be sealed
     # before mock'\''s offline build. A *-zig-cache.tar.* Source requests a
     # deterministic Zig global cache generated with the exact pinned Zig Source2.
