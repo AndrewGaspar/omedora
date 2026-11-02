@@ -6,7 +6,7 @@
 
 Name:           monado-xreal
 Version:        25.1.0^%{snapshot}.git%{shortcommit}
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        HypXRland Monado runtime for XREAL Air displays
 
 License:        BSL-1.0 AND Apache-2.0 AND BSD-3-Clause AND MIT
@@ -188,7 +188,13 @@ if grep -qE '^Environment=XREAL_AIR_(SLAM|PLANES)=' "$unit"; then
 fi
 %{buildroot}%{_libexecdir}/monado-xreal/monado-cli 2>&1 | grep -q xreal-slam-replay
 grep -F '%{_libdir}/monado-xreal/libopenxr_monado_xreal.so' %{SOURCE2}
-! getcap %{buildroot}%{_libexecdir}/monado-xreal/monado-service | grep -q .
+# No file capabilities: they would put the Vulkan loader in secure-execution
+# mode. `! cmd` never trips rpm's `sh -e`, so the check exits by hand. The
+# assignment fails the build if getcap itself fails.
+caps=$(getcap %{buildroot}%{_libexecdir}/monado-xreal/monado-service)
+if [[ -n $caps ]]; then
+  exit 1
+fi
 
 %post
 %systemd_user_post monado-xreal.service
@@ -208,6 +214,11 @@ grep -F '%{_libdir}/monado-xreal/libopenxr_monado_xreal.so' %{SOURCE2}
 %{_datadir}/openxr/1/openxr_monado-xreal.json
 
 %changelog
+* Mon Nov 02 2026 omedora <noreply@omedora> - 25.1.0^20261016.2.git613d8eeb1-2
+- Make the %%check that monado-service has no file capabilities able to fail:
+  rpm's sh -e ignored the bare `! getcap ...` line, and a failing getcap
+  passed too.
+
 * Sun Nov 01 2026 omedora <noreply@omedora> - 25.1.0^20261016.2.git613d8eeb1-1
 - Refresh to the fork's hypxrland branch tip 613d8ee, six commits past
   HypXRland's submodule pin: opt-in horizontal plane detection

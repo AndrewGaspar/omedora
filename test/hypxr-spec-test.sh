@@ -158,6 +158,19 @@ grep -qF -- '-DXRT_FEATURE_SLAM=ON' "$MONADO" \
 grep -qF '%{buildroot}%{_libexecdir}/monado-xreal/monado-cli' "$MONADO" \
   && pass "monado-xreal installs monado-cli privately" \
   || fail "monado-xreal installs monado-cli privately"
+# The service binary must never gain file capabilities (they put the Vulkan
+# loader in secure-execution mode). rpm runs %check under `sh -e`, which never
+# fails on a `! cmd` line, so the check has to exit by hand.
+monado_check=$(sed -n '/^%check/,/^%post/p' "$MONADO")
+if grep -qE '^[[:space:]]*! ' <<<"$monado_check"; then
+  fail "monado-xreal %check has no bare negated commands (they never fail the build)"
+else
+  pass "monado-xreal %check has no bare negated commands (they never fail the build)"
+fi
+grep -qF 'caps=$(getcap %{buildroot}%{_libexecdir}/monado-xreal/monado-service)' <<<"$monado_check" \
+  && grep -qx 'if \[\[ -n $caps \]\]; then' <<<"$monado_check" \
+  && pass "monado-xreal %check fails on file capabilities" \
+  || fail "monado-xreal %check fails on file capabilities"
 grep -qE '^Source3:[[:space:]]+monado-xreal\.README\.package\.md$' "$MONADO" \
   && grep -qF 'Environment=XREAL_AIR_SLAM=1' "$COPR/monado-xreal.README.package.md" \
   && grep -qF 'Environment=XREAL_AIR_PLANES=1' "$COPR/monado-xreal.README.package.md" \
