@@ -75,8 +75,11 @@ fi
 
 mounts=(-v "$REPO:/repo")
 env_args=()
+# OMEDORA_DNF_CACHE_VOL and OMEDORA_L3_CTR give --update-verify private names,
+# so it can share the host with other gates (as build-session.sh's overrides do).
+dnf_cache_vol="${OMEDORA_DNF_CACHE_VOL:-omedora-dnf-cache$OMEDORA_RELEASE_SUFFIX}"
 if [[ $script == "update-verify.sh" ]]; then
-  mounts+=(-v "omedora-dnf-cache$OMEDORA_RELEASE_SUFFIX:/var/cache/libdnf5")
+  mounts+=(-v "$dnf_cache_vol:/var/cache/libdnf5")
 fi
 if $local_repo; then
   if $rebuild_repo; then
@@ -107,13 +110,13 @@ if [[ $script == "update-verify.sh" ]]; then
     exit 2
   fi
   systemd_base_ensure
-  ctr="omedora-l3-update-verify$OMEDORA_RELEASE_SUFFIX"
+  ctr="${OMEDORA_L3_CTR:-omedora-l3-update-verify$OMEDORA_RELEASE_SUFFIX}"
   if ! $keep; then
     trap 'podman rm -f "$ctr" >/dev/null 2>&1 || true' EXIT
   fi
   echo "Booting $SYSTEMD_BASE_IMAGE under systemd as $ctr..."
-  podman volume exists "omedora-dnf-cache$OMEDORA_RELEASE_SUFFIX" ||
-    podman volume create "omedora-dnf-cache$OMEDORA_RELEASE_SUFFIX" >/dev/null
+  podman volume exists "$dnf_cache_vol" ||
+    podman volume create "$dnf_cache_vol" >/dev/null
   systemd_container_run "$ctr" "${mounts[@]}"
   systemd_container_wait "$ctr"
   rc=0

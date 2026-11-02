@@ -72,8 +72,10 @@ fi
 
 FROM_RELEASE=$OMEDORA_FEDORA_RELEASE
 TO_RELEASE="${OMEDORA_UPGRADE_TO:-$((FROM_RELEASE + 1))}"
-DNF_CACHE_VOL="omedora-dnf-cache$OMEDORA_RELEASE_SUFFIX"
-CTR="omedora-l3-release-upgrade-f$FROM_RELEASE"
+# OMEDORA_DNF_CACHE_VOL and OMEDORA_L3_CTR give a run private names, so it can
+# share the host with other gates (as build-session.sh's overrides do).
+DNF_CACHE_VOL="${OMEDORA_DNF_CACHE_VOL:-omedora-dnf-cache$OMEDORA_RELEASE_SUFFIX}"
+CTR="${OMEDORA_L3_CTR:-omedora-l3-release-upgrade-f$FROM_RELEASE}"
 VERIFY=/repo/omedora/test/fedora/release-upgrade-verify.sh
 mounts=(-v "$REPO:/repo" -v "$DNF_CACHE_VOL:/var/cache/libdnf5")
 exec_env=(-e "OMEDORA_UPGRADE_CODE=$code_mode")
