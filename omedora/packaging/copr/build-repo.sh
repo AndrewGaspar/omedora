@@ -121,9 +121,11 @@ SPECS=(
   # monado-xreal is published but remains hardware-specific and opt-in.
   # basalt-xreal, the Basalt VIT tracker for monado-xreal's opt-in 6DoF,
   # builds before it: monado-xreal requires it and BuildRequires it for %check.
+  # xreal-ctl (the XREAL 2D/3D HID helper, built from hypxrland's archive)
+  # precedes hypxrland-omedora, which requires it.
   hypxrpaper.spec hypxrva.spec hypxrhud.spec hypxrcompose.spec
   hypxrvoice-model-base-en.spec hypxrvoice.spec
-  wivrn-hypxr.spec basalt-xreal.spec monado-xreal.spec
+  wivrn-hypxr.spec basalt-xreal.spec monado-xreal.spec xreal-ctl.spec
   hypxrland-legacy-config.spec
   hypxrland.spec hypxrland-stack.spec hypxrland-omedora.spec
   # hyprland-omedora (the 3.8.2-era session-entry shim) is RETIRED on the 4.x

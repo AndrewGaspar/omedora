@@ -633,7 +633,9 @@ kept_names=$(sed -n '/^v4_kept_packages=(/,/^)/p' "$ROOT/bin/omedora-upgrade-to-
 # hyprpad (Steam Controller / gamepad driver) is opt-in hardware support —
 # on-demand. basalt-xreal (monado-xreal's 6DoF tracker) is new on the 4 line
 # and arrives as a hard dependency of the kept monado-xreal — on-demand.
-on_demand_specs=" voxtype openclaw hyprpad basalt-xreal "
+# xreal-ctl (the XREAL 2D/3D HID helper) is new on the 4 line too and arrives
+# as a hard dependency of the kept hypxrland-omedora — on-demand.
+on_demand_specs=" voxtype openclaw hyprpad basalt-xreal xreal-ctl "
 missing=""
 for s in $spec_names; do
   [[ $on_demand_specs == *" $s "* ]] && continue
