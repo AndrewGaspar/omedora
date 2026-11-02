@@ -1,0 +1,88 @@
+#!/usr/bin/python3
+"""Hold the "performance" power profile until a process exits.
+
+Usage: performance-hold PID
+
+omarchy-xr-session starts this detached, passing its own PID. That PID stays
+the session's for its whole life: the wrapper execs hypxrland-session, which
+execs uwsm, which execs the shell that waits on the compositor unit.
+
+The helper asks the PowerProfiles daemon (Fedora's tuned-ppd, or
+power-profiles-daemon) for a "performance" hold over the system bus. It keeps
+that bus connection open until PID exits, then releases the hold. Both daemons
+also drop a hold when its owner leaves the bus, so a crash or a killed helper
+cannot leave the machine stuck in performance mode.
+
+Each failure is logged, and the helper then exits 0. Possible failures: no
+daemon, no performance profile, an older daemon without HoldProfile, or polkit
+refusing the hold. The session never waits on the hold and never depends on it.
+"""
+
+import os
+import select
+import sys
+
+BUS_NAME = "org.freedesktop.UPower.PowerProfiles"
+OBJECT_PATH = "/org/freedesktop/UPower/PowerProfiles"
+INTERFACE = "org.freedesktop.UPower.PowerProfiles"
+PROFILE = "performance"
+REASON = "HypXRland XR session"
+APP_ID = "omedora-xr"
+TIMEOUT_MS = 10000
+
+
+def log(message):
+    print(f"omarchy-xr-session: performance hold: {message}", file=sys.stderr, flush=True)
+
+
+def main(argv):
+    if len(argv) != 2 or not argv[1].isdigit():
+        log("usage: performance-hold PID")
+        return 2
+    pid = int(argv[1])
+
+    try:
+        pidfd = os.pidfd_open(pid)
+    except OSError as error:
+        log(f"cannot watch the session process {pid} ({error.strerror}); not holding")
+        return 0
+
+    try:
+        from gi.repository import Gio, GLib
+    except ImportError as error:
+        log(f"PyGObject is unavailable ({error}); not holding")
+        return 0
+
+    try:
+        bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+        reply = bus.call_sync(
+            BUS_NAME, OBJECT_PATH, INTERFACE, "HoldProfile",
+            GLib.Variant("(sss)", (PROFILE, REASON, APP_ID)),
+            GLib.VariantType("(u)"), Gio.DBusCallFlags.NONE, TIMEOUT_MS, None)
+    except GLib.Error as error:
+        log(f"not holding: {error.message}")
+        return 0
+    cookie = reply.unpack()[0]
+    log(f"holding '{PROFILE}' (cookie {cookie}) until the session ends")
+
+    # GDBus services the connection on its own thread, so blocking here keeps
+    # the hold alive without a main loop.
+    poller = select.poll()
+    poller.register(pidfd, select.POLLIN)
+    poller.poll()
+
+    try:
+        bus.call_sync(
+            BUS_NAME, OBJECT_PATH, INTERFACE, "ReleaseProfile",
+            GLib.Variant("(u)", (cookie,)), None, Gio.DBusCallFlags.NONE,
+            TIMEOUT_MS, None)
+    except GLib.Error as error:
+        # A manual profile change already cancelled the hold.
+        log(f"release: {error.message}")
+    else:
+        log(f"released '{PROFILE}'")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
