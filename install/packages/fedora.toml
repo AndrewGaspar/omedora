@@ -621,6 +621,13 @@ reason = "Arm (NVIDIA N1x) laptop firmware; Omedora doesn't own firmware or aarc
 source = "skip"
 reason = "Dell XPS 13 speaker amplifier setup that rebuilds the boot image; boot/initramfs are Fedora's. Its migration (1787666837) is Fedora-gated."
 
+# --- Omarchy 4.5-rc3 additions ----------------------------------------------
+
+[xorg-xsetroot]
+source = "dnf"
+names = ["xsetroot"]
+reason = "4.5-rc3 resets the X11 root cursor with xsetroot when the desktop is revealed (default/hypr/startup-cursor.lua), so XWayland apps don't keep a transparent cursor. Fedora split xorg-x11-server-utils into per-tool packages; this one is xsetroot. Migration 1793512402 adds it to existing installs through this entry."
+
 # --- Menu installers (Install / Setup > Defaults rows; test/menu-pkg-audit-test.sh)
 # Every package a menu row checks or installs is mapped here, listed in the
 # audit's reviewed same-name allowlist, or reached only from a row with a
