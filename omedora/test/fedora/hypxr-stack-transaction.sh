@@ -77,7 +77,8 @@ REPO
     test "$(rpm -qf /usr/bin/ffprobe)" = "$fixture_nevra"
     rpm -q hyprland-no-session hypxrland-omedora hypxrland-stack hypxrland \
       hypxrland-legacy-config hypxrcompose hypxrhud hypxrpaper hypxrva \
-      hypxrvoice hypxrvoice-model-base-en wivrn-hypxr omedora-settings
+      hypxrvoice hypxrvoice-model-base-en wivrn-hypxr omedora-settings \
+      monado-xreal basalt-xreal xreal-ctl
 
     test -x /usr/libexec/hypxrland/Hyprland
     test -x /usr/libexec/hypxrland/hyprctl

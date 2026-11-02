@@ -118,7 +118,7 @@ SPECS=(
   # HypXRland's complete rolling stack. The compositor is private under
   # /usr/libexec and shares the 0.56.x libraries with the stable Hyprland built
   # above. Leaf runtimes precede the dependency-only stack/session packages;
-  # monado-xreal is published but remains hardware-specific and opt-in.
+  # the stack leaves monado-xreal out, and hypxrland-omedora requires it.
   # basalt-xreal, the Basalt VIT tracker for monado-xreal's opt-in 6DoF,
   # builds before it: monado-xreal requires it and BuildRequires it for %check.
   # xreal-ctl (the XREAL 2D/3D HID helper, built from hypxrland's archive)

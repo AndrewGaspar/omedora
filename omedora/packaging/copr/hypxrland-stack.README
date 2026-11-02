@@ -67,7 +67,9 @@ external /usr/bin/showmethekey-cli backend. The XR session's private hyprctl is
 into the ticker shim. Full Fedora guidance is installed at
 /usr/share/doc/hypxrhud/hypxrhud-fedora.md.
 
-XREAL Air users can additionally install monado-xreal. Its runtime manifest is
+hypxrland-omedora also installs monado-xreal, the XREAL Air runtime, and
+xreal-ctl, which switches the glasses between 2D and 3D side-by-side for the
+desktop. The runtime's manifest is
 /usr/share/openxr/1/openxr_monado-xreal.json and its private user unit is
 monado-xreal.service. GPU selection and direct-mode connector settings remain
 machine-specific systemd user drop-ins. The RPM requires Fedora's xr-hardware
