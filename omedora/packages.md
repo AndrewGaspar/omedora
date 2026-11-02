@@ -266,8 +266,11 @@ Quattro's Lua defaults, while the current fork also ships a Lua XR example.
 
 `hypxrland-stack` version-locks the compositor, HUD, voice/model, VA gate,
 background client, WiVRn host runtime, and offline `.hypxrtake` compositor to
-their minimum compatible EVRs. `monado-xreal` remains an optional,
-hardware-specific suggestion. It requires `basalt-xreal`, the Basalt VIT
+their minimum compatible EVRs. The stack only suggests `monado-xreal`, the
+XREAL Air runtime, but `hypxrland-omedora` requires it and `xreal-ctl` (the
+2D/3D HID helper), because XREAL glasses are the session's primary hardware and
+Omedora installs with weak dependencies off. `monado-xreal` requires
+`basalt-xreal`, the Basalt VIT
 tracker its opt-in 6DoF path loads, and its unit points Monado at it, so
 `XREAL_AIR_SLAM=1` (plus `XREAL_AIR_PLANES=1` for plane detection) in a user
 drop-in is all 6DoF needs. Runtime media requirements are `/usr/bin/ffmpeg`

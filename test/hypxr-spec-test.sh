@@ -60,6 +60,20 @@ for requirement in hypxrland hypxrcompose hypxrhud hypxrpaper hypxrva \
     && pass "stack versions $requirement" || fail "stack versions $requirement"
 done
 
+# XREAL is the session's primary hardware. Omedora installs with weak deps
+# off, so the runtime and the 2D/3D helper are hard dependencies of the session
+# package (#13).
+SESSION="$COPR/hypxrland-omedora.spec"
+for requirement in monado-xreal xreal-ctl; do
+  grep -qE "^Requires:[[:space:]]+$requirement >= " "$SESSION" \
+    && pass "XR session requires $requirement" || fail "XR session requires $requirement"
+done
+if grep -qE '^(Recommends|Suggests):' "$SESSION"; then
+  fail "XR session declares no weak dependencies (Omedora installs without them)"
+else
+  pass "XR session declares no weak dependencies (Omedora installs without them)"
+fi
+
 grep -qE '^Requires:[[:space:]]+/usr/bin/ffmpeg$' "$COPR/hypxrcompose.spec" \
   && pass "compose uses ffmpeg capability" || fail "compose uses ffmpeg capability"
 grep -qE '^Requires:[[:space:]]+/usr/bin/ffprobe$' "$COPR/hypxrcompose.spec" \

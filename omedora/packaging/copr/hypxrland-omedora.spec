@@ -7,7 +7,7 @@
 
 Name:           hypxrland-omedora
 Version:        1.1.0
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Omedora XR wayland-session entry
 
 License:        MIT
@@ -24,10 +24,18 @@ BuildRequires:  desktop-file-utils
 # must add a choice to the greeter, never replace the known-good fallback.
 Requires:       hypxrland-stack >= 1.1.0-1
 Requires:       omedora-settings >= 0.2.0~beta.2
+# XREAL Air glasses are the session's primary hardware: the XREAL runtime
+# (its user unit, OpenXR manifest and the Basalt 6DoF tracker) and the HID
+# helper every 2D/3D desktop switch needs. Hard dependencies, not
+# Recommends: Omedora installs and updates packages with weak dependencies
+# off, and the stack's Suggests is never installed at all.
+Requires:       monado-xreal >= 25.1.0^20261016.2.git613d8eeb1-1
+Requires:       xreal-ctl >= 0^20261016.1.git9097b3c02-1
 
 %description
 The Omedora XR display-manager session entry. It installs the complete Fedora
-HypXRland runtime stack and launches the private compositor through uwsm using
+HypXRland runtime stack, the XREAL Air runtime (monado-xreal) and its 2D/3D
+helper (xreal-ctl), and launches the private compositor through uwsm using
 ~/.config/hypr/hyprland-xr.lua while retaining the ordinary "Omedora"
 Hyprland session as a stable fallback.
 
@@ -62,6 +70,10 @@ bash -n %{buildroot}%{_bindir}/omarchy-xr-session
 %{_datadir}/hypxrland/omarchy/hyprland-xr.lua
 
 %changelog
+* Mon Nov 02 2026 omedora <noreply@omedora> - 1.1.0-3
+- Require monado-xreal and xreal-ctl: a fresh install had neither the XREAL
+  runtime nor the HID helper the 2D/3D desktop switch needs.
+
 * Tue Sep 08 2026 omedora <noreply@omedora> - 1.1.0-2
 - Seed the Lua XR entry point absent-only via omarchy-setup-hypxrland and run
   it through the omarchy-xr-session wrapper the greeter entry now executes.

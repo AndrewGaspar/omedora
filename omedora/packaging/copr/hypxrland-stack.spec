@@ -2,7 +2,7 @@
 
 Name:           hypxrland-stack
 Version:        1.1.0
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Complete HypXRland runtime stack for Fedora
 
 License:        MIT
@@ -42,6 +42,9 @@ install -Dpm0644 %{SOURCE0} \
 %doc %{_pkgdocdir}/README
 
 %changelog
+* Mon Nov 02 2026 omedora <noreply@omedora> - 1.1.0-4
+- README: hypxrland-omedora now installs monado-xreal and xreal-ctl.
+
 * Fri Oct 16 2026 omedora <noreply@omedora> - 1.1.0-3
 - Raise the hypxrland minimum to the Oct 16 snapshot and the monado-xreal
   suggestion to the matching SLAM-capable snapshot.
