@@ -1,0 +1,25 @@
+[Unit]
+Description=Keep the XREAL runtime off the power-saver profile
+Documentation=file:///usr/share/doc/monado-xreal/README.package.md
+# A stopgap until Monado runs well without turbo. monado-xreal.service pulls
+# this unit in with Wants=. BindsTo= stops it, which runs ExecStop=, whenever
+# the runtime stops, crashes or is killed. Mask this unit to turn it off.
+BindsTo=monado-xreal.service
+After=monado-xreal.service
+# monado-xreal -4's performance hold keeps running, with no unit file, if the
+# package was upgraded while the runtime ran. Stop it before reading the
+# profile, so it cannot outlive the upgrade by more than one XR session.
+Conflicts=monado-xreal-performance-hold.service
+After=monado-xreal-performance-hold.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Switches power-saver to balanced on start, and back on stop if the profile
+# is still that balanced. The marker in the runtime directory records the
+# switch. Every failure (no daemon, no polkit grant, no balanced profile) is
+# logged and exits 0, so it never fails the runtime.
+RuntimeDirectory=monado-xreal-avoid-power-saver
+RuntimeDirectoryMode=0700
+ExecStart=/usr/libexec/monado-xreal/avoid-power-saver enter
+ExecStop=/usr/libexec/monado-xreal/avoid-power-saver leave

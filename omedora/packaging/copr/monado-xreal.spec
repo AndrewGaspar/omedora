@@ -6,7 +6,7 @@
 
 Name:           monado-xreal
 Version:        25.1.0^%{snapshot}.git%{shortcommit}
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        HypXRland Monado runtime for XREAL Air displays
 
 License:        BSL-1.0 AND Apache-2.0 AND BSD-3-Clause AND MIT
@@ -15,9 +15,9 @@ Source0:        %{url}/archive/%{commit}/%{name}-%{commit}.tar.gz
 Source1:        monado-xreal.service
 Source2:        openxr_monado-xreal.json
 Source3:        monado-xreal.README.package.md
-# A stopgap: hold the "performance" power profile while the runtime runs.
-Source4:        monado-xreal-performance-hold.service
-Source5:        monado-xreal-performance-hold
+# A stopgap: keep the runtime off the "power-saver" profile while it runs.
+Source4:        monado-xreal-avoid-power-saver.service
+Source5:        monado-xreal-avoid-power-saver
 
 ExclusiveArch:  x86_64
 
@@ -31,8 +31,8 @@ BuildRequires:  glslang
 BuildRequires:  libcap
 BuildRequires:  ninja-build
 BuildRequires:  python3
-# %%check runs the power-profile hold helper.
-BuildRequires:  python3-gobject-base
+# %%check runs the power-saver helper, which talks to the daemon with busctl.
+BuildRequires:  /usr/bin/busctl
 BuildRequires:  libshaderc-devel
 BuildRequires:  spirv-tools
 BuildRequires:  systemd-rpm-macros
@@ -63,10 +63,9 @@ Requires:       xr-hardware >= 1.1.2
 # Omedora installs packages with weak dependencies off, and turning 6DoF on
 # should take only XREAL_AIR_SLAM=1. The floor exports basalt_vit_restartable.
 Requires:       basalt-xreal >= 0^20261015.gite3dec7b44
-# The performance hold talks to the PowerProfiles daemon (tuned-ppd on Fedora)
-# through PyGObject, which a weak-deps-off install of either daemon does not
-# guarantee.
-Requires:       python3-gobject-base
+# The power-saver helper reads and sets the PowerProfiles daemon's profile
+# (tuned-ppd on Fedora) with busctl.
+Requires:       /usr/bin/busctl
 
 %description
 This package builds the HypXRland-pinned Monado fork as an XREAL Air runtime:
@@ -85,11 +84,11 @@ The service binary deliberately has no file capabilities. A file capability
 puts the Vulkan loader into secure-execution mode and prevents the per-machine
 GPU ICD selection required by hybrid-GPU XREAL systems.
 
-While the runtime runs, monado-xreal-performance-hold.service holds the
-"performance" power profile through the PowerProfiles hold API (tuned-ppd or
-power-profiles-daemon), so on battery the tracker keeps turbo. The hold ends
-when the runtime stops, and the runtime starts without it if no daemon grants
-it. Mask that unit to turn the hold off.
+While the runtime runs, monado-xreal-avoid-power-saver.service switches the
+"power-saver" power profile, which turns turbo off, to "balanced", and
+switches it back when the runtime stops (tuned-ppd or power-profiles-daemon).
+Any other profile is left alone. The runtime starts unchanged if no daemon
+allows the switch. Mask that unit to turn it off.
 
 %prep
 %autosetup -n monado-%{commit} -p1
@@ -179,9 +178,9 @@ install -Dpm0644 %{SOURCE1} \
 install -Dpm0644 %{SOURCE2} \
   %{buildroot}%{_datadir}/openxr/1/openxr_monado-xreal.json
 install -Dpm0644 %{SOURCE4} \
-  %{buildroot}%{_userunitdir}/monado-xreal-performance-hold.service
+  %{buildroot}%{_userunitdir}/monado-xreal-avoid-power-saver.service
 install -Dpm0755 %{SOURCE5} \
-  %{buildroot}%{_libexecdir}/monado-xreal/performance-hold
+  %{buildroot}%{_libexecdir}/monado-xreal/avoid-power-saver
 
 %check
 grep -q '^XRT_BUILD_DRIVER_XREAL_AIR:BOOL=ON$' \
@@ -214,15 +213,21 @@ caps=$(getcap %{buildroot}%{_libexecdir}/monado-xreal/monado-service)
 if [[ -n $caps ]]; then
   exit 1
 fi
-# The runtime pulls the hold in without depending on it, and the hold is bound
-# to the runtime. It fails open: with no PowerProfiles daemon (none runs in a
-# build root) it logs and exits 0.
-grep -qx 'Wants=monado-xreal-performance-hold.service' "$unit"
-hold_unit=%{buildroot}%{_userunitdir}/monado-xreal-performance-hold.service
-grep -qx 'BindsTo=monado-xreal.service' "$hold_unit"
-grep -qx 'ExecStart=%{_libexecdir}/monado-xreal/performance-hold' "$hold_unit"
-DBUS_SYSTEM_BUS_ADDRESS="unix:path=$PWD/no-such-bus" \
-  timeout 30 %{buildroot}%{_libexecdir}/monado-xreal/performance-hold
+# The runtime pulls the power-saver unit in without depending on it, and that
+# unit is bound to the runtime, so its ExecStop= runs however the runtime
+# ends. The helper fails open: with no PowerProfiles daemon (none runs in a
+# build root) both steps log and exit 0.
+grep -qx 'Wants=monado-xreal-avoid-power-saver.service' "$unit"
+avoid_unit=%{buildroot}%{_userunitdir}/monado-xreal-avoid-power-saver.service
+grep -qx 'BindsTo=monado-xreal.service' "$avoid_unit"
+grep -qx 'ExecStart=%{_libexecdir}/monado-xreal/avoid-power-saver enter' "$avoid_unit"
+grep -qx 'ExecStop=%{_libexecdir}/monado-xreal/avoid-power-saver leave' "$avoid_unit"
+mkdir -p avoid-power-saver-rt
+for step in enter leave; do
+  RUNTIME_DIRECTORY=$PWD/avoid-power-saver-rt \
+    DBUS_SYSTEM_BUS_ADDRESS="unix:path=$PWD/no-such-bus" \
+    timeout 30 %{buildroot}%{_libexecdir}/monado-xreal/avoid-power-saver "$step"
+done
 
 %post
 %systemd_user_post monado-xreal.service
@@ -239,10 +244,22 @@ DBUS_SYSTEM_BUS_ADDRESS="unix:path=$PWD/no-such-bus" \
 %{_libexecdir}/monado-xreal/
 %{_libdir}/monado-xreal/
 %{_userunitdir}/monado-xreal.service
-%{_userunitdir}/monado-xreal-performance-hold.service
+%{_userunitdir}/monado-xreal-avoid-power-saver.service
 %{_datadir}/openxr/1/openxr_monado-xreal.json
 
 %changelog
+* Mon Nov 02 2026 omedora <noreply@omedora> - 25.1.0^20261016.2.git613d8eeb1-5
+- Replace the "performance" hold with monado-xreal-avoid-power-saver.service:
+  on a laptop whose CPU and GPU share one power limit, performance pinned
+  every core at full clock and throttled the iGPU, so the compositor missed
+  frames (#14). The new unit, still bound to the runtime, switches
+  power-saver to balanced while the runtime runs and restores power-saver
+  when it stops, crashes or is killed, unless the profile was changed in the
+  meantime. Other profiles, and a power-saver another application holds, are
+  left alone. The helper is a busctl shell script, so the package no longer
+  requires python3-gobject-base. The unit also stops a -4 hold left running
+  by an upgrade. Mask the unit to turn it off.
+
 * Mon Nov 02 2026 omedora <noreply@omedora> - 25.1.0^20261016.2.git613d8eeb1-4
 - Hold the "performance" power profile while the runtime runs, a stopgap until
   Monado runs well without turbo: monado-xreal.service pulls in the new

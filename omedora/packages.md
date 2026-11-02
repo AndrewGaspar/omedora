@@ -294,26 +294,35 @@ drop-in is all 6DoF needs. Runtime media requirements are `/usr/bin/ffmpeg`
 and `/usr/bin/ffprobe`, not the `ffmpeg-free` package name, so RPM Fusion's full
 ffmpeg remains a valid provider; build roots use Fedora's ffmpeg-free packages.
 
-`monado-xreal` holds the `performance` power profile while the XREAL runtime
-runs, because 6DoF tracking is CPU-bound and on battery the default profile
-turns turbo off. It is a stopgap until Monado runs well without turbo, kept to
-one unit, one line and one helper so it is easy to remove. `monado-xreal.service`
-pulls in `monado-xreal-performance-hold.service` with `Wants=`, and that unit
-is `BindsTo=`/`After=` the runtime, so stopping, crashing or killing the runtime
-stops the hold. The unit runs `/usr/libexec/monado-xreal/performance-hold`, a
-small PyGObject helper that calls the PowerProfiles `HoldProfile`, stays on the
-bus until SIGTERM, then calls `ReleaseProfile`. Fedora's tuned-ppd 2.28 (F44
-and F45) implements both; polkit allows the hold for the user's active session,
-including from a `user@.service` unit, and the daemon drops a hold whose caller
-leaves the bus. A one-shot `busctl` call would release at once, and
-`powerprofilesctl launch` fails closed and is only a per-user shim on Fedora.
-Each failure is logged to the unit's journal and exits 0, never failing the
-runtime: no daemon, no polkit grant, no performance profile, or no PyGObject.
-Picking a profile by hand cancels the hold until the runtime next starts.
-`systemctl --user mask monado-xreal-performance-hold.service` turns it off.
-There is no battery-level cut-off. `test/monado-xreal-performance-hold-test.sh`
-covers the wiring, the packaging, and the helper against a fake daemon; the
-unit itself was checked against tuned-ppd in Fedora 44/45 systemd containers.
+`monado-xreal` keeps the XREAL runtime off the `power-saver` profile, which
+turns turbo off, while it runs. It is a stopgap until Monado runs well without
+turbo, kept to one unit, one line and one helper so it is easy to remove.
+`monado-xreal.service` pulls in `monado-xreal-avoid-power-saver.service` with
+`Wants=`. That unit is a `Type=oneshot` + `RemainAfterExit=yes` service,
+`BindsTo=`/`After=` the runtime, running
+`/usr/libexec/monado-xreal/avoid-power-saver enter` on start and `leave` on
+stop. `BindsTo=` stops it, and so runs `leave`, whenever the runtime goes
+inactive, including after a crash or the runtime's SIGKILL stop; an
+`ExecStopPost=` on the runtime would do the same, but would lose the separate
+unit to mask and add the helper's D-Bus calls to the runtime's own start and
+stop. `enter` switches `power-saver` to `balanced` with a `busctl` set of
+`ActiveProfile`, and records that in a marker in the unit's
+`RuntimeDirectory=`; `leave` restores `power-saver` only if the marker exists
+and the profile is still `balanced`. `balanced`, `performance` and a held
+`power-saver` are left alone, since setting a profile cancels every hold. It is
+not a hold: tuned-ppd 2.28 and power-profiles-daemon both hold only
+`performance` and `power-saver`, and holding `performance` throttled the iGPU
+on a shared-power-limit laptop (#14). Setting `ActiveProfile` needs polkit's
+`switch-profile` action (`allow_active`); polkit resolves a `user@.service`
+process to the user's active local display session, so it is granted on a
+desktop and refused without one. Each failure is logged to the unit's journal
+and exits 0, never failing the runtime. The unit also `Conflicts=` the old
+`monado-xreal-performance-hold.service`, which an upgrade while the runtime ran
+leaves running with no unit file. `systemctl --user mask
+monado-xreal-avoid-power-saver.service` turns it off.
+`test/monado-xreal-avoid-power-saver-test.sh` covers the wiring, the
+packaging, and the helper against a stub `busctl`; the unit itself was checked
+in a real user manager against tuned-ppd in Fedora 44/45 systemd containers.
 
 The WiVRn RPM does not include a headset APK. Device camera and raw-microphone
 capture require the commit-matched custom `hypxr` client documented in the

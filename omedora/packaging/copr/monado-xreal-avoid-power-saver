@@ -1,0 +1,120 @@
+#!/bin/bash
+#
+# Keep the XREAL runtime off the "power-saver" power profile.
+#
+# Usage: avoid-power-saver enter|leave
+#
+# monado-xreal-avoid-power-saver.service runs "enter" when monado-xreal.service
+# starts and "leave" when it stops. The unit is bound to the runtime
+# (BindsTo=), so "leave" also runs after a crash or a SIGKILL.
+#
+#   enter  If the active profile is power-saver, switch it to balanced and
+#          leave a marker in $RUNTIME_DIRECTORY. Any other profile is left
+#          alone, and so is a power-saver another application holds.
+#   leave  If "enter" switched, and the profile is still balanced, switch
+#          back to power-saver. A profile picked during the session stays.
+#
+# power-saver turns turbo off, which the 6DoF tracker needs. balanced keeps
+# turbo, and unlike performance it does not pin every core at full clock, so
+# a laptop whose CPU and GPU share one power limit keeps power for the GPU.
+# The PowerProfiles hold API can hold only performance or power-saver, so
+# this sets ActiveProfile instead of holding.
+#
+# Each failure is logged and the helper exits 0: no daemon, a polkit refusal,
+# no balanced profile, or no runtime directory. The runtime never waits on
+# this helper and never depends on it.
+#
+# A stopgap until Monado runs well without turbo. Mask
+# monado-xreal-avoid-power-saver.service to turn it off.
+
+set -u
+
+readonly BUS_NAME=org.freedesktop.UPower.PowerProfiles
+readonly OBJECT_PATH=/org/freedesktop/UPower/PowerProfiles
+readonly INTERFACE=org.freedesktop.UPower.PowerProfiles
+readonly TIMEOUT=10
+
+log() {
+  printf 'avoid-power-saver: %s\n' "$*" >&2
+}
+
+property() { # <name>
+  busctl --system --timeout="$TIMEOUT" get-property \
+    "$BUS_NAME" "$OBJECT_PATH" "$INTERFACE" "$1"
+}
+
+# Print the active profile's name.
+active_profile() {
+  local out
+  if ! out=$(property ActiveProfile 2>&1); then
+    log "cannot read the active power profile: $out"
+    return 1
+  fi
+  # busctl prints a string property as: s "power-saver"
+  if [[ ! $out =~ ^s\ \"([a-z-]+)\"$ ]]; then
+    log "unexpected ActiveProfile reply: $out"
+    return 1
+  fi
+  printf '%s\n' "${BASH_REMATCH[1]}"
+}
+
+switch_to() { # <profile>
+  local out
+  if ! out=$(busctl --system --timeout="$TIMEOUT" set-property \
+    "$BUS_NAME" "$OBJECT_PATH" "$INTERFACE" ActiveProfile s "$1" 2>&1); then
+    log "cannot switch to $1: $out"
+    return 1
+  fi
+}
+
+# Setting a profile cancels every hold, so a power-saver hold (a low-battery
+# policy, say) is left in place. A daemon without the property has no holds.
+held() {
+  local out
+  out=$(property ActiveProfileHolds 2>/dev/null) || return 1
+  [[ $out != "aa{sv} 0" ]]
+}
+
+if (( $# != 1 )) || [[ $1 != "enter" && $1 != "leave" ]]; then
+  log "usage: avoid-power-saver enter|leave"
+  exit 2
+fi
+
+# systemd sets RUNTIME_DIRECTORY from the unit's RuntimeDirectory= and removes
+# the directory when the unit stops, so a marker never outlives the session.
+dir=${RUNTIME_DIRECTORY:-}
+dir=${dir%%:*}
+if [[ -z $dir || ! -d $dir ]]; then
+  log "no runtime directory to keep the marker in; not switching"
+  exit 0
+fi
+marker="$dir/switched-to-balanced"
+
+if [[ $1 == "enter" ]]; then
+  rm -f "$marker"
+  profile=$(active_profile) || exit 0
+  if [[ $profile != "power-saver" ]]; then
+    log "the active profile is $profile; leaving it"
+    exit 0
+  fi
+  if held; then
+    log "power-saver is held by another application; leaving it"
+    exit 0
+  fi
+  switch_to balanced || exit 0
+  : >"$marker"
+  log "switched power-saver to balanced while the XREAL runtime runs"
+else
+  if [[ ! -e $marker ]]; then
+    exit 0
+  fi
+  rm -f "$marker"
+  profile=$(active_profile) || exit 0
+  if [[ $profile != "balanced" ]]; then
+    log "the profile changed to $profile during the session; leaving it"
+    exit 0
+  fi
+  switch_to power-saver || exit 0
+  log "restored power-saver"
+fi
+exit 0
