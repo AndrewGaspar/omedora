@@ -22,6 +22,7 @@ HOLD="$COPR/monado-xreal-performance-hold"
 HOLD_UNIT="$COPR/monado-xreal-performance-hold.service"
 RUNTIME_UNIT="$COPR/monado-xreal.service"
 SPEC="$COPR/monado-xreal.spec"
+SESSION_SPEC="$COPR/hypxrland-omedora.spec"
 
 assert_file_exists "performance-hold helper exists" "$HOLD"
 assert_file_exists "hold unit exists" "$HOLD_UNIT"
@@ -92,6 +93,18 @@ if sed -n '/^%check/,/^%files/p' "$SPEC" | grep -qE '^[[:space:]]*! '; then
 else
   pass "%check has no bare negated commands (they never fail the build)"
 fi
+# The hold lives only in the runtime now; the XR session no longer starts one.
+# (The spec's %changelog keeps the history, so it is left out.)
+if [[ -e $COPR/hypxr-performance-hold ]] \
+  || cat "$COPR/omarchy-xr-session" <(sed '/^%changelog/,$d' "$SESSION_SPEC") |
+    grep -qiE 'performance.hold|PERFORMANCE_HOLD|setsid|python3-gobject'; then
+  fail "the XR session carries no hold of its own"
+else
+  pass "the XR session carries no hold of its own"
+fi
+grep -qE '^Requires:[[:space:]]+monado-xreal >= 25\.1\.0\^20261016\.2\.git613d8eeb1-4$' "$SESSION_SPEC" \
+  && pass "the XR session requires the monado-xreal that holds" \
+  || fail "the XR session requires the monado-xreal that holds"
 
 # --- the helper, against a fake PowerProfiles daemon ---------------------------------
 status=0

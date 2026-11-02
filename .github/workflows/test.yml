@@ -167,9 +167,6 @@ jobs:
       - name: Run xreal-ctl-spec static guard
         run: bash test/xreal-ctl-spec-test.sh
 
-      - name: Run XR session performance-hold test
-        run: bash test/xr-session-performance-hold-test.sh
-
       - name: Run monado-xreal performance-hold test
         run: bash test/monado-xreal-performance-hold-test.sh
 
