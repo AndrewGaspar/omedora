@@ -277,8 +277,11 @@ install -Dpm644 etc/profile.d/omarchy.sh %{buildroot}%{_sysconfdir}/profile.d/om
 # ships. omarchy-locale-generate's passwordless grant (Omarchy 4.5) stays a
 # reference copy: on Fedora the helper installs a glibc langpack through dnf,
 # and omarchy-language falls back to a polkit prompt without the grant.
+# omarchy-sudo-timeout (4.5-rc3) ships: one sudo password lasts ten minutes in
+# a terminal, which omarchy update's single authorization relies on now that
+# Omarchy no longer revokes the timestamp between steps.
 install -d %{buildroot}%{_sysconfdir}/sudoers.d
-for f in omarchy-dns omarchy-passwd-tries omarchy-theme-browser omarchy-tzupdate; do
+for f in omarchy-dns omarchy-passwd-tries omarchy-sudo-timeout omarchy-theme-browser omarchy-tzupdate; do
   install -pm440 "etc/sudoers.d/$f" "%{buildroot}%{_sysconfdir}/sudoers.d/$f"
 done
 install -Dpm644 etc/sudoers.d/omarchy-locale-generate \
@@ -438,6 +441,7 @@ desktop-file-validate %{buildroot}%{_datadir}/wayland-sessions/omedora.desktop
 %{_sysconfdir}/profile.d/omarchy.sh
 %config(noreplace) %{_sysconfdir}/sudoers.d/omarchy-dns
 %config(noreplace) %{_sysconfdir}/sudoers.d/omarchy-passwd-tries
+%config(noreplace) %{_sysconfdir}/sudoers.d/omarchy-sudo-timeout
 %config(noreplace) %{_sysconfdir}/sudoers.d/omarchy-theme-browser
 %config(noreplace) %{_sysconfdir}/sudoers.d/omarchy-tzupdate
 %config(noreplace) %{_sysconfdir}/sysctl.d/90-omarchy-file-watchers.conf
