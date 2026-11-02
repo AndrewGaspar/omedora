@@ -116,4 +116,15 @@ for manifest in "$COPR"/{hyprland,hypxrland,hypxrpaper,hypxrva,hypxrhud,hypxrcom
     || fail "$(basename "$manifest") has immutable SHA-256 pins"
 done
 
+MONADO_UNIT="$COPR/monado-xreal.service"
+grep -qF -- '-DXRT_IPC_MSG_SOCK_FILENAME=monado-xreal/comp_ipc' "$COPR/monado-xreal.spec" \
+  && pass "monado-xreal keeps its socket under monado-xreal/" \
+  || fail "monado-xreal keeps its socket under monado-xreal/"
+grep -qx 'RuntimeDirectory=monado-xreal' "$MONADO_UNIT" \
+  && pass "monado-xreal unit creates the socket directory" \
+  || fail "monado-xreal unit creates the socket directory"
+grep -qx 'RuntimeDirectoryMode=0700' "$MONADO_UNIT" \
+  && pass "monado-xreal socket directory is private to the user" \
+  || fail "monado-xreal socket directory is private to the user"
+
 echo "# all HypXR spec tests passed"
