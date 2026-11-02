@@ -90,6 +90,14 @@ SPECS=(
   # noarch copy of files, so nothing is vendored. On-demand (not in any base
   # package set). No intra-stack BuildRequires.
   openclaw.spec
+  # hyprpad: drive Hyprland from a Steam Controller or gamepad. From-source
+  # cargo build, vendored like voxtype, with TWO vendor tarballs because the
+  # on-screen keyboard is a second standalone crate (osk/, own Cargo.lock).
+  # Ships the daemon + hyprpad-osk, the broker socket/service, user unit, udev
+  # rule, sysusers group, and the Omarchy shell plugins its helpers install.
+  # Hardware-specific and opt-in; enables nothing and is in no base package
+  # set. No intra-stack BuildRequires.
+  hyprpad.spec
   # omarchy-nvim.spec is intentionally NOT built: its %build bakes the plugin
   # cache via a headless `:Lazy! sync` that fetches ~50 plugins from GitHub,
   # which fails in COPR's offline mock build. Nothing Requires it, so instead
