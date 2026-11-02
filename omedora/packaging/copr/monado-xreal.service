@@ -8,6 +8,11 @@ PartOf=graphical-session.target
 Type=simple
 Environment=XRT_COMPOSITOR_FORCE_WAYLAND=1
 Environment=XRT_NO_STDIN=1
+# The build moves the IPC socket to $XDG_RUNTIME_DIR/monado-xreal/comp_ipc and
+# Monado never creates that directory. systemd creates it on start and removes
+# it on stop, which also clears the socket the SIGKILL stop leaves behind.
+RuntimeDirectory=monado-xreal
+RuntimeDirectoryMode=0700
 ExecStart=/usr/libexec/monado-xreal/monado-service
 Restart=no
 KillSignal=SIGKILL

@@ -6,7 +6,7 @@
 
 Name:           monado-xreal
 Version:        25.1.0^%{snapshot}.git%{shortcommit}
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        HypXRland Monado runtime for XREAL Air displays
 
 License:        BSL-1.0 AND Apache-2.0 AND BSD-3-Clause AND MIT
@@ -176,6 +176,11 @@ grep -F '%{_libdir}/monado-xreal/libopenxr_monado_xreal.so' %{SOURCE2}
 %{_datadir}/openxr/1/openxr_monado-xreal.json
 
 %changelog
+* Sun Nov 01 2026 omedora <noreply@omedora> - 25.1.0^20261016.1.git6e23edfb3-2
+- Create the IPC socket directory with RuntimeDirectory=monado-xreal: the
+  service failed to bind $XDG_RUNTIME_DIR/monado-xreal/comp_ipc on a fresh
+  login because nothing created the directory.
+
 * Fri Oct 16 2026 omedora <noreply@omedora> - 25.1.0^20261016.1.git6e23edfb3-1
 - Refresh to the current HypXRland-pinned Monado tip: XREAL SLAM robustness
   (wear hold, divergence restarts, pose guard), per-serial gyro-bias
