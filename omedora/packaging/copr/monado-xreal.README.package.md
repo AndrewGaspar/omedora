@@ -59,6 +59,27 @@ other apps first. Both apply only inside your own session: system services
 still share the CPU with your session as a whole. Override either one in a
 drop-in, for example `CPUWeight=` (empty) to go back to the default.
 
+## Performance power profile
+
+6DoF tracking is CPU-bound, and on battery Fedora's default power profile
+turns turbo off. So while the runtime runs, `monado-xreal.service` pulls in
+`monado-xreal-performance-hold.service`, which holds the `performance` profile
+through the PowerProfiles hold API (tuned-ppd or power-profiles-daemon). The
+hold unit is bound to the runtime: stopping, crashing or killing
+`monado-xreal.service` stops it, and the daemon then drops the hold. The hold
+is a stopgap until Monado performs well without turbo.
+
+The hold never blocks the runtime. With no daemon, no polkit grant or no
+performance profile, the helper logs why (`journalctl --user -u
+monado-xreal-performance-hold.service`) and exits. Picking a power profile by
+hand ends the hold until the runtime next starts. To turn it off:
+
+```bash
+systemctl --user mask monado-xreal-performance-hold.service
+```
+
+`systemctl --user unmask` it to turn it back on.
+
 ## Using your own Basalt build
 
 Point `VIT_SYSTEM_LIBRARY_PATH` at your library in a drop-in. The unit's

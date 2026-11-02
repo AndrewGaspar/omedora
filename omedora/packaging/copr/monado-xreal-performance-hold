@@ -1,0 +1,89 @@
+#!/usr/bin/python3
+"""Hold the "performance" power profile until stopped.
+
+Usage: performance-hold
+
+monado-xreal-performance-hold.service runs this. monado-xreal.service pulls
+that unit in, and the unit is bound to it (BindsTo=), so systemd stops the
+helper whenever the XREAL runtime stops, crashes or is killed. The hold lasts
+exactly as long as XR is in use.
+
+The helper asks the PowerProfiles daemon (Fedora's tuned-ppd, or
+power-profiles-daemon) for a "performance" hold over the system bus. It keeps
+that bus connection open until SIGTERM or SIGINT, then releases the hold and
+exits 0. Both daemons also drop a hold when its owner leaves the bus, so a
+crash or a SIGKILL cannot leave the machine stuck in performance mode.
+
+Each failure is logged, and the helper then exits 0. Possible failures: no
+daemon, no performance profile, an older daemon without HoldProfile, polkit
+refusing the hold, or no PyGObject. The runtime never waits on the hold and
+never depends on it.
+
+The hold is a stopgap until Monado runs well without turbo. Mask
+monado-xreal-performance-hold.service to turn it off.
+"""
+
+import signal
+import sys
+
+BUS_NAME = "org.freedesktop.UPower.PowerProfiles"
+OBJECT_PATH = "/org/freedesktop/UPower/PowerProfiles"
+INTERFACE = "org.freedesktop.UPower.PowerProfiles"
+PROFILE = "performance"
+REASON = "XREAL runtime running"
+APP_ID = "monado-xreal"
+TIMEOUT_MS = 10000
+STOP_SIGNALS = {signal.SIGTERM, signal.SIGINT}
+
+
+def log(message):
+    print(f"performance-hold: {message}", file=sys.stderr, flush=True)
+
+
+def main(argv):
+    if len(argv) != 1:
+        log("usage: performance-hold (no arguments)")
+        return 2
+
+    # Block the stop signals before GLib starts any thread, so every thread
+    # inherits the mask and sigwait() below is the only place they land. A
+    # signal that arrives while the hold is being taken stays pending.
+    signal.pthread_sigmask(signal.SIG_BLOCK, STOP_SIGNALS)
+
+    try:
+        from gi.repository import Gio, GLib
+    except ImportError as error:
+        log(f"PyGObject is unavailable ({error}); not holding")
+        return 0
+
+    try:
+        bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+        reply = bus.call_sync(
+            BUS_NAME, OBJECT_PATH, INTERFACE, "HoldProfile",
+            GLib.Variant("(sss)", (PROFILE, REASON, APP_ID)),
+            GLib.VariantType("(u)"), Gio.DBusCallFlags.NONE, TIMEOUT_MS, None)
+    except GLib.Error as error:
+        log(f"not holding: {error.message}")
+        return 0
+    cookie = reply.unpack()[0]
+    log(f"holding '{PROFILE}' (cookie {cookie}) until stopped")
+
+    # GDBus services the connection on its own thread, so blocking here keeps
+    # the hold alive without a main loop.
+    signal.sigwait(STOP_SIGNALS)
+
+    try:
+        bus.call_sync(
+            BUS_NAME, OBJECT_PATH, INTERFACE, "ReleaseProfile",
+            GLib.Variant("(u)", (cookie,)), None, Gio.DBusCallFlags.NONE,
+            TIMEOUT_MS, None)
+    except GLib.Error as error:
+        # A manual profile change already cancelled the hold.
+        log(f"release: {error.message}")
+    else:
+        log(f"released '{PROFILE}'")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

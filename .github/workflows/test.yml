@@ -32,7 +32,9 @@ jobs:
       - name: Install prereqs
         run: |
           sudo apt-get update
-          sudo apt-get install -y jq python3
+          # python3-gi and dbus: the monado-xreal performance-hold test runs
+          # its helper against a fake PowerProfiles daemon on a private bus.
+          sudo apt-get install -y dbus jq python3 python3-gi
 
       - name: Verify Python 3.11+ (needs tomllib)
         run: python3 -c 'import sys, tomllib; assert sys.version_info >= (3, 11)'
@@ -167,6 +169,9 @@ jobs:
 
       - name: Run XR session performance-hold test
         run: bash test/xr-session-performance-hold-test.sh
+
+      - name: Run monado-xreal performance-hold test
+        run: bash test/monado-xreal-performance-hold-test.sh
 
       - name: Run hypr BuildRequires floor guard
         run: bash test/hypr-buildrequires-floor-test.sh

@@ -3,6 +3,9 @@ Description=Monado XREAL Air OpenXR runtime for HypXRland
 Documentation=https://github.com/AndrewGaspar/Hyprland
 After=graphical-session.target
 PartOf=graphical-session.target
+# Temporary: hold the performance power profile while the runtime runs (see
+# README.package.md). Mask monado-xreal-performance-hold.service to opt out.
+Wants=monado-xreal-performance-hold.service
 
 [Service]
 Type=simple

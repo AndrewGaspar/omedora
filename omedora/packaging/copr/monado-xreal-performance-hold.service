@@ -1,0 +1,16 @@
+[Unit]
+Description=Performance power profile hold while the XREAL runtime runs
+Documentation=file:///usr/share/doc/monado-xreal/README.package.md
+# A stopgap until Monado runs well without turbo. monado-xreal.service pulls
+# this unit in with Wants=, and BindsTo= stops it whenever the runtime stops,
+# crashes or is killed. Mask this unit to turn the hold off.
+BindsTo=monado-xreal.service
+After=monado-xreal.service
+
+[Service]
+Type=simple
+# Holds "performance" through the PowerProfiles daemon until SIGTERM, then
+# releases it. Every failure (no daemon, no polkit grant, no performance
+# profile) is logged and exits 0, so it never fails the runtime.
+ExecStart=/usr/libexec/monado-xreal/performance-hold
+Restart=no

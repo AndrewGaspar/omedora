@@ -6,7 +6,7 @@
 
 Name:           monado-xreal
 Version:        25.1.0^%{snapshot}.git%{shortcommit}
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        HypXRland Monado runtime for XREAL Air displays
 
 License:        BSL-1.0 AND Apache-2.0 AND BSD-3-Clause AND MIT
@@ -15,6 +15,9 @@ Source0:        %{url}/archive/%{commit}/%{name}-%{commit}.tar.gz
 Source1:        monado-xreal.service
 Source2:        openxr_monado-xreal.json
 Source3:        monado-xreal.README.package.md
+# A stopgap: hold the "performance" power profile while the runtime runs.
+Source4:        monado-xreal-performance-hold.service
+Source5:        monado-xreal-performance-hold
 
 ExclusiveArch:  x86_64
 
@@ -28,6 +31,8 @@ BuildRequires:  glslang
 BuildRequires:  libcap
 BuildRequires:  ninja-build
 BuildRequires:  python3
+# %%check runs the power-profile hold helper.
+BuildRequires:  python3-gobject-base
 BuildRequires:  libshaderc-devel
 BuildRequires:  spirv-tools
 BuildRequires:  systemd-rpm-macros
@@ -58,6 +63,10 @@ Requires:       xr-hardware >= 1.1.2
 # Omedora installs packages with weak dependencies off, and turning 6DoF on
 # should take only XREAL_AIR_SLAM=1. The floor exports basalt_vit_restartable.
 Requires:       basalt-xreal >= 0^20261015.gite3dec7b44
+# The performance hold talks to the PowerProfiles daemon (tuned-ppd on Fedora)
+# through PyGObject, which a weak-deps-off install of either daemon does not
+# guarantee.
+Requires:       python3-gobject-base
 
 %description
 This package builds the HypXRland-pinned Monado fork as an XREAL Air runtime:
@@ -75,6 +84,12 @@ privately under %{_libexecdir}/monado-xreal. See README.package.md.
 The service binary deliberately has no file capabilities. A file capability
 puts the Vulkan loader into secure-execution mode and prevents the per-machine
 GPU ICD selection required by hybrid-GPU XREAL systems.
+
+While the runtime runs, monado-xreal-performance-hold.service holds the
+"performance" power profile through the PowerProfiles hold API (tuned-ppd or
+power-profiles-daemon), so on battery the tracker keeps turbo. The hold ends
+when the runtime stops, and the runtime starts without it if no daemon grants
+it. Mask that unit to turn the hold off.
 
 %prep
 %autosetup -n monado-%{commit} -p1
@@ -163,6 +178,10 @@ install -Dpm0644 %{SOURCE1} \
   %{buildroot}%{_userunitdir}/monado-xreal.service
 install -Dpm0644 %{SOURCE2} \
   %{buildroot}%{_datadir}/openxr/1/openxr_monado-xreal.json
+install -Dpm0644 %{SOURCE4} \
+  %{buildroot}%{_userunitdir}/monado-xreal-performance-hold.service
+install -Dpm0755 %{SOURCE5} \
+  %{buildroot}%{_libexecdir}/monado-xreal/performance-hold
 
 %check
 grep -q '^XRT_BUILD_DRIVER_XREAL_AIR:BOOL=ON$' \
@@ -195,6 +214,15 @@ caps=$(getcap %{buildroot}%{_libexecdir}/monado-xreal/monado-service)
 if [[ -n $caps ]]; then
   exit 1
 fi
+# The runtime pulls the hold in without depending on it, and the hold is bound
+# to the runtime. It fails open: with no PowerProfiles daemon (none runs in a
+# build root) it logs and exits 0.
+grep -qx 'Wants=monado-xreal-performance-hold.service' "$unit"
+hold_unit=%{buildroot}%{_userunitdir}/monado-xreal-performance-hold.service
+grep -qx 'BindsTo=monado-xreal.service' "$hold_unit"
+grep -qx 'ExecStart=%{_libexecdir}/monado-xreal/performance-hold' "$hold_unit"
+DBUS_SYSTEM_BUS_ADDRESS="unix:path=$PWD/no-such-bus" \
+  timeout 30 %{buildroot}%{_libexecdir}/monado-xreal/performance-hold
 
 %post
 %systemd_user_post monado-xreal.service
@@ -211,9 +239,18 @@ fi
 %{_libexecdir}/monado-xreal/
 %{_libdir}/monado-xreal/
 %{_userunitdir}/monado-xreal.service
+%{_userunitdir}/monado-xreal-performance-hold.service
 %{_datadir}/openxr/1/openxr_monado-xreal.json
 
 %changelog
+* Mon Nov 02 2026 omedora <noreply@omedora> - 25.1.0^20261016.2.git613d8eeb1-4
+- Hold the "performance" power profile while the runtime runs, a stopgap until
+  Monado runs well without turbo: monado-xreal.service pulls in the new
+  monado-xreal-performance-hold.service (Wants=), which is bound to it and runs
+  %%{_libexecdir}/monado-xreal/performance-hold. The helper holds through the
+  PowerProfiles API until stopped and fails open. It replaces the session-long
+  hold in hypxrland-omedora. Mask the unit to turn it off.
+
 * Mon Nov 02 2026 omedora <noreply@omedora> - 25.1.0^20261016.2.git613d8eeb1-3
 - Give the user unit CPUWeight=1000, so the runtime wins CPU against the
   session's other apps, and ManagedOOMPreference=avoid, which systemd-oomd
