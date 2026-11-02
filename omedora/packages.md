@@ -277,6 +277,24 @@ drop-in is all 6DoF needs. Runtime media requirements are `/usr/bin/ffmpeg`
 and `/usr/bin/ffprobe`, not the `ffmpeg-free` package name, so RPM Fusion's full
 ffmpeg remains a valid provider; build roots use Fedora's ffmpeg-free packages.
 
+`hypxrland-omedora`'s greeter wrapper, `omarchy-xr-session`, holds the
+`performance` power profile for the life of the session, because 6DoF tracking
+is CPU-bound and on battery the default profile turns turbo off. It uses the
+PowerProfiles hold API, which Fedora's tuned-ppd 2.28 (F44 and F45) implements:
+`HoldProfile` is allowed for an active local session by polkit, and the daemon
+drops the hold when its caller leaves the system bus. A one-shot `busctl` or
+`gdbus` call would release it at once, and `powerprofilesctl launch` fails
+closed (no hold, no session) and is only a per-user shim on Fedora. So a small
+PyGObject helper, `/usr/libexec/hypxrland-omedora/performance-hold`, is started
+with `setsid -f`. It watches the session PID, which the exec chain keeps, with
+a pidfd, and stays connected until that process exits. Each failure is logged
+(the greeter's session log) and ignored: no daemon, no polkit grant, an old
+daemon, or no PyGObject. Picking a profile by hand cancels the hold, and
+`OMEDORA_XR_PERFORMANCE_HOLD=0` in the session's environment turns it off.
+There is no battery-level cut-off. `test/xr-session-performance-hold-test.sh`
+covers the wrapper and the fail-open paths; the hold itself was checked against
+tuned-ppd in Fedora 44/45 containers.
+
 The WiVRn RPM does not include a headset APK. Device camera and raw-microphone
 capture require the commit-matched custom `hypxr` client documented in the
 package; a stock client supports only the host half of `.hypxrtake` recording.

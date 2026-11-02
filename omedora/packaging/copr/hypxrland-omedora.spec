@@ -7,7 +7,7 @@
 
 Name:           hypxrland-omedora
 Version:        1.1.0
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Omedora XR wayland-session entry
 
 License:        MIT
@@ -16,9 +16,14 @@ Source0:        omedora-xr.desktop
 Source1:        omarchy-setup-hypxrland
 Source2:        omarchy-xr-session
 Source3:        hyprland-xr.lua
+# Holds the "performance" power profile for the session's lifetime.
+Source4:        hypxr-performance-hold
 
 BuildArch:      noarch
 BuildRequires:  desktop-file-utils
+# %%check runs the power-profile hold helper.
+BuildRequires:  python3
+BuildRequires:  python3-gobject-base
 
 # Requiring the branded stable session is deliberate: installing Omedora XR
 # must add a choice to the greeter, never replace the known-good fallback.
@@ -31,6 +36,11 @@ Requires:       omedora-settings >= 0.2.0~beta.2
 # off, and the stack's Suggests is never installed at all.
 Requires:       monado-xreal >= 25.1.0^20261016.2.git613d8eeb1-1
 Requires:       xreal-ctl >= 0^20261016.1.git9097b3c02-1
+# The session's performance hold talks to the PowerProfiles daemon (tuned-ppd
+# on Fedora) through PyGObject, and detaches with setsid. Neither
+# power-profiles-daemon nor a weak-deps-off install guarantees PyGObject.
+Requires:       python3-gobject-base
+Requires:       /usr/bin/setsid
 
 %description
 The Omedora XR display-manager session entry. It installs the complete Fedora
@@ -38,6 +48,12 @@ HypXRland runtime stack, the XREAL Air runtime (monado-xreal) and its 2D/3D
 helper (xreal-ctl), and launches the private compositor through uwsm using
 ~/.config/hypr/hyprland-xr.lua while retaining the ordinary "Omedora"
 Hyprland session as a stable fallback.
+
+For the life of the session it holds the "performance" power profile through
+the PowerProfiles hold API (tuned-ppd or power-profiles-daemon), so on battery
+the XR tracker keeps turbo. The hold ends with the session, and the session
+starts without it if no daemon grants it. Set OMEDORA_XR_PERFORMANCE_HOLD=0 to
+turn it off, or pick a power profile by hand to end it for one session.
 
 %prep
 # Nothing to unpack; the Sources are installed verbatim below.
@@ -54,12 +70,27 @@ install -Dpm0755 %{SOURCE2} \
   %{buildroot}%{_bindir}/omarchy-xr-session
 install -Dpm0644 %{SOURCE3} \
   %{buildroot}%{_datadir}/hypxrland/omarchy/hyprland-xr.lua
+install -Dpm0755 %{SOURCE4} \
+  %{buildroot}%{_libexecdir}/hypxrland-omedora/performance-hold
 
 %check
 desktop-file-validate \
   %{buildroot}%{_datadir}/wayland-sessions/omedora-xr.desktop
 bash -n %{buildroot}%{_bindir}/omarchy-setup-hypxrland
 bash -n %{buildroot}%{_bindir}/omarchy-xr-session
+hold=%{buildroot}%{_libexecdir}/hypxrland-omedora/performance-hold
+grep -qF '%{_libexecdir}/hypxrland-omedora/performance-hold "$$"' \
+  %{buildroot}%{_bindir}/omarchy-xr-session
+status=0
+"$hold" >/dev/null 2>&1 || status=$?
+[[ $status == 2 ]]
+# The hold fails open: with no PowerProfiles daemon (none runs in a build root)
+# it logs and exits 0, and for a session PID that is already gone it exits 0.
+sleep 3 &
+sleeper=$!
+timeout 30 "$hold" "$sleeper"
+wait "$sleeper"
+"$hold" "$sleeper"
 
 %files
 %{_datadir}/wayland-sessions/omedora-xr.desktop
@@ -68,8 +99,15 @@ bash -n %{buildroot}%{_bindir}/omarchy-xr-session
 %dir %{_datadir}/hypxrland/
 %dir %{_datadir}/hypxrland/omarchy/
 %{_datadir}/hypxrland/omarchy/hyprland-xr.lua
+%{_libexecdir}/hypxrland-omedora/
 
 %changelog
+* Mon Nov 02 2026 omedora <noreply@omedora> - 1.1.0-4
+- Hold the "performance" power profile for the life of the XR session through
+  the PowerProfiles hold API, so the 6DoF tracker keeps turbo on battery. The
+  detached helper watches the session PID and fails open.
+  OMEDORA_XR_PERFORMANCE_HOLD=0 turns it off.
+
 * Mon Nov 02 2026 omedora <noreply@omedora> - 1.1.0-3
 - Require monado-xreal and xreal-ctl: a fresh install had neither the XREAL
   runtime nor the HID helper the 2D/3D desktop switch needs.
