@@ -1,0 +1,62 @@
+--- a/thirdparty/basalt-headers/CMakeLists.txt
++++ b/thirdparty/basalt-headers/CMakeLists.txt
+@@ -143,7 +143,11 @@
+   message(STATUS "Cereal already available")
+ endif()
+ report_dependency_location(cereal cereal::cereal)
+-ignore_external_warnings(cereal)
++# Only the submodule creates a plain `cereal` target; a system cereal
++# exports cereal::cereal alone.
++if(TARGET cereal)
++  ignore_external_warnings(cereal)
++endif()
+ 
+ add_library(basalt-headers INTERFACE)
+ add_library(basalt::basalt-headers ALIAS basalt-headers)
+--- a/thirdparty/CMakeLists.txt
++++ b/thirdparty/CMakeLists.txt
+@@ -40,18 +40,23 @@
+     _add_definitions(${ARGN})
+   endif()
+ endmacro()
+-add_subdirectory(opengv EXCLUDE_FROM_ALL)
++# Only the tools link opengv; the shared VIT library (keypoints.cpp guards its
++# opengv use with BASALT_BUILD_SHARED_LIBRARY_ONLY) never does, so the
++# library-only build does not need the opengv sources at all.
++if(NOT BASALT_BUILD_SHARED_LIBRARY_ONLY)
++  add_subdirectory(opengv EXCLUDE_FROM_ALL)
++
++  # fix opengv: c++17 and debug postfix
++  set_target_properties(opengv PROPERTIES CXX_STANDARD 17 DEBUG_POSTFIX "")
+ 
+-# fix opengv: c++17 and debug postfix
+-set_target_properties(opengv PROPERTIES CXX_STANDARD 17 DEBUG_POSTFIX "")
++  # fix opengv: compile options (CMAKE_CXX_FLAGS is overwritten by Opengv)
++  target_compile_options(opengv PRIVATE ${BASALT_MARCH_FLAGS} "SHELL:${BASALT_PASSED_CXX_FLAGS}")
+ 
+-# fix opengv: compile options (CMAKE_CXX_FLAGS is overwritten by Opengv)
+-target_compile_options(opengv PRIVATE ${BASALT_MARCH_FLAGS} "SHELL:${BASALT_PASSED_CXX_FLAGS}")
++  # fix opengv: opengv used cassert from Eigen3, with Eigen5 the include needs to be explicit
++  target_compile_options(opengv PRIVATE "-include" "cassert") # only gcc and clang
+ 
+-# fix opengv: opengv used cassert from Eigen3, with Eigen5 the include needs to be explicit
+-target_compile_options(opengv PRIVATE "-include" "cassert") # only gcc and clang
+-
+-ignore_external_warnings(opengv)
++  ignore_external_warnings(opengv)
++endif()
+ 
+ # Hack to disable CPack in Pangolin.
+ macro(include)
+@@ -101,7 +106,10 @@
+ # the properties to only include these eigen paths in the
+ # "BUILD_INTERFACE" (not "INSTALL").
+ if(EIGEN3_INCLUDE_DIR MATCHES "^${CMAKE_SOURCE_DIR}.*")
+-  set(_targets opengv)
++  set(_targets)
++  if(TARGET opengv)
++    list(APPEND _targets opengv)
++  endif()
+   if(TARGET pangolin)
+     list(APPEND _targets pangolin)
+   endif()
