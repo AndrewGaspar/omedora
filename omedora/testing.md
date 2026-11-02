@@ -144,6 +144,11 @@ network access:
 | `name-resolution-integration.sh` | Every base, baseline, Fedora-run hardware and installer name resolves through dnf (a package Fedora lacks is mapped to `skip` and its command gated); every registry language has a `glibc-langpack`; `omarchy-locale-generate` works under a pkexec-style clean environment |
 | `mise-confd-integration.sh` | The COPR mise lists `/etc/mise/conf.d/omarchy*.toml`, reports no unknown field, applies the settings and creates lazy shims |
 
+This runner and `run-smoke.sh` use Docker when its daemon answers and rootless
+Podman otherwise; set `OMEDORA_CONTAINER_ENGINE` to choose one
+(`omedora/test/fedora/lib/engine.sh`). `run-release-upgrade.sh` always uses
+Podman, since it boots a systemd container.
+
 ### Arch contract
 
 ```bash
