@@ -11,9 +11,9 @@ a git checkout.
 | Ref | Purpose |
 | --- | --- |
 | `omarchy` remote | `omacom/omarchy` upstream |
-| upstream `v4.5.0-rc2` | Release candidate at `5978d93ae7da0a325b7493501911e3f1266cadd3` |
+| upstream `v4.5.0-rc3` | Release candidate at `8d19ad75ace59af8b6ded52f8b2bec1b15adda7c` |
 | `origin/omedora-4` | Omedora patch stack |
-| `omedora-base-20261027-omarchy4-5978d93a` | Immutable pin for this rebase |
+| `omedora-base-20261102-omarchy4-8d19ad75` | Immutable pin for this rebase |
 
 The pin label is recorded at the top of [`architecture.md`](architecture.md).
 `test/byte-identity-test.sh` reads it there. During delegated review, before the
@@ -25,7 +25,7 @@ Never rebase a maintainer worktree in place. Fetch the selected upstream object
 without creating a local upstream release tag, then create an isolated branch:
 
 ```bash
-git fetch --no-tags omarchy 5978d93ae7da0a325b7493501911e3f1266cadd3
+git fetch --no-tags omarchy 8d19ad75ace59af8b6ded52f8b2bec1b15adda7c
 git worktree add -b agent/quattro-rebase \
   /home/ajg/code/omedora-quattro-rebase origin/omedora-4
 ```
@@ -34,13 +34,14 @@ Replay only Omedora commits above the previous immutable base:
 
 ```bash
 git rebase --onto \
-  5978d93ae7da0a325b7493501911e3f1266cadd3 \
-  94a8fbc2d67eec5673c7f16b8c5e8a9c8452ffdc
+  8d19ad75ace59af8b6ded52f8b2bec1b15adda7c \
+  5978d93ae7da0a325b7493501911e3f1266cadd3
 ```
 
 Using explicit `--onto <new-base> <old-base>` is mandatory. Upstream branches
 may be rewritten; a merge-base-derived rebase can accidentally replay upstream
-history as Omedora work. The 4.5 rebase is the sharp case: `v4.0.5` sits on the
+history as Omedora work. The first 4.5 rebase (from `v4.0.5`'s
+`94a8fbc2` onto rc2) was the sharp case: `v4.0.5` sits on the
 4.0.x release branch and is not an ancestor of `v4.5.0-rc2` (their merge base
 is `f0020448`), so only the explicit old base replays exactly the Omedora
 commits.
@@ -89,14 +90,14 @@ Fedora migration pipeline, so it is patched in place and tested.
 Prepare the label from the rebase date and upstream SHA:
 
 ```bash
-NEWPIN=omedora-base-20261027-omarchy4-5978d93a
+NEWPIN=omedora-base-20261102-omarchy4-8d19ad75
 ```
 
 After parent review, create the annotated tag at the upstream commit:
 
 ```bash
-git tag -a "$NEWPIN" 5978d93ae7da0a325b7493501911e3f1266cadd3 \
-  -m "Omedora base pin: Omarchy v4.5.0-rc2 @ 5978d93a"
+git tag -a "$NEWPIN" 8d19ad75ace59af8b6ded52f8b2bec1b15adda7c \
+  -m "Omedora base pin: Omarchy v4.5.0-rc3 @ 8d19ad75"
 ```
 
 Do not create or push the tag from delegated implementation work. Existing pin
@@ -107,7 +108,7 @@ tags are immutable and are never moved or deleted.
 Run before and after authored fixes:
 
 ```bash
-OMEDORA_BASE_TAG=5978d93ae7da0a325b7493501911e3f1266cadd3 \
+OMEDORA_BASE_TAG=8d19ad75ace59af8b6ded52f8b2bec1b15adda7c \
   bash test/byte-identity-test.sh
 ```
 

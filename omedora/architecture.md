@@ -1,8 +1,8 @@
 # Omedora 4 architecture
 
-> **Current base (2026-10-27):** Omarchy `v4.5.0-rc2`, commit
-> `5978d93ae7da0a325b7493501911e3f1266cadd3`. The immutable Omedora
-> pin is `omedora-base-20261027-omarchy4-5978d93a`, to be cut locally on this
+> **Current base (2026-11-02):** Omarchy `v4.5.0-rc3`, commit
+> `8d19ad75ace59af8b6ded52f8b2bec1b15adda7c`. The immutable Omedora
+> pin is `omedora-base-20261102-omarchy4-8d19ad75`, to be cut locally on this
 > branch; push the tag before the branch at promote time.
 
 Omedora is an additive Fedora port of Omarchy, not a separate implementation.
@@ -123,7 +123,7 @@ metadata retain upstream naming. See [`branding.md`](branding.md).
 ## 8. Version identity
 
 - `omedora/version`: Omedora release identity, currently `0.2.0-beta.2`.
-- `omedora/base-version`: reported upstream base, currently `4.5.0-rc2`.
+- `omedora/base-version`: reported upstream base, currently `4.5.0-rc3`.
 - root `version`: upstream-owned package metadata and intentionally unchanged.
 - the `omedora-base-*` tag: immutable git object used by the rebase and
   byte-identity audits.

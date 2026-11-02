@@ -5,8 +5,8 @@ Omedora 4 has three separate identities. They must not be conflated.
 | Identity | Source | Current value | Purpose |
 | --- | --- | --- | --- |
 | Omedora release | `omedora/version` | `0.2.0-beta.7` | Public version and release tag |
-| Reported Omarchy base | `omedora/base-version` | `4.5.0-rc2` | User-facing upstream compatibility label |
-| Immutable git base | `omedora-base-20261027-omarchy4-5978d93a` | `5978d93ae7da0a325b7493501911e3f1266cadd3` | Rebase and byte-identity audit anchor |
+| Reported Omarchy base | `omedora/base-version` | `4.5.0-rc3` | User-facing upstream compatibility label |
+| Immutable git base | `omedora-base-20261102-omarchy4-8d19ad75` | `8d19ad75ace59af8b6ded52f8b2bec1b15adda7c` | Rebase and byte-identity audit anchor |
 
 The root `version` file belongs to upstream Omarchy. It remains unchanged even
 when its historical prerelease text is less precise than Omedora's immutable
@@ -18,7 +18,7 @@ pin. It still provides the major used by `bin/omedora-copr` to select
 On Fedora, `omarchy-version` reports:
 
 ```text
-Omedora 0.2.0-beta.7 (rebased on Omarchy 4.5.0-rc2)
+Omedora 0.2.0-beta.7 (rebased on Omarchy 4.5.0-rc3)
 ```
 
 On Arch, upstream package-version behavior remains unchanged.

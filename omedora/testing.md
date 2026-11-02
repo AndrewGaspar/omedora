@@ -100,7 +100,7 @@ For a rebase, run byte identity against the candidate commit when the prepared
 pin tag has not been created yet:
 
 ```bash
-OMEDORA_BASE_TAG=5978d93ae7da0a325b7493501911e3f1266cadd3 \
+OMEDORA_BASE_TAG=8d19ad75ace59af8b6ded52f8b2bec1b15adda7c \
   bash test/byte-identity-test.sh
 ```
 
