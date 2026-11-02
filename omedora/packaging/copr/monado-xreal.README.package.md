@@ -50,6 +50,15 @@ Environment=XREAL_AIR_PLANES=1
 The tuning variables (`XREAL_AIR_SLAM_*`, `XREAL_AIR_PLANES_*`) are documented
 in the fork's `src/xrt/drivers/xreal_air/xreal_air_slam.h`.
 
+## CPU priority
+
+The unit sets `CPUWeight=1000`, ten times the default, so the runtime gets the
+CPU it needs when other apps in your session are busy. It also sets
+`ManagedOOMPreference=avoid`, so under memory pressure `systemd-oomd` stops
+other apps first. Both apply only inside your own session: system services
+still share the CPU with your session as a whole. Override either one in a
+drop-in, for example `CPUWeight=` (empty) to go back to the default.
+
 ## Using your own Basalt build
 
 Point `VIT_SYSTEM_LIBRARY_PATH` at your library in a drop-in. The unit's

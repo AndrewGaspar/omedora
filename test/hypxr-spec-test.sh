@@ -127,6 +127,22 @@ grep -qx 'RuntimeDirectoryMode=0700' "$MONADO_UNIT" \
   && pass "monado-xreal socket directory is private to the user" \
   || fail "monado-xreal socket directory is private to the user"
 
+# Resource control (#11). A user unit can raise its CPU weight (the user
+# manager has cpu delegated) and oomd honors the preference under Fedora's
+# per-user-slice defaults. IOWeight= stays out: user@.service delegates no io
+# controller, so the line would be a no-op.
+grep -qx 'CPUWeight=1000' "$MONADO_UNIT" \
+  && pass "monado-xreal unit raises its CPU weight" \
+  || fail "monado-xreal unit raises its CPU weight"
+grep -qx 'ManagedOOMPreference=avoid' "$MONADO_UNIT" \
+  && pass "monado-xreal unit asks systemd-oomd to avoid it" \
+  || fail "monado-xreal unit asks systemd-oomd to avoid it"
+if grep -qE '^IOWeight=' "$MONADO_UNIT"; then
+  fail "monado-xreal unit carries no no-op IOWeight="
+else
+  pass "monado-xreal unit carries no no-op IOWeight="
+fi
+
 MONADO="$COPR/monado-xreal.spec"
 grep -qx '%global commit 613d8eeb1e29be2b208a3b0eff2f5826f4bef983' "$MONADO" \
   && pass "monado-xreal pins the fork's hypxrland tip" \
