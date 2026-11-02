@@ -127,4 +127,41 @@ grep -qx 'RuntimeDirectoryMode=0700' "$MONADO_UNIT" \
   && pass "monado-xreal socket directory is private to the user" \
   || fail "monado-xreal socket directory is private to the user"
 
+MONADO="$COPR/monado-xreal.spec"
+grep -qx '%global commit 613d8eeb1e29be2b208a3b0eff2f5826f4bef983' "$MONADO" \
+  && pass "monado-xreal pins the fork's hypxrland tip" \
+  || fail "monado-xreal pins the fork's hypxrland tip"
+grep -qx '%global snapshot 20261016.2' "$MONADO" \
+  && pass "monado-xreal snapshot sorts above the previous Oct 16 pin" \
+  || fail "monado-xreal snapshot sorts above the previous Oct 16 pin"
+grep -qF '9d170f5b20fdab8c89d5a527b3155b311544cb24ce77e86b0c163099bf05476a  monado-xreal-613d8eeb1e29be2b208a3b0eff2f5826f4bef983.tar.gz' \
+  "$COPR/monado-xreal.spec.sources" \
+  && pass "monado-xreal archive checksum is pinned" \
+  || fail "monado-xreal archive checksum is pinned"
+# 6DoF works once enabled (the packaged Basalt is installed and wired in the
+# unit; basalt-xreal-spec-test.sh checks those paths), but stays opt-in.
+grep -qE '^Requires:[[:space:]]+basalt-xreal >= ' "$MONADO" \
+  && pass "monado-xreal requires the packaged Basalt tracker" \
+  || fail "monado-xreal requires the packaged Basalt tracker"
+grep -q '^Environment=VIT_SYSTEM_LIBRARY_PATH=/usr/lib64/basalt-xreal/' "$MONADO_UNIT" \
+  && pass "monado-xreal unit points VIT at basalt-xreal" \
+  || fail "monado-xreal unit points VIT at basalt-xreal"
+if grep -qE '^Environment=XREAL_AIR_(SLAM|PLANES)=' "$MONADO_UNIT"; then
+  fail "monado-xreal unit leaves 6DoF and planes off"
+else
+  pass "monado-xreal unit leaves 6DoF and planes off"
+fi
+grep -qF -- '-DXRT_FEATURE_SLAM=ON' "$MONADO" \
+  && grep -qF -- '-DXRT_FEATURE_OPENXR_PLANE_DETECTION=ON' "$MONADO" \
+  && pass "monado-xreal builds the SLAM and plane detection paths" \
+  || fail "monado-xreal builds the SLAM and plane detection paths"
+grep -qF '%{buildroot}%{_libexecdir}/monado-xreal/monado-cli' "$MONADO" \
+  && pass "monado-xreal installs monado-cli privately" \
+  || fail "monado-xreal installs monado-cli privately"
+grep -qE '^Source3:[[:space:]]+monado-xreal\.README\.package\.md$' "$MONADO" \
+  && grep -qF 'Environment=XREAL_AIR_SLAM=1' "$COPR/monado-xreal.README.package.md" \
+  && grep -qF 'Environment=XREAL_AIR_PLANES=1' "$COPR/monado-xreal.README.package.md" \
+  && pass "monado-xreal README documents enabling 6DoF and planes" \
+  || fail "monado-xreal README documents enabling 6DoF and planes"
+
 echo "# all HypXR spec tests passed"

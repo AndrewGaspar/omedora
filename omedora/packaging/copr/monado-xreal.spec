@@ -1,12 +1,12 @@
 # monado-xreal.spec — private XREAL Air runtime for HypXRland.
 
-%global snapshot 20261016.1
-%global commit 6e23edfb3132ebec89fcd1d791651871675f655f
+%global snapshot 20261016.2
+%global commit 613d8eeb1e29be2b208a3b0eff2f5826f4bef983
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 
 Name:           monado-xreal
 Version:        25.1.0^%{snapshot}.git%{shortcommit}
-Release:        2%{?dist}
+Release:        1%{?dist}
 Summary:        HypXRland Monado runtime for XREAL Air displays
 
 License:        BSL-1.0 AND Apache-2.0 AND BSD-3-Clause AND MIT
@@ -14,6 +14,7 @@ URL:            https://github.com/AndrewGaspar/monado
 Source0:        %{url}/archive/%{commit}/%{name}-%{commit}.tar.gz
 Source1:        monado-xreal.service
 Source2:        openxr_monado-xreal.json
+Source3:        monado-xreal.README.package.md
 
 ExclusiveArch:  x86_64
 
@@ -44,11 +45,19 @@ BuildRequires:  pkgconfig(x11-xcb)
 BuildRequires:  pkgconfig(xcb)
 BuildRequires:  pkgconfig(xcb-randr)
 BuildRequires:  pkgconfig(xrandr)
+# %%check confirms the unit's VIT library and settings paths are the ones
+# basalt-xreal installs.
+BuildRequires:  basalt-xreal >= 0^20261015.gite3dec7b44
 
 # Fedora's xr-hardware rules grant the active seat access to the XREAL HID
 # interfaces. 1.1.2 is the first Fedora 44 build that includes Air Ultra
 # (3318:0426) alongside Air/Air 2/Air 2 Pro.
 Requires:       xr-hardware >= 1.1.2
+# The opt-in 6DoF path loads Basalt's VIT library from basalt-xreal (the unit
+# points VIT_SYSTEM_LIBRARY_PATH there). A hard dependency, not Recommends:
+# Omedora installs packages with weak dependencies off, and turning 6DoF on
+# should take only XREAL_AIR_SLAM=1. The floor exports basalt_vit_restartable.
+Requires:       basalt-xreal >= 0^20261015.gite3dec7b44
 
 %description
 This package builds the HypXRland-pinned Monado fork as an XREAL Air runtime:
@@ -56,10 +65,12 @@ the XREAL HID driver, real Vulkan compositor, and Wayland window/direct
 backends. Its service, libraries, IPC socket, and manifest have private names
 so it can be installed alongside the WiVRn runtime.
 
-Tracking is 3DoF by default. The build includes the opt-in 6DoF SLAM path
-(t_slam/VIT, against OpenCV): set XREAL_AIR_SLAM=1 and point
-VIT_SYSTEM_LIBRARY_PATH at a user-built Basalt library to enable it, as
-documented in HypXRland's XREAL setup. No Basalt library is shipped.
+Tracking is 3DoF by default. The opt-in 6DoF path runs visual-inertial SLAM
+through the Basalt tracker in basalt-xreal, which the user unit already points
+at: set XREAL_AIR_SLAM=1 in a drop-in to enable it, and XREAL_AIR_PLANES=1 on
+top for XR_EXT_plane_detection (horizontal planes). monado-cli, with the
+xreal-slam-replay and plane-map-replay commands for recordings, is installed
+privately under %{_libexecdir}/monado-xreal. See README.package.md.
 
 The service binary deliberately has no file capabilities. A file capability
 puts the Vulkan loader into secure-execution mode and prevents the per-machine
@@ -67,6 +78,7 @@ GPU ICD selection required by hybrid-GPU XREAL systems.
 
 %prep
 %autosetup -n monado-%{commit} -p1
+cp -p %{SOURCE3} README.package.md
 
 %build
 export CXXFLAGS="%{build_cxxflags} -include cstdint"
@@ -104,6 +116,7 @@ export CXXFLAGS="%{build_cxxflags} -include cstdint"
   -DXRT_BUILD_DRIVER_XREAL_AIR=ON \
   -DXRT_BUILD_SAMPLES=OFF \
   -DXRT_FEATURE_DEBUG_GUI=OFF \
+  -DXRT_FEATURE_OPENXR_PLANE_DETECTION=ON \
   -DXRT_FEATURE_RENDERDOC=OFF \
   -DXRT_FEATURE_SERVICE=ON \
   -DXRT_FEATURE_SERVICE_SYSTEMD=OFF \
@@ -123,16 +136,19 @@ export CXXFLAGS="%{build_cxxflags} -include cstdint"
   -DXRT_IPC_SERVICE_PID_FILENAME=monado-xreal.pid \
   -DXRT_MODULE_COMPOSITOR_MAIN=ON \
   -DXRT_MODULE_COMPOSITOR_NULL=OFF \
-  -DXRT_MODULE_MONADO_CLI=OFF \
+  -DXRT_MODULE_MONADO_CLI=ON \
   -DXRT_MODULE_MONADO_GUI=OFF \
   -DXRT_OXR_RUNTIME_SUFFIX=monado_xreal
 ninja-build -C %{__cmake_builddir} %{?_smp_mflags} \
-  monado-service openxr_monado_xreal monado
+  monado-service openxr_monado_xreal monado cli
 
 %install
 install -Dpm0755 \
   %{__cmake_builddir}/src/xrt/targets/service/monado-service \
   %{buildroot}%{_libexecdir}/monado-xreal/monado-service
+install -Dpm0755 \
+  %{__cmake_builddir}/src/xrt/targets/cli/monado-cli \
+  %{buildroot}%{_libexecdir}/monado-xreal/monado-cli
 install -Dpm0755 \
   %{__cmake_builddir}/src/xrt/targets/openxr/libopenxr_monado_xreal.so \
   %{buildroot}%{_libdir}/monado-xreal/libopenxr_monado_xreal.so
@@ -155,6 +171,22 @@ grep -q '^XRT_HAVE_WAYLAND:BOOL=ON$' \
   %{__cmake_builddir}/CMakeCache.txt
 grep -q '^XRT_FEATURE_SLAM:BOOL=ON$' \
   %{__cmake_builddir}/CMakeCache.txt
+grep -q '^XRT_FEATURE_OPENXR_PLANE_DETECTION:BOOL=ON$' \
+  %{__cmake_builddir}/CMakeCache.txt
+# 6DoF: the unit points at basalt-xreal's library and settings (both must
+# exist as installed by the BuildRequires'd package) and never enables SLAM or
+# planes itself.
+unit=%{buildroot}%{_userunitdir}/monado-xreal.service
+vit=$(sed -n 's/^Environment=VIT_SYSTEM_LIBRARY_PATH=//p' "$unit")
+slam_config=$(sed -n 's/^Environment=XREAL_AIR_SLAM_CONFIG=//p' "$unit")
+[[ $vit == %{_libdir}/basalt-xreal/libbasalt.so.2 ]]
+[[ $slam_config == %{_datadir}/basalt-xreal/xreal_air.toml ]]
+test -e "$vit"
+test -f "$slam_config"
+if grep -qE '^Environment=XREAL_AIR_(SLAM|PLANES)=' "$unit"; then
+  exit 1
+fi
+%{buildroot}%{_libexecdir}/monado-xreal/monado-cli 2>&1 | grep -q xreal-slam-replay
 grep -F '%{_libdir}/monado-xreal/libopenxr_monado_xreal.so' %{SOURCE2}
 ! getcap %{buildroot}%{_libexecdir}/monado-xreal/monado-service | grep -q .
 
@@ -169,13 +201,24 @@ grep -F '%{_libdir}/monado-xreal/libopenxr_monado_xreal.so' %{SOURCE2}
 
 %files
 %license LICENSE
-%doc README.md
+%doc README.md README.package.md
 %{_libexecdir}/monado-xreal/
 %{_libdir}/monado-xreal/
 %{_userunitdir}/monado-xreal.service
 %{_datadir}/openxr/1/openxr_monado-xreal.json
 
 %changelog
+* Sun Nov 01 2026 omedora <noreply@omedora> - 25.1.0^20261016.2.git613d8eeb1-1
+- Refresh to the fork's hypxrland branch tip 613d8ee, six commits past
+  HypXRland's submodule pin: opt-in horizontal plane detection
+  (XR_EXT_plane_detection with an SGBM depth source, XREAL_AIR_PLANES=1 on
+  top of 6DoF) and plane output in the replay CLI.
+- Ship 6DoF ready to enable: require basalt-xreal and point the unit's
+  VIT_SYSTEM_LIBRARY_PATH and XREAL_AIR_SLAM_CONFIG at it, so XREAL_AIR_SLAM=1
+  is the only setting a user adds. 6DoF and planes stay off by default.
+- Install monado-cli privately in /usr/libexec/monado-xreal for the
+  xreal-slam-replay and plane-map-replay commands, and README.package.md.
+
 * Sun Nov 01 2026 omedora <noreply@omedora> - 25.1.0^20261016.1.git6e23edfb3-2
 - Create the IPC socket directory with RuntimeDirectory=monado-xreal: the
   service failed to bind $XDG_RUNTIME_DIR/monado-xreal/comp_ipc on a fresh

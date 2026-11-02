@@ -6,8 +6,9 @@
 # 6DoF. COPR's mock build is offline and commit archives carry no submodules,
 # so every submodule the library build reads is its own pinned SourceN. This
 # audits the spec text so an edit cannot silently move the library onto the
-# linker path, unpin a submodule, or break the toml's config-path rewrite.
-# Pure bash + grep; no build.
+# linker path, unpin a submodule, break the toml's config-path rewrite, or
+# drift from the paths monado-xreal's unit points at. Pure bash + grep; no
+# build.
 
 set -euo pipefail
 
@@ -148,6 +149,15 @@ fi
 for check in vit_api_get_version basalt_vit_restartable './vit-smoke'; do
   grep -qF "$check" "$SPEC" && pass "%check covers $check" || fail "%check covers $check"
 done
+
+# --- monado-xreal's unit points at exactly these paths ------------------------
+unit="$COPR/monado-xreal.service"
+grep -qx 'Environment=VIT_SYSTEM_LIBRARY_PATH=/usr/lib64/basalt-xreal/libbasalt.so.2' "$unit" \
+  && pass "monado-xreal unit loads the packaged library by SONAME" \
+  || fail "monado-xreal unit loads the packaged library by SONAME"
+grep -qx 'Environment=XREAL_AIR_SLAM_CONFIG=/usr/share/basalt-xreal/xreal_air.toml' "$unit" \
+  && pass "monado-xreal unit selects the packaged pipeline settings" \
+  || fail "monado-xreal unit selects the packaged pipeline settings"
 
 # --- build order --------------------------------------------------------------
 order=$(sed -n '/^SPECS=(/,/^)/p' "$COPR/build-repo.sh" | sed 's/#.*//' | tr -s '[:space:]' ' ')
