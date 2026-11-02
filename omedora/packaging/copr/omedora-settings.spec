@@ -44,7 +44,7 @@
 Name:           omedora-settings
 # Version is normally read from the repo's omedora/version file; hardcoded here
 # for now — a follow-up wires .copr/srpm.sh to substitute it at SRPM-gen time.
-Version:        0.2.0~beta.8
+Version:        0.2.0~beta.9
 Release:        1%{?dist}
 Summary:        Omedora pre-install settings: /etc/skel seeds, system defaults, fonts, branding
 
@@ -408,6 +408,9 @@ desktop-file-validate %{buildroot}%{_datadir}/wayland-sessions/omedora.desktop
 %config(noreplace) %{_sysconfdir}/dnf/libdnf5-plugins/actions.d/omedora-release-guard.actions
 
 %changelog
+* Mon Nov 02 2026 omedora <noreply@omedora> - 0.2.0~beta.9-1
+- Rebuild for the 0.2.0~beta.9 release.
+
 * Tue Oct 27 2026 omedora <noreply@omedora> - 0.2.0~beta.8-1
 - Refresh the packaged defaults for the official Omarchy 4.0.6 release.
 - Ship the dnf release-upgrade guard.
