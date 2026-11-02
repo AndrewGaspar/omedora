@@ -6,7 +6,7 @@
 
 Name:           monado-xreal
 Version:        25.1.0^%{snapshot}.git%{shortcommit}
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        HypXRland Monado runtime for XREAL Air displays
 
 License:        BSL-1.0 AND Apache-2.0 AND BSD-3-Clause AND MIT
@@ -214,6 +214,12 @@ fi
 %{_datadir}/openxr/1/openxr_monado-xreal.json
 
 %changelog
+* Mon Nov 02 2026 omedora <noreply@omedora> - 25.1.0^20261016.2.git613d8eeb1-3
+- Give the user unit CPUWeight=1000, so the runtime wins CPU against the
+  session's other apps, and ManagedOOMPreference=avoid, which systemd-oomd
+  honors under Fedora's per-user-slice defaults. No IOWeight=: the user
+  manager has no io controller delegated. Document both in README.package.md.
+
 * Mon Nov 02 2026 omedora <noreply@omedora> - 25.1.0^20261016.2.git613d8eeb1-2
 - Make the %%check that monado-service has no file capabilities able to fail:
   rpm's sh -e ignored the bare `! getcap ...` line, and a failing getcap
