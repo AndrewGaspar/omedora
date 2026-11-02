@@ -145,6 +145,9 @@ jobs:
       - name: Run basalt-xreal-spec static guard
         run: bash test/basalt-xreal-spec-test.sh
 
+      - name: Run xreal-ctl-spec static guard
+        run: bash test/xreal-ctl-spec-test.sh
+
       - name: Run hypr BuildRequires floor guard
         run: bash test/hypr-buildrequires-floor-test.sh
 
