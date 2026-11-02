@@ -119,9 +119,11 @@ SPECS=(
   # /usr/libexec and shares the 0.56.x libraries with the stable Hyprland built
   # above. Leaf runtimes precede the dependency-only stack/session packages;
   # monado-xreal is published but remains hardware-specific and opt-in.
+  # basalt-xreal, the Basalt VIT tracker for monado-xreal's opt-in 6DoF,
+  # builds before it.
   hypxrpaper.spec hypxrva.spec hypxrhud.spec hypxrcompose.spec
   hypxrvoice-model-base-en.spec hypxrvoice.spec
-  wivrn-hypxr.spec monado-xreal.spec
+  wivrn-hypxr.spec basalt-xreal.spec monado-xreal.spec
   hypxrland-legacy-config.spec
   hypxrland.spec hypxrland-stack.spec hypxrland-omedora.spec
   # hyprland-omedora (the 3.8.2-era session-entry shim) is RETIRED on the 4.x
