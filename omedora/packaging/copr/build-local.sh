@@ -195,6 +195,7 @@ EOF
     # already in SOURCES/, so non-Rust specs are untouched.
     grep -iE "^Source[0-9]*:" "/copr/$OMEDORA_BUILD_SPEC" | sed -E "s/^[^:]+:[[:space:]]*//" | while read -r src; do
       case "$src" in
+        *-go-vendor.tar.*) : ;;                   # Go, generated below
         *-vendor.tar.*)
           # Resolve %{name}/%{version} macros in the SourceN value.
           read -r nv_name nv_version < <(rpmspec -q --srpm --qf "%{name} %{version}\n" "/copr/$OMEDORA_BUILD_SPEC")
@@ -224,6 +225,32 @@ EOF
           tar --sort=name --mtime="@0" --owner=0 --group=0 --numeric-owner \
             -C "$topdir" -caf "$vendor_tar" "$vendor_dir"
           rm -rf "$work"
+          ;;
+      esac
+    done
+
+    # Go module vendor tarball for any *-go-vendor.tar.* SourceN (kitty):
+    # `go mod vendor` against the pinned Source0 tarball'\''s go.sum, whose
+    # module hashes the go tool verifies. Unpacks to vendor/. Mirrors
+    # .copr/srpm.sh — keep the two in sync.
+    grep -iE "^Source[0-9]*:" "/copr/$OMEDORA_BUILD_SPEC" | sed -E "s/^[^:]+:[[:space:]]*//" | while read -r src; do
+      case "$src" in
+        *-go-vendor.tar.*)
+          command -v go >/dev/null 2>&1 || \
+            dnf install -y --setopt=keepcache=1 --setopt=install_weak_deps=False golang >/dev/null
+          read -r nv_name nv_version < <(rpmspec -q --srpm --qf "%{name} %{version}\n" "/copr/$OMEDORA_BUILD_SPEC")
+          go_vendor_tar="$HOME/rpmbuild/SOURCES/${nv_name}-${nv_version}-go-vendor.tar.zst"
+          [[ -f "$go_vendor_tar" ]] && continue
+          echo "==> Generating Go vendor tarball: $(basename "$go_vendor_tar")"
+          work=$(mktemp -d)
+          src0=$(rpmspec -P "/copr/$OMEDORA_BUILD_SPEC" | sed -nE "s/^Source0:[[:space:]]*//p" | head -n1)
+          tar -C "$work" -xf "$HOME/rpmbuild/SOURCES/$(basename "$src0")"
+          go_top=$(find "$work" -mindepth 1 -maxdepth 1 -type d | head -n1)
+          ( cd "$go_top" && GOTOOLCHAIN=local GOFLAGS=-mod=mod GOMODCACHE="$work/gomodcache" \
+              go mod vendor )
+          tar --sort=name --mtime="@0" --owner=0 --group=0 --numeric-owner \
+            -C "$go_top" -caf "$go_vendor_tar" vendor
+          chmod -R u+w "$work" && rm -rf "$work"
           ;;
       esac
     done
