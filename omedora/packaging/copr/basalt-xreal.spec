@@ -16,7 +16,9 @@
 # basalt-xreal.spec.sources) unpacked into its submodule path in %%prep. The
 # pins are the gitlinks recorded in the Basalt / basalt-headers commits.
 #   system (exact or compatible Fedora versions): Eigen 5.0.1 (the submodule
-#     pin is 5.0.1 too), cereal 1.3.2 (= the submodule pin), TBB, OpenCV, fmt.
+#     pin is 5.0.1 too), cereal 1.3.2 (= the submodule pin), TBB, fmt, and
+#     OpenCV (core, imgproc, calib3d, highgui, and video for the klt8
+#     tracker's pyramids; opencv-devel requires every module).
 #   bundled (no Fedora package, or the include path is hard-wired and the
 #     Fedora version differs; all header-only): basalt-headers, Sophus,
 #     CLI11 2.6.2, magic_enum 0.9.7, and the in-tree nlohmann/json 3.9.1 and
@@ -33,11 +35,16 @@
 # same reason. Code generation targets x86-64-v3 (AVX2/FMA) rather than the
 # Fedora baseline: the tracker runs in real time on Eigen kernels, and Basalt's
 # own default is -march=native.
+#
+# TRACKER CONFIGS: xreal_air.toml selects xreal_air_config.json, the default
+# tracker. The two experimental 8-bit (klt8) configs ship beside it unused;
+# opting in takes a toml whose config-path points at one of them. No klt8
+# toml is shipped and the default does not change.
 
-%global commit e3dec7b4477eb25629c7d3ebc509a7e6c2d15b86
+%global commit c08b9e2cc2925f19a779769d43d910f430ecd726
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 # Upstream commit date of the pin (snapshot versioning, as the hypxr specs).
-%global snapshot 20261015
+%global snapshot 20261102
 
 # Submodule pins (gitlinks at %%{commit} and at basalt-headers_commit).
 %global headers_commit e6db0fb84c69614bc4923fde6c52154c221c1768
@@ -160,6 +167,12 @@ ln -s libbasalt.so.%{vit_version} \
 ln -s libbasalt.so.%{vit_major} %{buildroot}%{_libdir}/basalt-xreal/libbasalt.so
 install -Dpm0644 data/xreal/xreal_air_config.json \
   %{buildroot}%{_datadir}/basalt-xreal/xreal_air_config.json
+# Library-only mode installs only the default json; ship the opt-in klt8
+# configs next to it.
+install -Dpm0644 data/xreal/xreal_air_config_klt8.json \
+  %{buildroot}%{_datadir}/basalt-xreal/xreal_air_config_klt8.json
+install -Dpm0644 data/xreal/xreal_air_config_klt8_cap2.json \
+  %{buildroot}%{_datadir}/basalt-xreal/xreal_air_config_klt8_cap2.json
 # The configured toml points config-path at upstream's share/basalt; point it
 # at the private copy instead.
 sed 's|^config-path=.*$|config-path="%{_datadir}/basalt-xreal/xreal_air_config.json"|' \
@@ -184,6 +197,8 @@ nm -D --defined-only "$lib" | grep -qw basalt_vit_restartable
 if nm -D --defined-only "$lib" | grep -v -E ' (vit_|basalt_vit_|BASALT_)' | grep -q ' T '; then
   exit 1
 fi
+# The klt8 tracker builds its pyramids with OpenCV's video module.
+objdump -p "$lib" | grep -qE 'NEEDED[[:space:]]+libopencv_video\.so'
 # No GUI stack leaked in (visualization is off).
 if objdump -p "$lib" | grep -E 'NEEDED' | grep -qiE 'pangolin|libGL|epoxy|wayland'; then
   exit 1
@@ -196,6 +211,8 @@ grep -qx 'use-double=0' "$toml"
 grep -qx 'cam-calib=""' "$toml"
 grep -qx 'show-gui=0' "$toml"
 test -f %{buildroot}%{_datadir}/basalt-xreal/xreal_air_config.json
+test -f %{buildroot}%{_datadir}/basalt-xreal/xreal_air_config_klt8.json
+test -f %{buildroot}%{_datadir}/basalt-xreal/xreal_air_config_klt8_cap2.json
 # Load it the way Monado does and ask for the VIT version.
 cat > vit-smoke.c <<'EOF'
 #include <dlfcn.h>
@@ -226,6 +243,13 @@ gcc -o vit-smoke vit-smoke.c
 %{_datadir}/basalt-xreal/
 
 %changelog
+* Mon Nov 02 2026 omedora <noreply@omedora> - 0^20261102.gitc08b9e2cc-1
+- Update to xreal-vit c08b9e2: SLAM efficiency work (about 72-74% less CPU
+  per frame with the default config, same tracking results).
+- Ship the experimental klt8 tracker configs beside the default one; the
+  default stays xreal_air_config.json.
+- The library now links OpenCV's video module.
+
 * Sun Nov 01 2026 omedora <noreply@omedora> - 0^20261015.gite3dec7b44-1
 - Initial package: the xreal-vit Basalt fork at e3dec7b as monado-xreal's
   private VIT library, with the XREAL Air pipeline settings.

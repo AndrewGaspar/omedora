@@ -25,9 +25,9 @@ assert_file_exists "basalt-xreal.spec.sources exists" "$SOURCES"
 assert_file_exists "basalt-xreal library-build patch exists" "$PATCH"
 
 # --- pins ---------------------------------------------------------------------
-grep -qE '^%global commit e3dec7b4477eb25629c7d3ebc509a7e6c2d15b86$' "$SPEC" \
+grep -qE '^%global commit c08b9e2cc2925f19a779769d43d910f430ecd726$' "$SPEC" \
   && pass "Basalt xreal-vit tip is pinned" || fail "Basalt xreal-vit tip is pinned"
-grep -qE '^%global snapshot 20261015$' "$SPEC" \
+grep -qE '^%global snapshot 20261102$' "$SPEC" \
   && pass "snapshot is the pinned commit's date" || fail "snapshot is the pinned commit's date"
 grep -qE '^Version:[[:space:]]+0\^%\{snapshot\}\.git%\{shortcommit\}$' "$SPEC" \
   && pass "Version is a snapshot of the pinned commit" \
@@ -51,7 +51,7 @@ done
 expand() {
   local value=$1 macro
   value=${value//%\{url\}/https://github.com/AndrewGaspar/basalt}
-  value=${value//%\{commit\}/e3dec7b4477eb25629c7d3ebc509a7e6c2d15b86}
+  value=${value//%\{commit\}/c08b9e2cc2925f19a779769d43d910f430ecd726}
   for macro in "${!submodules[@]}"; do
     value=${value//%\{$macro\}/${submodules[$macro]}}
   done
@@ -140,6 +140,21 @@ grep -qF "grep -qx 'config-path=\"%{_datadir}/basalt-xreal/xreal_air_config.json
   || fail "%check verifies the rewritten config-path"
 grep -qF 'data/xreal/xreal_air_config.json' "$SPEC" \
   && pass "ships the XREAL pipeline json" || fail "ships the XREAL pipeline json"
+# The experimental klt8 configs ship beside the default, unselected: only the
+# default json is ever a config-path, and no klt8 toml is installed.
+for json in xreal_air_config_klt8.json xreal_air_config_klt8_cap2.json; do
+  grep -qF "install -Dpm0644 data/xreal/$json \\" "$SPEC" \
+    && grep -qxF "test -f %{buildroot}%{_datadir}/basalt-xreal/$json" "$SPEC" \
+    && pass "ships and checks $json" || fail "ships and checks $json"
+done
+if grep -vE '^[[:space:]]*#' "$SPEC" | grep -E 'config-path|klt8[^[:space:]]*\.toml' | grep -q klt8; then
+  fail "the default tracker stays selected (no klt8 toml)"
+else
+  pass "the default tracker stays selected (no klt8 toml)"
+fi
+grep -qF "grep -qE 'NEEDED[[:space:]]+libopencv_video\.so'" "$SPEC" \
+  && pass "%check verifies the OpenCV video link" \
+  || fail "%check verifies the OpenCV video link"
 # rpm runs %check under `sh -e`, which never fails on a `! cmd` line.
 if sed -n '/^%check/,/^%files/p' "$SPEC" | grep -qE '^[[:space:]]*! '; then
   fail "%check has no bare negated commands (they never fail the build)"
