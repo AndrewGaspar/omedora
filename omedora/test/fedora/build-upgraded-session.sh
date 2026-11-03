@@ -19,6 +19,8 @@
 #         missing; override with OMEDORA_UPGRADE_FROM_IMAGE)
 # Output: omedora-test:fedora<to>-session-4-upgraded
 #         (override with OMEDORA_UPGRADE_TO_IMAGE)
+# Container: omedora-upgrade-session-f<from>-f<to> (override with
+#         OMEDORA_UPGRADE_CTR, e.g. to run beside another checkout's gate)
 #
 # The offline transaction ends by asking logind to reboot, which stops the
 # container; starting it again boots the upgraded system, as a real reboot
@@ -45,7 +47,7 @@ FROM_RELEASE=$OMEDORA_FEDORA_RELEASE
 TO_RELEASE="${OMEDORA_UPGRADE_TO:-$((FROM_RELEASE + 1))}"
 FROM_IMAGE="${OMEDORA_UPGRADE_FROM_IMAGE:-$OMEDORA_TEST_TAG-session-4}"
 TO_IMAGE="${OMEDORA_UPGRADE_TO_IMAGE:-omedora-test:fedora$TO_RELEASE-session-4-upgraded}"
-CTR="omedora-upgrade-session-f$FROM_RELEASE-f$TO_RELEASE"
+CTR="${OMEDORA_UPGRADE_CTR:-omedora-upgrade-session-f$FROM_RELEASE-f$TO_RELEASE}"
 DNF_CACHE_VOL="omedora-dnf-cache$OMEDORA_RELEASE_SUFFIX"
 LOG_DIR="${OMEDORA_UPGRADE_LOG_DIR:-${TMPDIR:-/tmp}/omedora-upgrade-session-f$FROM_RELEASE-f$TO_RELEASE}"
 OFFLINE_DIR=/usr/lib/sysimage/libdnf5/offline
