@@ -50,7 +50,7 @@ Generic Cloud Base qcow2, first match wins:
 
 1. `OMEDORA_VM_BASE_URL` / `OMEDORA_VM_BASE_NAME` overrides
    (`OMEDORA_VM_BASE_SHA256` pins the digest of a custom download).
-2. The pinned GA image in `OMEDORA_VM_PINNED_IMAGES` (44 → `44-1.7`). Add a
+2. The pinned GA image in `OMEDORA_VM_PINNED_IMAGES` (44 → `44-1.7`, 45 → `45-1.4`). Add a
    release here once its GA image is published under `releases/<N>/`.
 3. The newest image for that release already cached in
    `/var/tmp/omedora-vmtest/images/`, so runs work offline and the base does

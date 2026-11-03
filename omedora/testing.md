@@ -30,7 +30,7 @@ OMEDORA_FEDORA_RELEASE=45 omedora/test/fedora/run-integration.sh
 | L4 images | `omedora-test:fedora44-session-4*` | `omedora-test:fedoraN-session-4*` |
 | dnf cache volumes | `omedora-dnf-cache`, `omedora-rpmbuild-dnf-cache` | the same with `-fN` |
 | Local RPM build | `packaging/copr/output/`, `packaging/copr/repo/` | `output-fN/`, `repo-fN/` |
-| VM base image | pinned `Fedora-Cloud-Base-Generic-44-1.7` | pinned GA if listed, else cached, else newest nightly |
+| VM base image | pinned `Fedora-Cloud-Base-Generic-44-1.7` | pinned GA if listed (45: `45-1.4`), else cached, else newest nightly |
 | VM domain / SSH port | `omedora-vmtest` / 2222 | `omedora-vmtest-fN` / 2222+N−44 |
 
 Fedora 44 keeps the names the harness used before the knob existed, so cached

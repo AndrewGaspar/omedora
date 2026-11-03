@@ -24,6 +24,7 @@ OMEDORA_VM_FEDORA_MIRROR="${OMEDORA_VM_FEDORA_MIRROR:-https://dl.fedoraproject.o
 # release -> pinned GA image URL.
 declare -A OMEDORA_VM_PINNED_IMAGES=(
   [44]="https://download.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-44-1.7.x86_64.qcow2"
+  [45]="https://download.fedoraproject.org/pub/fedora/linux/releases/45/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-45-1.4.x86_64.qcow2"
 )
 
 # Print the newest Generic qcow2 basename listed at <dir_url> for the release.
