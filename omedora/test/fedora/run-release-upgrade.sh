@@ -35,6 +35,10 @@
 # before its first release): the code comes from the checkout, but the
 # packages it reads come from the RPMs. See lib/local-repo.sh.
 #
+# OMEDORA_UPGRADE_LOG_DIR=<host dir> keeps the per-step logs (install, check,
+# download, execute, update-*) and the container's dnf5 logs there; without it
+# they go away with the container.
+#
 # Needs network (live COPR, Fedora mirrors) and ~25 minutes.
 
 set -euo pipefail
@@ -80,6 +84,10 @@ VERIFY=/repo/omedora/test/fedora/release-upgrade-verify.sh
 mounts=(-v "$REPO:/repo" -v "$DNF_CACHE_VOL:/var/cache/libdnf5")
 exec_env=(-e "OMEDORA_UPGRADE_CODE=$code_mode")
 [[ -z ${OMEDORA_UPGRADE_TO:-} ]] || exec_env+=(-e "OMEDORA_UPGRADE_TO=$OMEDORA_UPGRADE_TO")
+if [[ -n ${OMEDORA_UPGRADE_LOG_DIR:-} ]]; then
+  mkdir -p "$OMEDORA_UPGRADE_LOG_DIR"
+  mounts+=(-v "$(cd -- "$OMEDORA_UPGRADE_LOG_DIR" && pwd):/var/tmp/release-upgrade")
+fi
 
 # local_repo_dir <release> — make <release>'s local repo hold HEAD's core RPMs
 # (building them when it does not) and print its directory.

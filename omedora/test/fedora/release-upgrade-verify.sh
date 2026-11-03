@@ -51,6 +51,10 @@ OFFLINE_DIR=/usr/lib/sysimage/libdnf5/offline
 LOG_DIR=/var/tmp/release-upgrade
 mkdir -p "$LOG_DIR"
 
+# Keep dnf's own logs (the release guard's verdicts land in dnf5.log) next to
+# the step logs, which run-release-upgrade.sh can bind-mount to the host.
+trap 'cp -f /var/log/dnf5.log* "$LOG_DIR/" 2>/dev/null || true' EXIT
+
 ok() { echo "ok - $1"; }
 die() {
   echo "not ok - $1" >&2
