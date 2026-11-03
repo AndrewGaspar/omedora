@@ -1,0 +1,23 @@
+# kitty_tests/fonts.py assumes sys.getrefcount() counts its own argument;
+# Python 3.15 passes the local without a new reference, so a correct
+# get_fallback_font() reports 2, not 3. Compare with an object owned the
+# same way instead. Not yet upstream (kitty 0.50.0).
+--- a/kitty_tests/fonts.py
++++ b/kitty_tests/fonts.py
+@@ -637,9 +637,13 @@
+                 face = get_fallback_font(text, False, False)
+             except ValueError:
+                 continue
+-            # one reference held by the FontGroup, one by face, one by the
+-            # argument to getrefcount()
+-            self.assertGreaterEqual(sys.getrefcount(face), 3, f'get_fallback_font() returned a borrowed reference for {text!r}')
++            # one reference held by the FontGroup and one by face. Compare
++            # with an object owned the same way: whether getrefcount() counts
++            # its own argument depends on the Python version (3.15 borrows it).
++            holder = [object()]
++            probe = holder[0]
++            self.assertGreaterEqual(sys.getrefcount(face), sys.getrefcount(probe), f'get_fallback_font() returned a borrowed reference for {text!r}')
++            del holder, probe
+             del face
+             # the Face must still be usable via the FontGroup
+             self.assertIsInstance(get_fallback_font(text, False, False).postscript_name(), str)

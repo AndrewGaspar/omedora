@@ -71,6 +71,10 @@ SPECS=(
   # Herdr is the optional-but-integrated terminal workspace manager in the
   # beta base set. It uses a vendored Rust tree and exact Zig 0.15.2 cache.
   herdr.spec
+  # kitty: newer than Fedora's (crash fixes). Fedora's spec plus a generated
+  # Go vendor tarball and a build-only Slang shader compiler. No intra-stack
+  # BuildRequires.
+  kitty.spec
   # gpu-screen-recorder: the GPU-accelerated screen recorder omarchy's screenrecord
   # flow + Quickshell bar indicator are hardcoded to. From-source Meson C/C++ build
   # (git.dec05eba.com, GPL-3.0-only); builds against Fedora main's ffmpeg-free-devel

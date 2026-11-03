@@ -165,6 +165,9 @@ jobs:
       - name: Run xreal-ctl-spec static guard
         run: bash test/xreal-ctl-spec-test.sh
 
+      - name: Run kitty-spec static guard
+        run: bash test/kitty-spec-test.sh
+
       - name: Run monado-xreal avoid-power-saver test
         run: bash test/monado-xreal-avoid-power-saver-test.sh
 

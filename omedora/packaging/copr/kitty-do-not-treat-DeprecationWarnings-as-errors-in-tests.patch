@@ -1,0 +1,27 @@
+# Fedora downstream patch (src.fedoraproject.org/rpms/kitty), rebased onto 0.50.0:
+# do not fail the test suite on DeprecationWarnings from system Python modules.
+--- a/kitty_tests/main.py
++++ b/kitty_tests/main.py
+@@ -264,7 +264,7 @@
+             XDG_DATA_DIRS=os.path.join(tdir, '.local', 'xdg'),
+             XDG_CACHE_HOME=os.path.join(tdir, '.cache'),
+             XDG_RUNTIME_DIR=os.path.join(tdir, '.cache', 'run'),
+-            PYTHONWARNINGS='error',
++            PYTHONWARNINGS='error,default::DeprecationWarning',
+         ),
+     ):
+         if os.path.isdir(gohome):
+@@ -415,6 +415,7 @@
+     import warnings
+ 
+     warnings.simplefilter('error')
++    warnings.simplefilter('default', DeprecationWarning)
+     # we need fonts installed in the user home directory as well, so initialize
+     # fontconfig before nuking $HOME and friends
+     from kitty.fonts.common import all_fonts_map
+@@ -941,4 +942,5 @@
+     import warnings
+ 
+     warnings.simplefilter('error')
++    warnings.simplefilter('default', DeprecationWarning)
+     run_tests()
