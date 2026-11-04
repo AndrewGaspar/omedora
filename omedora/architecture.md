@@ -122,7 +122,7 @@ metadata retain upstream naming. See [`branding.md`](branding.md).
 
 ## 8. Version identity
 
-- `omedora/version`: Omedora release identity, currently `0.2.0-beta.2`.
+- `omedora/version`: Omedora release identity, currently `0.3.0-beta.1`.
 - `omedora/base-version`: reported upstream base, currently `4.5.0`.
 - root `version`: upstream-owned package metadata and intentionally unchanged.
 - the `omedora-base-*` tag: immutable git object used by the rebase and
@@ -181,7 +181,7 @@ user-manager re-exec cannot kill the transaction from inside the session.
 
 Changing runtime files requires rebuilding `omedora`; changing packaged
 defaults requires rebuilding `omedora-settings`. This rebase changes both and
-therefore prepares `0.2.0-beta.2` for each. No COPR build, release tag, or git
+therefore prepares `0.3.0-beta.1` for each. No COPR build, release tag, or git
 push is part of the rebase implementation itself.
 
 ## 13. Verification

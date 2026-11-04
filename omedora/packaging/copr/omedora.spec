@@ -20,7 +20,7 @@
 Name:           omedora
 # Version is normally read from the repo's omedora/version file; hardcoded here
 # for now — a follow-up wires .copr/srpm.sh to substitute it at SRPM-gen time.
-Version:        0.2.0~beta.7
+Version:        0.3.0~beta.1
 Release:        1%{?dist}
 Summary:        Omedora runtime: omarchy commands, installer, migrations, themes, Quickshell desktop
 
@@ -211,6 +211,22 @@ fi
 /etc/skel/.local/
 
 %changelog
+* Wed Nov 04 2026 omedora <noreply@omedora> - 0.3.0~beta.1-1
+- Rebase the runtime payload onto the official Omarchy 4.5.0 release.
+- Install 4.5's new base apps (omasnap, owe, hype, monologue, signed,
+  disktree) from the Omedora COPR; skip gliff and the Hyprland titlebars.
+- Hide installers Fedora has no source for and gate 4.5's Arch-only migrations.
+
+* Mon Nov 02 2026 omedora <noreply@omedora> - 0.2.0~beta.9-1
+- Stop omarchy-pkg-drop and the package picker from cascading into dependents.
+- Answer the menu's package guards through the Fedora map; skipped packages are never present.
+- Repair the Fedora fingerprint setup and make the fingerprint/FIDO2 removers undo it.
+- Run the managed dnf transaction in its own scope; skip Sunshine and hide Grok Bot.
+
+* Tue Oct 27 2026 omedora <noreply@omedora> - 0.2.0~beta.8-1
+- Rebase the runtime payload onto the official Omarchy 4.0.6 release.
+- Add Fedora 45 support and the in-place Fedora release-upgrade path.
+
 * Sun Oct 18 2026 omedora <noreply@omedora> - 0.2.0~beta.7-1
 - Rebase the runtime payload onto the official Omarchy 4.0.5 release.
 
