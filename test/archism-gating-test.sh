@@ -54,12 +54,28 @@ log_has mkinitcpio && fail "omarchy-plymouth-set: no mkinitcpio on Fedora" \
   || pass "omarchy-plymouth-set: no mkinitcpio on Fedora"
 
 # --- install gates: Fedora dispatches to dnf names, not pacman --------------
+# A reader is present, so setup gets past its hardware check on any host.
+printf '#!/bin/bash\nexit 0\n' >"$BIN/omarchy-hw-fingerprint"
+chmod +x "$BIN/omarchy-hw-fingerprint"
 run fedora "$ROOT/bin/omarchy-setup-security-fingerprint" >/dev/null || true
 log_has 'pacman -Rdd' && { cat "$MOCK_LOG" >&2; fail "fingerprint: no pacman -Rdd on Fedora"; } \
   || pass "fingerprint: no pacman -Rdd on Fedora"
 log_has 'omarchy-pkg-add fprintd fprintd-pam libfprint usbutils' \
   && pass "fingerprint: installs the Fedora package set" \
   || { cat "$MOCK_LOG" >&2; fail "fingerprint: installs the Fedora package set"; }
+# The whole Fedora flow, with a package install that succeeds and the lock
+# screen helper stubbed under a scratch OMARCHY_PATH.
+mkdir -p "$TMP/omarchy/bin"
+printf '#!/bin/bash\nprintf "omarchy-apply-lock\\n" >>"%s"\n' "$MOCK_LOG" >"$TMP/omarchy/bin/omarchy-apply-lock"
+printf '#!/bin/bash\nprintf "omarchy-pkg-add %%s\\n" "$*" >>"%s"\n' "$MOCK_LOG" >"$TMP/pkg-add-ok"
+chmod +x "$TMP/omarchy/bin/omarchy-apply-lock" "$TMP/pkg-add-ok"
+cp "$BIN/omarchy-pkg-add" "$TMP/pkg-add-tracer" && cp "$TMP/pkg-add-ok" "$BIN/omarchy-pkg-add"
+rc=$(OMARCHY_PATH="$TMP/omarchy" run fedora "$ROOT/bin/omarchy-setup-security-fingerprint")
+cp "$TMP/pkg-add-tracer" "$BIN/omarchy-pkg-add"
+assert_equals "fingerprint: Fedora setup completes" "0" "$rc"
+flow=$(grep -oE '^(omarchy-pkg-add|sudo fprintd-enroll|fprintd-verify|sudo authselect enable-feature|omarchy-apply-lock)' "$MOCK_LOG" | tr '\n' ',')
+assert_equals "fingerprint: install, enroll, verify, then authselect and the lock screen" \
+  "omarchy-pkg-add,sudo fprintd-enroll,fprintd-verify,sudo authselect enable-feature,omarchy-apply-lock," "$flow"
 
 # Sunshine has no Fedora package source: the command stops before any step.
 rc=$(run fedora "$ROOT/bin/omarchy-install-service-sunshine")
