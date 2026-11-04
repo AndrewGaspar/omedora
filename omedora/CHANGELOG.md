@@ -1,3 +1,30 @@
+## v0.3.0-beta.1 — 2026-11-04 (Omarchy 4.5.0)
+
+Omedora moves to Omarchy 4.5.0. The 4.5 base apps (Omasnap, OWE, Hype, Monologue, Signed and Disktree) come from the Omedora COPR; Gliff and the Hyprland titlebars are not available on Fedora yet. Voxtype is now the default dictation backend, and dictation moves to Alt+Space with Right Alt as push-to-talk. Other 4.5 changes: Ctrl + the display brightness keys drive the keyboard backlight, Alt+Shift+Tab cycles windows backwards, and installs no longer join the docker group by default. Fedora 44 and Fedora 45 are both supported, including the in-place 44→45 upgrade. Everything from the 0.2.0-beta.8 and beta.9 releases is included, as are kitty 0.50.0 and the Nov 2 HypXR snapshots in the COPR.
+
+Known gaps on Fedora: timed passwordless sudo (`omarchy-sudo-passwordless MINUTES`) is unavailable (permanent grants work), and the Amp Desktop installer is hidden.
+
+- chore(release): prepare core specs at 0.3.0~beta.1
+- docs(omedora): re-pin the 4.5 line to Omarchy v4.5.0
+- port(menu): hide Install > AI > Amp Desktop on Fedora
+- rebase(4.5.0): Fedora-gate the Intel video-decoding migration
+- settings: record 4.5.0's WirePlumber camera drop-in as not installed
+- settings: make Voxtype Fedora's default dictation backend
+- voxtype.spec: install the whisper tiers under /usr/lib/voxtype
+- feat(copr): package omasnap and owe for Omarchy 4.5
+- feat(copr): package hype, monologue, signed and disktree
+- port(packages): map Omarchy 4.5's new base packages
+- port(docker): follow 4.5 and stop granting the docker group at install
+- settings: ship 4.5's mise and XKB drop-ins; list /etc grants by name
+- packages(fedora): ship rc3's ten-minute sudo timeout drop-in
+- rebase(4.5): gate migrations whose Fedora counterpart isn't shipped
+- rebase(4.5): Fedora-gate the Arch-only upstream migrations
+- port(dictation): retire the Voxtype install shims for 4.5's backends
+- kitty: package 0.50.0 in the Omedora COPR
+- hypxrland+monado-xreal: update to the Nov 2 snapshots
+- basalt-xreal: update to xreal-vit c08b9e2
+- test(arch): install diffutils for the Arch test/cli contract
+
 ## v0.2.0-beta.9 — 2026-11-02 (Omarchy 4.0.6)
 
 Package removal no longer cascades: `omarchy-pkg-drop` and the package picker keep anything another package still needs, so removing one tool can't take out unrelated software such as `openssh`. The menu's installed/not-installed states now answer through the Fedora package map, and the Fedora fingerprint setup and its FIDO2/fingerprint removers are fixed. New in the COPR: hyprpad, OpenClaw, xreal-ctl and basalt-xreal (opt-in XREAL Air 6DoF for monado-xreal); the Omedora XR session now pulls in the XREAL runtime and holds the performance power profile.
