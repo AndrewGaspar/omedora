@@ -1,3 +1,71 @@
+## v0.2.0-beta.9 — 2026-11-02 (Omarchy 4.0.6)
+
+Package removal no longer cascades: `omarchy-pkg-drop` and the package picker keep anything another package still needs, so removing one tool can't take out unrelated software such as `openssh`. The menu's installed/not-installed states now answer through the Fedora package map, and the Fedora fingerprint setup and its FIDO2/fingerprint removers are fixed. New in the COPR: hyprpad, OpenClaw, xreal-ctl and basalt-xreal (opt-in XREAL Air 6DoF for monado-xreal); the Omedora XR session now pulls in the XREAL runtime and holds the performance power profile.
+
+- chore(release): prepare core specs at 0.2.0~beta.9
+- packages(fedora): skip sunshine and gate its installer
+- fix(fedora): repair the Fedora fingerprint setup
+- fix(fedora): make the fingerprint and FIDO2 removers undo Fedora's setup
+- fix(fedora): keep the package picker's removal from cascading
+- fix(fedora): never let omarchy-pkg-drop cascade into dependents
+- test(fedora): make the local repo the expected core repo in update-verify
+- test: skip the menu guard test where node is absent, outside CI
+- test(l4): assert Remove > Dictation follows the installed voxtype
+- port(menu): hide Install > AI > Grok Bot on Fedora
+- update(fedora): run the managed dnf transaction as a PID 1 scope
+- fix(menu): answer package guards through the Fedora map
+- fix(fedora): a skip-mapped package is never present
+- test(fedora): add a local-repo mode to the L3 smoke
+- test: make the plan disclosure test independent of the host's repos
+- test(fedora): build L4 session images from the current checkout
+- test(fedora): overlay the local RPM repo on the COPR in L4
+- packaging(copr): rebuild local core RPMs when HEAD moves
+- packages(fedora): hold the performance power profile for an XR session
+- packages(fedora): pull monado-xreal and xreal-ctl into Omedora XR
+- packages(fedora): give monado-xreal priority CPU and oomd avoidance
+- packages(fedora): make monado-xreal's getcap %check count
+- packages(fedora): package xreal-ctl
+- packages(fedora): turn on monado-xreal 6DoF with basalt-xreal
+- packages(fedora): make basalt-xreal's negative %check lines count
+- test: guard the basalt-xreal spec
+- packages(fedora): package basalt-xreal for monado-xreal's 6DoF
+- packages(fedora): create monado-xreal's socket directory
+- test: guard the hyprpad spec
+- packages(fedora): package hyprpad for the omedora COPR
+- test: guard the openclaw seed spec
+- packages(fedora): package OpenClaw as the seed for ~/.openclaw
+
+## v0.2.0-beta.8 — 2026-10-27 (Omarchy 4.0.6)
+
+Rebased onto Omarchy 4.0.6. Adds Fedora 45 support and guarded in-place upgrades from Fedora 44 (`omedora-upgrade-fedora`). On Fedora 45, a system still on beta.7 may need `omarchy update` run twice: the first run installs beta.8, the second finishes the update.
+
+- chore(release): prepare core specs at 0.2.0~beta.8
+- chore(rebase): re-pin Omedora 4 onto Omarchy v4.0.6
+- rebase(4.0.6): Fedora-gate the vconsole initramfs rebuild migration
+- test(vm): ignore per-release artifact directories
+- test(vm): wait for a new boot after the session reboot
+- test(vm): add a Fedora release-upgrade stage
+- test(fedora): L4 gate for in-place Fedora release upgrades
+- test(fedora): L3 gate for in-place Fedora release upgrades
+- test(install): keep the release-gate test off the real rpmdb
+- test(l4): regenerate the 30-visual golden for the new default wallpaper
+- docs: point the release-upgrade section at the dnf guard
+- omedora-settings: add a dnf guard against unsafe Fedora release changes
+- docs: Fedora 44 and 45 support, release upgrades and chroot policy
+- omedora-upgrade-fedora: point the /boot caveat at kernel-install remove
+- update: explain an unsupported Fedora release instead of dnf's error
+- omedora-upgrade-fedora: guarded in-place Fedora release upgrade
+- install: refuse an unsupported Fedora release before the plan
+- omedora-copr: add --chroot-available release probe
+- docs(testing): document the Fedora release knob and gate matrix
+- test(vm): map the Fedora release to a Cloud Base image
+- test(fedora): select the Fedora release for container tiers
+- packaging: build local RPMs per Fedora release
+- copr-submit: document re-registering before a chroot backfill
+- packaging: floor BuildRequires on vendored hypr libraries
+- packages(fedora): install pinta from Flathub
+- copr-submit: add CHROOTS to build only selected chroots
+
 ## v0.2.0-beta.7 — 2026-10-18 (Omarchy 4.0.5)
 
 - upgrade-to-4: retire the Omarchy 4.0.5 fastfetch default
