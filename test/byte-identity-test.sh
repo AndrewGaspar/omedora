@@ -172,6 +172,7 @@ ALLOW["default/omarchy/omarchy-menu.jsonc"]='  "install.aur": {"icon":"󰣇","la
   "install.editor.sublime": {"icon":"","label":"Sublime Text","disabled":"omarchy-pkg-present sublime-text-4","action":"omarchy-install-and-launch '"'"'Sublime Text'"'"' sublime-text-4 sublime_text"},
   "install.editor.emacs": {"icon":"","label":"Emacs","disabled":"omarchy-pkg-present omarchy-emacs","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-editor-emacs"},
   "install.ai.chatgpt": {"icon":"","iconFont":"omarchy","label":"ChatGPT Desktop","disabled":"omarchy-pkg-present openai-codex-desktop","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-ai-chatgpt"},
+  "install.ai.amp": {"icon":"","iconFont":"omarchy","label":"Amp Desktop","disabled":"omarchy-pkg-present amp-desktop-bin","action":"omarchy-install-and-launch '"'"'Amp Desktop'"'"' amp-desktop-bin amp-desktop"},
   "install.ai.grok-bot": {"icon":"","iconFont":"omarchy","label":"Grok Bot","disabled":"omarchy-pkg-present grok-bot","action":"omarchy-install-and-launch '"'"'Grok Bot'"'"' grok-bot grok-bot"},
   "install.ai.hermes": {"icon":"","iconFont":"omarchy","label":"Hermes Desktop","disabled":"omarchy-pkg-present hermes-desktop","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-ai-hermes"},
   "install.ai.lm-studio": {"icon":"","iconFont":"omarchy","label":"LM Studio","disabled":"omarchy-pkg-present lmstudio-bin","action":"omarchy-install-app '"'"'LM Studio'"'"' lmstudio-bin"},

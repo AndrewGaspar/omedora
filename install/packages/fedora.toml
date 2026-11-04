@@ -736,6 +736,10 @@ reason = "Not in Fedora, RPM Fusion or Flathub. Install > AI > Claude Desktop is
 source = "skip"
 reason = "ChatGPT/Codex desktop is AUR-only; not in Fedora, RPM Fusion or Flathub. Install > AI > ChatGPT Desktop is hidden on Fedora."
 
+[amp-desktop-bin]
+source = "skip"
+reason = "4.5.0's Install > AI > Amp Desktop. Amp ships only a vendor .deb (static.ampcode.com), which the AUR package repackages; not in Fedora, RPM Fusion or Flathub, and not redistributable through a COPR. Install > AI > Amp Desktop is hidden on Fedora; Remove > AI > Amp Desktop stays hidden because a skip is never present."
+
 [hermes-desktop]
 source = "skip"
 reason = "Hermes Desktop: omarchy-install-hermes-cli needs the Arch package's /usr/share/hermes-desktop/install.sh and /opt/hermes-desktop install stamp to set up in-app updates. Not in Fedora, RPM Fusion or Flathub. Install > AI > Hermes and Setup > Defaults > Agent > Hermes are hidden on Fedora. Packaging candidate: an RPM reproducing that layout, like the openclaw seed."
