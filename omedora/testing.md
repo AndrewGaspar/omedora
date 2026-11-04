@@ -153,7 +153,7 @@ Podman, since it boots a systemd container.
 
 ```bash
 docker run --rm -v "$PWD:/repo" -w /repo archlinux:latest bash -c '
-  pacman -Syu --noconfirm --needed jq python git gum ripgrep fontconfig >/dev/null
+  pacman -Syu --noconfirm --needed jq python git gum ripgrep fontconfig diffutils >/dev/null
   bash test/cli
 '
 ```
