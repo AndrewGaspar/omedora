@@ -197,6 +197,11 @@ install -Dpm644 default/hypr/toggles/flags.lua \
 install -d %{buildroot}%{_userunitdir}
 install -pm644 default/systemd/user/*.service \
   %{buildroot}%{_userunitdir}/
+# NOT INSTALLED from default/systemd/user/: app.slice.d/10-oomd.conf (oomd
+# policy, reference only like etc/systemd/oomd.conf.d) and 4.5.0's
+# wireplumber.service.d/10-omarchy-camera-access.conf, whose
+# omarchy-hw-wait-camera-access waits only on Snapdragon laptops (Omedora
+# builds x86_64 only). Both stay under /usr/share/omarchy/default/.
 # Keep existing absolute wants links valid until the per-user migration
 # replaces the retired notifier name. The directory watcher itself is gone.
 ln -s omarchy-migrate-notify.service \
