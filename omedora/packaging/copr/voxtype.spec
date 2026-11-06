@@ -79,7 +79,7 @@
 %global voxtype_libdir %{_prefix}/lib/voxtype
 Name:           voxtype
 Version:        1.0.1
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Voice dictation for Linux (whisper.cpp; CPU + Vulkan)
 
 License:        MIT
@@ -352,8 +352,26 @@ echo ""
 
 %postun
 %systemd_user_postun_with_restart voxtype.service
-# Remove symlink on package removal
-rm -f %{_bindir}/voxtype
+# Remove the symlink only on erase: on upgrade this runs after the new
+# package's %%post has already created it.
+if [ $1 -eq 0 ]; then
+    rm -f %{_bindir}/voxtype
+fi
+
+%posttrans
+# Releases up to 1.0.1-2 removed the symlink in %%postun on upgrade too, and
+# that old scriptlet still runs when upgrading to this one; it has also left
+# installs without /usr/bin/voxtype. Recreate it once the transaction is done.
+if [ ! -e %{_bindir}/voxtype ]; then
+    if [ -f /proc/cpuinfo ] && grep -q avx512f /proc/cpuinfo 2>/dev/null; then
+        ln -sf %{voxtype_libdir}/voxtype-avx512 %{_bindir}/voxtype
+    else
+        ln -sf %{voxtype_libdir}/voxtype-avx2 %{_bindir}/voxtype
+    fi
+    if command -v restorecon >/dev/null 2>&1; then
+        restorecon %{_bindir}/voxtype 2>/dev/null || true
+    fi
+fi
 
 %files
 %license %{_licensedir}/%{name}/LICENSE
@@ -390,6 +408,11 @@ rm -f %{_bindir}/voxtype
 %{_bindir}/voxtype-configure-launcher
 
 %changelog
+* Fri Nov 06 2026 omedora <noreply@omedora> - 1.0.1-3
+- Keep /usr/bin/voxtype across upgrades: %%postun removed the CPU-tier
+  symlink on upgrade too, after the new %%post had created it, leaving
+  voxtype.service failing with 203/EXEC; restore it in %%posttrans.
+
 * Tue Oct 27 2026 omedora <noreply@omedora> - 1.0.1-2
 - Install the whisper tiers under /usr/lib/voxtype (was /usr/lib64), where
   Omarchy 4.5's dictation installer looks for the Vulkan tier to enable GPU
