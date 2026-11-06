@@ -88,7 +88,7 @@ REPO
 
     stack_rpm=$(find /repo -name "hypxrland-stack-*.rpm" -print -quit)
     rpm -qp --requires "$stack_rpm" | grep -F \
-      "hypxrland >= 0.56.2^20261102.1.gite3a89bc8c-1"
+      "hypxrland >= 0.56.2^20261105.1.git964889899-1"
     rpm -qp --requires "$stack_rpm" | grep -F \
       "wivrn-hypxr >= 26.6.2^20260820.1.git3729c7b31-1"
     rpm -q --requires hypxrcompose | grep -Fx /usr/bin/ffmpeg

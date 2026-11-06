@@ -22,8 +22,8 @@
 # 0.56.x requires 5.5.
 
 %global base_version 0.56.2
-%global snapshot 20261102.1
-%global commit e3a89bc8c16690cb6b69c27350c18a80b51f68b5
+%global snapshot 20261105.1
+%global commit 96488989950e9b1e8bc48e99ac9d831fdba15ab9
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 %global udis86_commit 5336633af70f3917760a6d441ff02d93477b0c86
 %global lua_version 5.5.0
@@ -179,10 +179,10 @@ export PKG_CONFIG_PATH="%{_builddir}/hypxrland-lua-prefix/lib/pkgconfig${PKG_CON
 export GIT_COMMIT_HASH=%{commit}
 export GIT_BRANCH=hypxrland
 export GIT_COMMIT_MESSAGE="packaged HypXRland snapshot %{shortcommit}"
-export GIT_COMMIT_DATE=2026-11-02
+export GIT_COMMIT_DATE=2026-11-05
 export GIT_DIRTY=clean
-export GIT_TAG=v%{base_version}-455-g%{shortcommit}
-export GIT_COMMITS=8116
+export GIT_TAG=v%{base_version}-468-g%{shortcommit}
+export GIT_COMMITS=8129
 
 %cmake \
   -GNinja \
@@ -226,6 +226,13 @@ XDG_RUNTIME_DIR="$runtime_dir" %{__cmake_builddir}/Hyprland --version |
 %{_bindir}/hypxrland-session
 
 %changelog
+* Thu Nov 05 2026 omedora <noreply@omedora> - 0.56.2^20261105.1.git964889899-1
+- Refresh to the current public hypxrland tip: curved XR monitors,
+  submitted as cylinder composition layers (XR_KHR_composition_layer_cylinder)
+  with shape-aware hit tests and a curve config key, plus the xreal-capture
+  diagnostic script and a Monado submodule bump. No new build dependencies
+  and no soname changes; other submodule pins are unchanged.
+
 * Mon Nov 02 2026 omedora <noreply@omedora> - 0.56.2^20261102.1.gite3a89bc8c-1
 - Refresh to the current public hypxrland tip: XR surfaces (carried
   monitors snap onto detected tables and other horizontal planes through
