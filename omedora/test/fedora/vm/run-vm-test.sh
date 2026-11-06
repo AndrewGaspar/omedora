@@ -78,6 +78,9 @@ VM_RAM_MB="${OMEDORA_VM_RAM_MB:-4096}"
 VM_VCPUS="${OMEDORA_VM_VCPUS:-4}"
 VM_DISK_GB="${OMEDORA_VM_DISK_GB:-24}"
 SSH_PORT="${OMEDORA_VM_SSH_PORT:-$(( 2222 + OMEDORA_FEDORA_RELEASE - 44 ))}"  # host-forwarded port (passt) -> VM:22; 2222 on F44
+VM_GRAPHICS="${OMEDORA_VM_GRAPHICS:-vnc,listen=127.0.0.1}"  # e.g. egl-headless,rendernode=/dev/dri/renderD128
+VM_VIDEO="${OMEDORA_VM_VIDEO:-virtio}"                       # e.g. model.type=virtio,model.acceleration.accel3d=yes
+VM_GEOMETRY_SKIP="${OMEDORA_VM_GEOMETRY_SKIP:-1}"            # 0 with OMEDORA_VM_RES=1920x1080: diff the goldens for real
 SSH_KEY="$RUN/id_omedora_vmtest"
 OVERLAY="$IMAGES/${VM}-overlay.qcow2"
 SEED_ISO="$IMAGES/${VM}-seed.iso"
@@ -266,8 +269,8 @@ provision() {
     --disk "path=$SEED_ISO,device=cdrom" \
     --os-variant fedora-unknown \
     --network "$netopt" \
-    --graphics vnc,listen=127.0.0.1 \
-    --video virtio \
+    --graphics "$VM_GRAPHICS" \
+    --video "$VM_VIDEO" \
     "${qemu_cmdline_args[@]}" \
     --noautoconsole \
     || die "virt-install failed"
@@ -341,12 +344,17 @@ do_install() {
   # path; the interactive/expect path is exercised separately by --stage install
   # with a PTY (TODO, see README "Interactive path"). OMARCHY_NONINTERACTIVE is
   # kept for the Arch-inherited leaves that still read it.
+  # OMEDORA_SETUP_FROM_REPO: install-4.sh's dev/test seam — run system setup and
+  # finalize from the synced checkout instead of the installed RPM payload, so a
+  # setup change can be exercised before the COPR is rebuilt. Forwarded from the
+  # host environment; empty (the default) keeps the RPM path.
   # -tt PTY: the bootstrap's sudo guard wants a terminal (see vmssh_tty). The
   # in-VM `tee` keeps the full transcript at /tmp/omedora-install.out so the rc
   # we read is the install's, not ssh's PTY-forwarding rc.
   set +e
   vmssh_tty "set -o pipefail; \
-    export OMARCHY_NONINTERACTIVE=1 OMEDORA_PLAN_AUTOCONFIRM=1 OMEDORA_REF='$ref' $fastenv; \
+    export OMARCHY_NONINTERACTIVE=1 OMEDORA_PLAN_AUTOCONFIRM=1 OMEDORA_REF='$ref' \
+      OMEDORA_SETUP_FROM_REPO='${OMEDORA_SETUP_FROM_REPO:-}' $fastenv; \
     bash ~/.local/share/omarchy/omedora/install-4.sh 2>&1 | tee /tmp/omedora-install.out; \
     echo \"INSTALL_RC=\${PIPESTATUS[0]}\" | tee /tmp/omedora-install.rc"
   local rc=$?
@@ -445,7 +453,7 @@ run_session_tests() {
   # right env, and prints a TAP report. It copies per-test artifacts under
   # ~/vm-suite/artifacts which we pull back on the host.
   set +e
-  vmssh 'bash ~/vm-suite/run-suite-in-session.sh'
+  vmssh "SCREENSHOT_GEOMETRY_SKIP='$VM_GEOMETRY_SKIP' bash ~/vm-suite/run-suite-in-session.sh"
   local rc=$?
   # NOTE: do not re-enable errexit here — this script runs without `set -e`
   # on purpose (stages capture $? and continue); a stray `set -e` would abort
