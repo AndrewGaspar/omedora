@@ -44,6 +44,9 @@ BuildRequires:  pkgconfig(aquamarine)
 BuildRequires:  pkgconfig(cairo)
 BuildRequires:  pkgconfig(egl)
 BuildRequires:  pkgconfig(hyprcursor) >= 0.1.13
+# HypXRland's src/openxr headers (reached via OpenXRManager.hpp) include
+# openxr/openxr.h; hypxrland-devel doesn't pull the OpenXR headers in yet.
+BuildRequires:  pkgconfig(openxr)
 BuildRequires:  pkgconfig(hyprgraphics) >= 0.5.1
 BuildRequires:  pkgconfig(hyprlang) >= 0.6.8
 BuildRequires:  pkgconfig(hyprutils) >= 0.14.0

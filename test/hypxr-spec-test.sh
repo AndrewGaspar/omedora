@@ -151,6 +151,8 @@ grep -qE '^Requires:[[:space:]]+omarchy-hyprland-titlebars$' "$COPR/omarchy-hypr
   && pass "XR titlebars keep the stock file Omarchy checks for" || fail "XR titlebars keep the stock file Omarchy checks for"
 grep -qF 'nm -D --defined-only %{_libexecdir}/hypxrland/Hyprland' "$COPR/hyprshare.spec" \
   && pass "hyprshare checks its Lua symbols against the compositor" || fail "hyprshare checks its Lua symbols against the compositor"
+grep -qxF 'BuildRequires:  pkgconfig(openxr)' "$COPR/hyprshare.spec" \
+  && pass "hyprshare has the OpenXR headers HypXRland's openxr/ headers include" || fail "hyprshare has the OpenXR headers HypXRland's openxr/ headers include"
 
 TITLEBARS="$COPR/omarchy-hyprland-titlebars.spec"
 stock_evr="$(sed -nE 's/^Version:[[:space:]]+([0-9.]+)$/\1/p' "$COPR/hyprland.spec" | head -n1)-$(sed -nE 's/^Release:[[:space:]]+([0-9]+)%\{\?dist\}$/\1/p' "$COPR/hyprland.spec" | head -n1)%{?dist}"
