@@ -34,9 +34,19 @@ grep -qF 'c04b495a458c1ebc347e53ccdd1501f798a157fcac4335680e01873acdd5e5d0  hypx
   || fail "HypXRland current archive checksum is pinned"
 grep -qE '^%global base_version 0\.56\.2$' "$HYPXR" \
   && pass "HypXRland declares the 0.56.2 base" || fail "HypXRland declares the 0.56.2 base"
-grep -qE '^Release:[[:space:]]+1%\{\?dist\}$' "$HYPXR" \
-  && pass "HypXRland refreshed snapshot starts at release 1" \
-  || fail "HypXRland refreshed snapshot starts at release 1"
+grep -qE '^Release:[[:space:]]+2%\{\?dist\}$' "$HYPXR" \
+  && pass "HypXRland release 2 adds hypxrland-devel" \
+  || fail "HypXRland release 2 adds hypxrland-devel"
+grep -qE '^%package[[:space:]]+devel$' "$HYPXR" && grep -qE '^%files devel$' "$HYPXR" \
+  && pass "HypXRland ships a devel subpackage" || fail "HypXRland ships a devel subpackage"
+grep -qF "sed -E 's|^prefix=.*$|prefix=%{_prefix}/lib/hypxrland/include|'" "$HYPXR" \
+  && pass "hypxrland-devel's pkg-config file points at its private headers" \
+  || fail "hypxrland-devel's pkg-config file points at its private headers"
+if grep -qE '^%\{_includedir\}|%\{_datadir\}/pkgconfig' "$HYPXR"; then
+  fail "hypxrland-devel stays clear of hyprland-devel's paths"
+else
+  pass "hypxrland-devel stays clear of hyprland-devel's paths"
+fi
 grep -qF '%{__cmake_builddir}/hyprctl/hyprctl' "$HYPXR" \
   && pass "HypXRland installs private hyprctl" || fail "HypXRland installs private hyprctl"
 grep -qF 'export PATH="/usr/libexec/hypxrland:$PATH"' "$COPR/hypxrland-session" \
@@ -113,7 +123,7 @@ grep -qF 'a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002  ggml
   || fail "voice model source retains its verified LFS checksum"
 
 order=$(sed -n '/^SPECS=(/,/^)/p' "$COPR/build-repo.sh" | sed 's/#.*//' | tr '\n' ' ')
-[[ $order == *"hyprland.spec"*"hypxrhud.spec hypxrcompose.spec"*"hypxrvoice.spec"*"wivrn-hypxr.spec"*"hypxrland.spec hypxrland-stack.spec hypxrland-omedora.spec"* ]] \
+[[ $order == *"hyprland.spec"*"hypxrhud.spec hypxrcompose.spec"*"hypxrvoice.spec"*"wivrn-hypxr.spec"*"hypxrland.spec hypxrland-stack.spec"*"hypxrland-omedora.spec"* ]] \
   && pass "canonical build order contains the complete XR wave" \
   || fail "canonical build order contains the complete XR wave"
 

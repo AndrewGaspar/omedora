@@ -7,12 +7,16 @@
 #   /usr/libexec/hypxrland/Hyprland  private compositor binary
 #   /usr/libexec/hypxrland/hyprctl   private XR-aware control client
 #   /usr/bin/hypxrland-session       uwsm launcher for the XR session packages
+#   /usr/lib/hypxrland/plugins/      plugins built for this compositor build
+#   /usr/lib/hypxrland/include, pkgconfig  (hypxrland-devel) plugin headers
 #
 # We manually install only those files. In particular this package does NOT own
 # /usr/bin/{Hyprland,hyprctl,start-hyprland,hyprpm}, any portal configuration,
 # headers, pkg-config metadata, shared assets, or a wayland-session desktop
 # entry. Stable hyprland-no-session supplies those shared 0.56.x surfaces and
-# remains an independently launchable fallback.
+# remains an independently launchable fallback. hypxrland-devel's headers live
+# under /usr/lib/hypxrland, the same layout as the Arch hypxrland-headers
+# package, so they never shadow hyprland-devel's /usr/include/hyprland.
 #
 # GitHub commit archives omit git-submodule contents. The build uses Omedora's
 # packaged hyprland-protocols, wayland-protocols, hyprutils and Vulkan headers;
@@ -33,7 +37,7 @@
 
 Name:           hypxrland
 Version:        %{base_version}^%{snapshot}.git%{shortcommit}
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Hyprland-based spatial OpenXR compositor
 
 # HypXRland/Hyprland: BSD-3-Clause
@@ -144,6 +148,17 @@ The compositor uses the existing per-user
 hypxrland-session launcher. Install hypxrland-omedora for the visible
 "Omedora XR" display-manager entry.
 
+%package        devel
+Summary:        HypXRland headers for building plugins against this compositor build
+Requires:       %{name}%{?_isa} = %{version}-%{release}
+
+%description    devel
+Headers and a pkg-config file for building Hyprland plugins against this
+exact HypXRland build. A plugin loads only into the compositor build it was
+compiled against, so build with PKG_CONFIG_PATH=/usr/lib/hypxrland/pkgconfig,
+install under /usr/lib/hypxrland/plugins/<name>/ and require this exact
+hypxrland version-release.
+
 %prep
 # The commit archive unpacks to Hyprland-<commit>/; -a2 also unpacks the Lua
 # release beside the source tree, matching hyprland.spec's private Lua build.
@@ -209,6 +224,24 @@ install -Dpm0755 %{__cmake_builddir}/Hyprland \
 install -Dpm0755 %{__cmake_builddir}/hyprctl/hyprctl \
   %{buildroot}%{_libexecdir}/hypxrland/hyprctl
 install -Dpm0755 %{SOURCE3} %{buildroot}%{_bindir}/hypxrland-session
+install -d %{buildroot}%{_prefix}/lib/hypxrland/plugins
+
+# hypxrland-devel: the headers this build was compiled from, with the
+# generated protocol headers and version.h, and its pkg-config file pointed at
+# them. Same selection as upstream's own install rules.
+include=%{buildroot}%{_prefix}/lib/hypxrland/include/hyprland
+find src protocols -type f \( -name '*.h' -o -name '*.hpp' -o -name '*.inc' \) -print0 |
+  while IFS= read -r -d '' header; do
+    install -Dpm0644 "$header" "$include/$header"
+  done
+grep -Fq '"%{commit}"' "$include/src/version.h"
+test -f "$include/protocols/hyprland-toplevel-export-v1.hpp"
+install -d %{buildroot}%{_prefix}/lib/hypxrland/pkgconfig
+sed -E 's|^prefix=.*$|prefix=%{_prefix}/lib/hypxrland/include|' \
+  %{__cmake_builddir}/hyprland.pc \
+  >%{buildroot}%{_prefix}/lib/hypxrland/pkgconfig/hyprland.pc
+grep -Fxq 'prefix=%{_prefix}/lib/hypxrland/include' \
+  %{buildroot}%{_prefix}/lib/hypxrland/pkgconfig/hyprland.pc
 
 %check
 bash -n %{SOURCE3}
@@ -224,8 +257,20 @@ XDG_RUNTIME_DIR="$runtime_dir" %{__cmake_builddir}/Hyprland --version |
 %doc example/openxr.conf contrib/hyprland-xr.lua docs/openxr/00-overview.md docs/openxr/05-configuration.md
 %{_libexecdir}/hypxrland/
 %{_bindir}/hypxrland-session
+%dir %{_prefix}/lib/hypxrland
+%dir %{_prefix}/lib/hypxrland/plugins
+
+%files devel
+%{_prefix}/lib/hypxrland/include/
+%{_prefix}/lib/hypxrland/pkgconfig/
 
 %changelog
+* Wed Nov 11 2026 omedora <noreply@omedora> - 0.56.2^20261105.1.git964889899-2
+- Add hypxrland-devel: this build's headers and pkg-config file under
+  /usr/lib/hypxrland, for plugins that must match the compositor exactly
+  (omarchy-hyprland-titlebars-hypxr, hyprshare). The base package now owns
+  /usr/lib/hypxrland/plugins/. Same commit; the compositor is unchanged.
+
 * Thu Nov 05 2026 omedora <noreply@omedora> - 0.56.2^20261105.1.git964889899-1
 - Refresh to the current public hypxrland tip: curved XR monitors,
   submitted as cylinder composition layers (XR_KHR_composition_layer_cylinder)
