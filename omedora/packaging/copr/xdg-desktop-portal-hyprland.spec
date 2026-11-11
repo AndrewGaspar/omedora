@@ -7,16 +7,28 @@
 # system sdbus-c++ (>=2.0.0) via pkg-config, satisfied by Fedora's 2.2.1, so no
 # sdbus bundling. omedora conventions: pinned Version, explicit Release +
 # changelog. Keeps solopasha's Epoch:1 so it out-ranks any older COPR build.
+#
+# Built from the HypXR share-switch branch (AndrewGaspar/xdg-desktop-portal-hyprland):
+# 1.4.1 plus upstream #424, #425 and #447, a requeue after a failed frame
+# (#445/#451), no repeated renegotiation, renegotiation instead of the DMA
+# format RASSERT abort, and a dma-buf retry reset. The Arch side ships the same
+# commit as xdg-desktop-portal-hyprland-hypxr; omedora owns this package on
+# Fedora, so the fixes go straight in. VERSION in the archive is still 1.4.1.
+
+%global base_version 1.4.1
+%global snapshot 20261110
+%global commit 540fb9237d29c4c2aee5b0b42688ef31e097d2ce
+%global shortcommit %(c=%{commit}; echo ${c:0:9})
 
 Name:           xdg-desktop-portal-hyprland
 Epoch:          1
-Version:        1.4.1
+Version:        %{base_version}^%{snapshot}.git%{shortcommit}
 Release:        1%{?dist}
 Summary:        xdg-desktop-portal backend for Hyprland
 
 License:        BSD-3-Clause
-URL:            https://github.com/hyprwm/xdg-desktop-portal-hyprland
-Source0:        %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
+URL:            https://github.com/AndrewGaspar/xdg-desktop-portal-hyprland
+Source0:        %{url}/archive/%{commit}/%{name}-%{commit}.tar.gz
 
 BuildRequires:  cmake
 BuildRequires:  gcc-c++
@@ -55,7 +67,8 @@ Supplements:    hyprland
 %{summary}.
 
 %prep
-%autosetup -p1
+%autosetup -n %{name}-%{commit} -p1
+test "$(cat VERSION)" = %{base_version}
 
 %build
 %cmake -DCMAKE_BUILD_TYPE=Release
@@ -80,6 +93,13 @@ Supplements:    hyprland
 %{_userunitdir}/%{name}.service
 
 %changelog
+* Wed Nov 11 2026 omedora <noreply@omedora> - 1:1.4.1^20261110.git540fb9237-1
+- Build from the HypXR share-switch branch at 540fb9237: a failed frame no
+  longer stalls a screenshare for good (#445/#451), renegotiation after a
+  resize or switch is deduplicated and no longer aborts on a DMA format
+  change, and the dma-buf retries reset so later renegotiations stay on
+  dma-buf. Also carries upstream #424, #425 and #447. No dependency changes.
+
 * Mon Aug 03 2026 omedora <noreply@omedora> - 1:1.4.1-1
 - Update to xdg-desktop-portal-hyprland 1.4.1 (Hyprland 0.56.1 wave).
 - Rebuilt against hyprutils 0.14.0 (SONAME 13).
