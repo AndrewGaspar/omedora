@@ -123,9 +123,21 @@ grep -qF 'a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002  ggml
   || fail "voice model source retains its verified LFS checksum"
 
 order=$(sed -n '/^SPECS=(/,/^)/p' "$COPR/build-repo.sh" | sed 's/#.*//' | tr '\n' ' ')
-[[ $order == *"hyprland.spec"*"hypxrhud.spec hypxrcompose.spec"*"hypxrvoice.spec"*"wivrn-hypxr.spec"*"hypxrland.spec hypxrland-stack.spec"*"hypxrland-omedora.spec"* ]] \
+[[ $order == *"hyprland.spec"*"omarchy-hyprland-titlebars.spec"*"hypxrhud.spec hypxrcompose.spec"*"hypxrvoice.spec"*"wivrn-hypxr.spec"*"hypxrland.spec hypxrland-stack.spec"*"hypxrland-omedora.spec"* ]] \
   && pass "canonical build order contains the complete XR wave" \
   || fail "canonical build order contains the complete XR wave"
+
+TITLEBARS="$COPR/omarchy-hyprland-titlebars.spec"
+stock_evr="$(sed -nE 's/^Version:[[:space:]]+([0-9.]+)$/\1/p' "$COPR/hyprland.spec" | head -n1)-$(sed -nE 's/^Release:[[:space:]]+([0-9]+)%\{\?dist\}$/\1/p' "$COPR/hyprland.spec" | head -n1)%{?dist}"
+grep -qxF "%global hyprland_evr $stock_evr" "$TITLEBARS" \
+  && pass "stock titlebars pin the current hyprland build" || fail "stock titlebars pin the current hyprland build ($stock_evr)"
+grep -qE '^BuildRequires:[[:space:]]+hyprland-devel = %\{hyprland_evr\}$' "$TITLEBARS" \
+  && grep -qE '^Requires:[[:space:]]+hyprland-no-session%\{\?_isa\} = %\{hyprland_evr\}$' "$TITLEBARS" \
+  && pass "stock titlebars require the exact hyprland build" || fail "stock titlebars require the exact hyprland build"
+grep -qxF "%global lua_version $(sed -nE 's/^%global lua_version (.*)$/\1/p' "$COPR/hyprland.spec")" "$TITLEBARS" \
+  && pass "stock titlebars use Hyprland's bundled Lua headers" || fail "stock titlebars use Hyprland's bundled Lua headers"
+grep -qF '%{_prefix}/lib/%{name}/titlebars.so' "$TITLEBARS" \
+  && pass "stock titlebars install where workspace-modes.lua loads them" || fail "stock titlebars install where workspace-modes.lua loads them"
 
 XDPH="$COPR/xdg-desktop-portal-hyprland.spec"
 grep -qxF '%global commit 540fb9237d29c4c2aee5b0b42688ef31e097d2ce' "$XDPH" \

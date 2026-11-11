@@ -116,6 +116,9 @@ SPECS=(
   hyprtoolkit.spec hyprland.spec hyprland-guiutils.spec
   hyprpicker.spec hyprsunset.spec
   xdg-desktop-portal-hyprland.spec
+  # Omarchy's floating-workspace titlebars: a plugin pinned to the exact
+  # hyprland.spec build above (BuildRequires its -devel).
+  omarchy-hyprland-titlebars.spec
   # uwsm (the session manager omedora launches through) is not in Fedora — so
   # it's vendored and built from omedora's own COPR too.
   uwsm.spec

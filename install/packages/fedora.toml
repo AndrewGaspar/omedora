@@ -586,8 +586,9 @@ source = "skip"
 reason = "owe's lock-screen QML feed plugin. 4.5's lock screen uses a still poster, not the feed, and owe.spec doesn't build the plugin yet. Only migration 1789764927 asks for it."
 
 [omarchy-hyprland-titlebars]
-source = "skip"
-reason = "Hyprland plugin (hyprbars fork) for 4.5's floating-workspace mode. Not packaged: a plugin loads only into the exact Hyprland build it was compiled against, so it would need an exact-EVR Requires and a rebuild with every hyprland.spec build (and its HypXR consumers). workspace-modes.lua skips titlebars when the .so is absent."
+source = "dnf"
+names = ["omarchy-hyprland-titlebars"]
+reason = "Hyprland plugin (hyprbars fork) for 4.5's floating-workspace mode. Vendored as omedora/packaging/copr/omarchy-hyprland-titlebars.spec (0.2.2) at the upstream path workspace-modes.lua loads. A plugin loads only into the exact Hyprland build it was compiled against, so the spec requires the exact hyprland-no-session version-release and is rebuilt with every hyprland.spec release (test/hypxr-spec-test.sh checks the pin). The XR session's build is omarchy-hyprland-titlebars-hypxr, pulled in by hypxrland-omedora."
 
 [hype]
 source = "dnf"
