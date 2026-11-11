@@ -7,7 +7,7 @@
 
 Name:           hypxrland-omedora
 Version:        1.1.0
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        Omedora XR wayland-session entry
 
 License:        MIT
@@ -33,6 +33,9 @@ Requires:       omedora-settings >= 0.2.0~beta.2
 # replaces this package's old session-long hold.
 Requires:       monado-xreal >= 25.1.0^20261016.2.git613d8eeb1-4
 Requires:       xreal-ctl >= 0^20261016.1.git9097b3c02-1
+# Omarchy's floating-workspace titlebars, built for this compositor; the stock
+# build fails to load into HypXRland with "Version mismatch".
+Requires:       omarchy-hyprland-titlebars-hypxr
 
 %description
 The Omedora XR display-manager session entry. It installs the complete Fedora
@@ -72,6 +75,11 @@ bash -n %{buildroot}%{_bindir}/omarchy-xr-session
 %{_datadir}/hypxrland/omarchy/hyprland-xr.lua
 
 %changelog
+* Wed Nov 11 2026 omedora <noreply@omedora> - 1.1.0-6
+- Require omarchy-hyprland-titlebars-hypxr, the titlebars plugin built for
+  HypXRland. The XR session loads it once HypXRland redirects Omarchy's
+  stock plugin path to /usr/lib/hypxrland/plugins.
+
 * Mon Nov 02 2026 omedora <noreply@omedora> - 1.1.0-5
 - Drop the session-long performance power-profile hold, its helper and its
   python3-gobject-base and setsid requirements: monado-xreal -4 now holds the

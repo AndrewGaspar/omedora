@@ -123,9 +123,34 @@ grep -qF 'a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002  ggml
   || fail "voice model source retains its verified LFS checksum"
 
 order=$(sed -n '/^SPECS=(/,/^)/p' "$COPR/build-repo.sh" | sed 's/#.*//' | tr '\n' ' ')
-[[ $order == *"hyprland.spec"*"omarchy-hyprland-titlebars.spec"*"hypxrhud.spec hypxrcompose.spec"*"hypxrvoice.spec"*"wivrn-hypxr.spec"*"hypxrland.spec hypxrland-stack.spec"*"hypxrland-omedora.spec"* ]] \
+[[ $order == *"hyprland.spec"*"omarchy-hyprland-titlebars.spec"*"hypxrhud.spec hypxrcompose.spec"*"hypxrvoice.spec"*"wivrn-hypxr.spec"*"hypxrland.spec hypxrland-stack.spec"*"omarchy-hyprland-titlebars-hypxr.spec hyprshare.spec"*"hypxrland-omedora.spec"* ]] \
   && pass "canonical build order contains the complete XR wave" \
   || fail "canonical build order contains the complete XR wave"
+
+# Plugins load only into the exact compositor build they were compiled against,
+# so each pins the exact version-release of the -devel it builds with.
+hypxr_evr="$(sed -nE 's/^%global base_version (.*)$/\1/p' "$HYPXR")^$(sed -nE 's/^%global snapshot (.*)$/\1/p' "$HYPXR").git$(sed -nE 's/^%global commit (.{9}).*$/\1/p' "$HYPXR")-$(sed -nE 's/^Release:[[:space:]]+([0-9]+)%\{\?dist\}$/\1/p' "$HYPXR")%{?dist}"
+hypxr_lua=$(sed -nE 's/^%global lua_version (.*)$/\1/p' "$HYPXR")
+for plugin in omarchy-hyprland-titlebars-hypxr hyprshare; do
+  spec="$COPR/$plugin.spec"
+  assert_file_exists "$plugin spec exists" "$spec"
+  grep -qxF "%global hypxrland_evr $hypxr_evr" "$spec" \
+    && pass "$plugin pins the current hypxrland build" || fail "$plugin pins the current hypxrland build ($hypxr_evr)"
+  grep -qE '^BuildRequires:[[:space:]]+hypxrland-devel = %\{hypxrland_evr\}$' "$spec" \
+    && pass "$plugin builds against hypxrland-devel" || fail "$plugin builds against hypxrland-devel"
+  grep -qE '^Requires:[[:space:]]+hypxrland%\{\?_isa\} = %\{hypxrland_evr\}$' "$spec" \
+    && pass "$plugin requires the exact hypxrland build" || fail "$plugin requires the exact hypxrland build"
+  grep -qxF "%global lua_version $hypxr_lua" "$spec" \
+    && pass "$plugin uses HypXRland's bundled Lua headers" || fail "$plugin uses HypXRland's bundled Lua headers"
+  grep -qF '%{_prefix}/lib/hypxrland/plugins/' "$spec" \
+    && pass "$plugin installs under the HypXRland plugin directory" || fail "$plugin installs under the HypXRland plugin directory"
+done
+grep -qE '^Requires:[[:space:]]+omarchy-hyprland-titlebars-hypxr$' "$COPR/hypxrland-omedora.spec" \
+  && pass "the XR session package pulls in the XR titlebars" || fail "the XR session package pulls in the XR titlebars"
+grep -qE '^Requires:[[:space:]]+omarchy-hyprland-titlebars$' "$COPR/omarchy-hyprland-titlebars-hypxr.spec" \
+  && pass "XR titlebars keep the stock file Omarchy checks for" || fail "XR titlebars keep the stock file Omarchy checks for"
+grep -qF 'nm -D --defined-only %{_libexecdir}/hypxrland/Hyprland' "$COPR/hyprshare.spec" \
+  && pass "hyprshare checks its Lua symbols against the compositor" || fail "hyprshare checks its Lua symbols against the compositor"
 
 TITLEBARS="$COPR/omarchy-hyprland-titlebars.spec"
 stock_evr="$(sed -nE 's/^Version:[[:space:]]+([0-9.]+)$/\1/p' "$COPR/hyprland.spec" | head -n1)-$(sed -nE 's/^Release:[[:space:]]+([0-9]+)%\{\?dist\}$/\1/p' "$COPR/hyprland.spec" | head -n1)%{?dist}"

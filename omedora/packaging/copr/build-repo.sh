@@ -134,7 +134,11 @@ SPECS=(
   hypxrvoice-model-base-en.spec hypxrvoice.spec
   wivrn-hypxr.spec basalt-xreal.spec monado-xreal.spec xreal-ctl.spec
   hypxrland-legacy-config.spec
-  hypxrland.spec hypxrland-stack.spec hypxrland-omedora.spec
+  hypxrland.spec hypxrland-stack.spec
+  # Plugins pinned to the exact hypxrland.spec build (BuildRequires
+  # hypxrland-devel); hypxrland-omedora requires the titlebars one.
+  omarchy-hyprland-titlebars-hypxr.spec hyprshare.spec
+  hypxrland-omedora.spec
   # hyprland-omedora (the 3.8.2-era session-entry shim) is RETIRED on the 4.x
   # line: omedora-settings ships the omedora.desktop session entry and
   # Obsoletes it. The published 1.0.0 stays on the COPR for upgrade paths.
