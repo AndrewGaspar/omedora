@@ -195,6 +195,7 @@ v4_kept_packages=(
   hyprtoolkit hyprtoolkit-devel
   hyprland hyprland-no-session hyprland-uwsm hyprland-devel
   hyprland-guiutils hyprpicker hyprsunset
+  omarchy-hyprland-titlebars
   xdg-desktop-portal-hyprland
   uwsm
   hypxrpaper hypxrva hypxrhud hypxrcompose

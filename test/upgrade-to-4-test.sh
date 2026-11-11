@@ -636,8 +636,11 @@ kept_names=$(sed -n '/^v4_kept_packages=(/,/^)/p' "$ROOT/bin/omedora-upgrade-to-
 # xreal-ctl (the XREAL 2D/3D HID helper) is new on the 4 line too and arrives
 # as a hard dependency of the kept hypxrland-omedora — on-demand.
 # kitty (newer than Fedora's) replaces Fedora's kitty only where the user
-# installed kitty — on-demand.
-on_demand_specs=" voxtype openclaw hyprpad basalt-xreal xreal-ctl kitty "
+# installed kitty — on-demand. omarchy-hyprland-titlebars-hypxr (titlebars
+# built for HypXRland) arrives as a hard dependency of the kept
+# hypxrland-omedora — on-demand. hyprshare (HypXRland screen-share plugin) is
+# installed only when the user opts in — on-demand.
+on_demand_specs=" voxtype openclaw hyprpad basalt-xreal xreal-ctl kitty omarchy-hyprland-titlebars-hypxr hyprshare "
 missing=""
 for s in $spec_names; do
   [[ $on_demand_specs == *" $s "* ]] && continue
