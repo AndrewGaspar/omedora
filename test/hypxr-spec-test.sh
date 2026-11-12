@@ -23,20 +23,27 @@ done
 
 grep -qE '^Version:[[:space:]]+0\.56\.2$' "$COPR/hyprland.spec" \
   && pass "stable Hyprland is 0.56.2" || fail "stable Hyprland is 0.56.2"
-grep -qE '^%global commit 96488989950e9b1e8bc48e99ac9d831fdba15ab9$' "$HYPXR" \
+grep -qE '^%global commit 7ac272db9ac77dee5c1ddab0d78ecb9885b7b204$' "$HYPXR" \
   && pass "HypXRland current branch tip is pinned" || fail "HypXRland current branch tip is pinned"
-grep -qE '^%global snapshot 20261105\.1$' "$HYPXR" \
-  && pass "HypXRland uses the Nov 5 snapshot revision" \
-  || fail "HypXRland uses the Nov 5 snapshot revision"
-grep -qF 'c04b495a458c1ebc347e53ccdd1501f798a157fcac4335680e01873acdd5e5d0  hypxrland-96488989950e9b1e8bc48e99ac9d831fdba15ab9.tar.gz' \
+grep -qE '^%global snapshot 20261111\.1$' "$HYPXR" \
+  && pass "HypXRland uses the Nov 11 snapshot revision" \
+  || fail "HypXRland uses the Nov 11 snapshot revision"
+grep -qF '6f55c050fb6116d1cea62538968d249d9d55379dddca3ef8ad570db25caa02f3  hypxrland-7ac272db9ac77dee5c1ddab0d78ecb9885b7b204.tar.gz' \
   "$COPR/hypxrland.spec.sources" \
   && pass "HypXRland current archive checksum is pinned" \
   || fail "HypXRland current archive checksum is pinned"
 grep -qE '^%global base_version 0\.56\.2$' "$HYPXR" \
   && pass "HypXRland declares the 0.56.2 base" || fail "HypXRland declares the 0.56.2 base"
-grep -qE '^Release:[[:space:]]+2%\{\?dist\}$' "$HYPXR" \
-  && pass "HypXRland release 2 adds hypxrland-devel" \
-  || fail "HypXRland release 2 adds hypxrland-devel"
+grep -qE '^Release:[[:space:]]+1%\{\?dist\}$' "$HYPXR" \
+  && pass "HypXRland snapshot is release 1" \
+  || fail "HypXRland snapshot is release 1"
+grep -qF "grep -qx 'HYPXR_PLUGIN_DIR:STRING=%{_prefix}/lib/hypxrland/plugins'" "$HYPXR" \
+  && grep -qF -- '-DHYPXR_PLUGIN_DIR=%{_prefix}/lib/hypxrland/plugins' "$HYPXR" \
+  && pass "HypXRland redirects stock plugin paths to /usr/lib/hypxrland/plugins" \
+  || fail "HypXRland redirects stock plugin paths to /usr/lib/hypxrland/plugins"
+sed -n '/^%package[[:space:]]*devel$/,/^%description/p' "$HYPXR" | grep -qE '^Requires:[[:space:]]+pkgconfig\(openxr\)$' \
+  && pass "hypxrland-devel requires the OpenXR headers" \
+  || fail "hypxrland-devel requires the OpenXR headers"
 grep -qE '^%package[[:space:]]+devel$' "$HYPXR" && grep -qE '^%files devel$' "$HYPXR" \
   && pass "HypXRland ships a devel subpackage" || fail "HypXRland ships a devel subpackage"
 grep -qF "sed -E 's|^prefix=.*$|prefix=%{_prefix}/lib/hypxrland/include|'" "$HYPXR" \
@@ -151,8 +158,6 @@ grep -qE '^Requires:[[:space:]]+omarchy-hyprland-titlebars$' "$COPR/omarchy-hypr
   && pass "XR titlebars keep the stock file Omarchy checks for" || fail "XR titlebars keep the stock file Omarchy checks for"
 grep -qF 'nm -D --defined-only %{_libexecdir}/hypxrland/Hyprland' "$COPR/hyprshare.spec" \
   && pass "hyprshare checks its Lua symbols against the compositor" || fail "hyprshare checks its Lua symbols against the compositor"
-grep -qxF 'BuildRequires:  pkgconfig(openxr)' "$COPR/hyprshare.spec" \
-  && pass "hyprshare has the OpenXR headers HypXRland's openxr/ headers include" || fail "hyprshare has the OpenXR headers HypXRland's openxr/ headers include"
 
 TITLEBARS="$COPR/omarchy-hyprland-titlebars.spec"
 stock_evr="$(sed -nE 's/^Version:[[:space:]]+([0-9.]+)$/\1/p' "$COPR/hyprland.spec" | head -n1)-$(sed -nE 's/^Release:[[:space:]]+([0-9]+)%\{\?dist\}$/\1/p' "$COPR/hyprland.spec" | head -n1)%{?dist}"

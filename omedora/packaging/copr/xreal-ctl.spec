@@ -15,8 +15,8 @@
 # every node under 3318:0424/0426/0428/0432 (the hidraw nodes included) with
 # uaccess, so no rule of our own is needed.
 
-%global snapshot 20261105.1
-%global commit 96488989950e9b1e8bc48e99ac9d831fdba15ab9
+%global snapshot 20261111.1
+%global commit 7ac272db9ac77dee5c1ddab0d78ecb9885b7b204
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 
 Name:           xreal-ctl
@@ -87,6 +87,9 @@ $ctl detect >/dev/null 2>&1 || status=$?
 %{_bindir}/xreal-ctl
 
 %changelog
+* Wed Nov 11 2026 omedora <noreply@omedora> - 0^20261111.1.git7ac272db9-1
+- Follow hypxrland to 7ac272db9; contrib/xreal is unchanged.
+
 * Thu Nov 05 2026 omedora <noreply@omedora> - 0^20261105.1.git964889899-1
 - Follow hypxrland.spec to the Nov 5 snapshot. contrib/xreal is unchanged.
 

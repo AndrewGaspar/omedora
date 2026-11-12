@@ -17,7 +17,7 @@
 # tarball hypxrland.spec builds, with no Libs, so the plugin links no Lua of its
 # own and binds to the compositor's.
 
-%global hypxrland_evr 0.56.2^20261105.1.git964889899-2%{?dist}
+%global hypxrland_evr 0.56.2^20261111.1.git7ac272db9-1%{?dist}
 %global commit f82d095e45dda325b7972039a9d6f273a45bc8c6
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 %global snapshot 20261111
@@ -27,7 +27,7 @@
 
 Name:           hyprshare
 Version:        0^%{snapshot}.git%{shortcommit}
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Switch what a screenshare shows without restarting it, for HypXRland
 
 License:        BSD-3-Clause
@@ -44,9 +44,6 @@ BuildRequires:  pkgconfig(aquamarine)
 BuildRequires:  pkgconfig(cairo)
 BuildRequires:  pkgconfig(egl)
 BuildRequires:  pkgconfig(hyprcursor) >= 0.1.13
-# HypXRland's src/openxr headers (reached via OpenXRManager.hpp) include
-# openxr/openxr.h; hypxrland-devel doesn't pull the OpenXR headers in yet.
-BuildRequires:  pkgconfig(openxr)
 BuildRequires:  pkgconfig(hyprgraphics) >= 0.5.1
 BuildRequires:  pkgconfig(hyprlang) >= 0.6.8
 BuildRequires:  pkgconfig(hyprutils) >= 0.14.0
@@ -136,6 +133,10 @@ fi
 %{_prefix}/lib/hypxrland/plugins/%{name}/%{name}.so
 
 %changelog
+* Wed Nov 11 2026 omedora <noreply@omedora> - 0^20261111.gitf82d095e4-2
+- Rebuild for HypXRland 0.56.2^20261111.1.git7ac272db9-1; hypxrland-devel
+  now brings the OpenXR headers.
+
 * Wed Nov 11 2026 omedora <noreply@omedora> - 0^20261111.gitf82d095e4-1
 - Initial omedora build of hyprshare at f82d095e4 for HypXRland
   0.56.2^20261105.1.git964889899-2.

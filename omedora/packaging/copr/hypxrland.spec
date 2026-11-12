@@ -26,8 +26,8 @@
 # 0.56.x requires 5.5.
 
 %global base_version 0.56.2
-%global snapshot 20261105.1
-%global commit 96488989950e9b1e8bc48e99ac9d831fdba15ab9
+%global snapshot 20261111.1
+%global commit 7ac272db9ac77dee5c1ddab0d78ecb9885b7b204
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 %global udis86_commit 5336633af70f3917760a6d441ff02d93477b0c86
 %global lua_version 5.5.0
@@ -37,7 +37,7 @@
 
 Name:           hypxrland
 Version:        %{base_version}^%{snapshot}.git%{shortcommit}
-Release:        2%{?dist}
+Release:        1%{?dist}
 Summary:        Hyprland-based spatial OpenXR compositor
 
 # HypXRland/Hyprland: BSD-3-Clause
@@ -151,6 +151,8 @@ hypxrland-session launcher. Install hypxrland-omedora for the visible
 %package        devel
 Summary:        HypXRland headers for building plugins against this compositor build
 Requires:       %{name}%{?_isa} = %{version}-%{release}
+# src/openxr/*.hpp include openxr/openxr.h.
+Requires:       pkgconfig(openxr)
 
 %description    devel
 Headers and a pkg-config file for building Hyprland plugins against this
@@ -194,10 +196,10 @@ export PKG_CONFIG_PATH="%{_builddir}/hypxrland-lua-prefix/lib/pkgconfig${PKG_CON
 export GIT_COMMIT_HASH=%{commit}
 export GIT_BRANCH=hypxrland
 export GIT_COMMIT_MESSAGE="packaged HypXRland snapshot %{shortcommit}"
-export GIT_COMMIT_DATE=2026-11-05
+export GIT_COMMIT_DATE=2026-11-11
 export GIT_DIRTY=clean
-export GIT_TAG=v%{base_version}-468-g%{shortcommit}
-export GIT_COMMITS=8129
+export GIT_TAG=v%{base_version}-469-g%{shortcommit}
+export GIT_COMMITS=8130
 
 %cmake \
   -GNinja \
@@ -206,12 +208,16 @@ export GIT_COMMITS=8129
   -DNO_TESTS=TRUE \
   -DBUILD_TESTING=FALSE \
   -DWITH_OPENXR=TRUE \
+  -DHYPXR_PLUGIN_DIR=%{_prefix}/lib/hypxrland/plugins \
   -DUSE_TRACY=FALSE
 
 # HypXRland's CMake treats OpenXR and the Vulkan GPU probe as optional. They
 # are mandatory for this package, so fail before compiling a misleadingly
 # successful non-XR or unguarded build.
 grep -q '^openxr_dep_FOUND:INTERNAL=1$' %{__cmake_builddir}/CMakeCache.txt
+# The plugin loader swaps stock /usr/lib{,64}/<pkg>/<name>.so paths for the
+# builds here. Its default follows %%{_libdir} (lib64), not the shared layout.
+grep -qx 'HYPXR_PLUGIN_DIR:STRING=%{_prefix}/lib/hypxrland/plugins' %{__cmake_builddir}/CMakeCache.txt
 grep -Eq '^HYPR_VULKAN_INCLUDE_DIR:PATH=/.*' %{__cmake_builddir}/CMakeCache.txt
 
 # Build the compositor and its matching control client. The latter stays under
@@ -265,6 +271,14 @@ XDG_RUNTIME_DIR="$runtime_dir" %{__cmake_builddir}/Hyprland --version |
 %{_prefix}/lib/hypxrland/pkgconfig/
 
 %changelog
+* Wed Nov 11 2026 omedora <noreply@omedora> - 0.56.2^20261111.1.git7ac272db9-1
+- Refresh to 7ac272db9: the plugin loader opens the HypXRland build in
+  /usr/lib/hypxrland/plugins/<pkg>/<name>.so when a config asks for the
+  stock /usr/lib{,64}/<pkg>/<name>.so, so Omarchy's titlebars path loads
+  omarchy-hyprland-titlebars-hypxr. HYPXR_PLUGIN_DIR is set explicitly,
+  since its default would follow %%{_libdir}.
+- hypxrland-devel requires the OpenXR headers its src/openxr headers include.
+
 * Wed Nov 11 2026 omedora <noreply@omedora> - 0.56.2^20261105.1.git964889899-2
 - Add hypxrland-devel: this build's headers and pkg-config file under
   /usr/lib/hypxrland, for plugins that must match the compositor exactly

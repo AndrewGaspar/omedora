@@ -2,7 +2,7 @@
 
 Name:           hypxrland-stack
 Version:        1.1.0
-Release:        6%{?dist}
+Release:        7%{?dist}
 Summary:        Complete HypXRland runtime stack for Fedora
 
 License:        MIT
@@ -11,7 +11,7 @@ Source0:        hypxrland-stack.README
 
 BuildArch:      noarch
 
-Requires:       hypxrland >= 0.56.2^20261105.1.git964889899-1
+Requires:       hypxrland >= 0.56.2^20261111.1.git7ac272db9-1
 Requires:       hypxrcompose >= 0^20260820.1.gitf75ccd4ec-1
 Requires:       hypxrhud >= 0^20260817.1.gitf96d0e794-1
 Requires:       hypxrpaper >= 0^20260704.1.git5cae848cd-1
@@ -42,6 +42,9 @@ install -Dpm0644 %{SOURCE0} \
 %doc %{_pkgdocdir}/README
 
 %changelog
+* Wed Nov 11 2026 omedora <noreply@omedora> - 1.1.0-7
+- Raise the hypxrland minimum to the Nov 11 snapshot (plugin-path redirect).
+
 * Thu Nov 05 2026 omedora <noreply@omedora> - 1.1.0-6
 - Raise the hypxrland minimum to the Nov 5 snapshot (curved XR monitors).
 
