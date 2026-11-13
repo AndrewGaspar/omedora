@@ -16,8 +16,8 @@
 # Fedora, so the fixes go straight in. VERSION in the archive is still 1.4.1.
 
 %global base_version 1.4.1
-%global snapshot 20261110
-%global commit 540fb9237d29c4c2aee5b0b42688ef31e097d2ce
+%global snapshot 20261112
+%global commit b9e0fd11ca56a96c917f02bd76e1ab904ce07471
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 
 Name:           xdg-desktop-portal-hyprland
@@ -93,6 +93,12 @@ test "$(cat VERSION)" = %{base_version}
 %{_userunitdir}/%{name}.service
 
 %changelog
+* Thu Nov 12 2026 omedora <noreply@omedora> - 1:1.4.1^20261112.gitb9e0fd11c-1
+- Update the share-switch branch to b9e0fd1: a new
+  io.github.andrewgaspar.hypxr.ScreencastControl1 D-Bus interface on
+  /org/freedesktop/portal/desktop (CloseAll, List), Session.Closed is
+  emitted, and a share ends when its output is removed.
+
 * Wed Nov 11 2026 omedora <noreply@omedora> - 1:1.4.1^20261110.git540fb9237-1
 - Build from the HypXR share-switch branch at 540fb9237: a failed frame no
   longer stalls a screenshare for good (#445/#451), renegotiation after a

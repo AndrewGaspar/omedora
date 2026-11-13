@@ -171,10 +171,15 @@ grep -qxF "%global lua_version $(sed -nE 's/^%global lua_version (.*)$/\1/p' "$C
 grep -qF '%{_prefix}/lib/%{name}/titlebars.so' "$TITLEBARS" \
   && pass "stock titlebars install where workspace-modes.lua loads them" || fail "stock titlebars install where workspace-modes.lua loads them"
 
+grep -qxF 'sos=(build/hyprshare*.so)' "$COPR/hyprshare.spec" \
+  && grep -qF '"${#sos[@]}" -ne 1' "$COPR/hyprshare.spec" \
+  && pass "hyprshare installs the one versioned .so its Makefile builds" \
+  || fail "hyprshare installs the one versioned .so its Makefile builds"
+
 XDPH="$COPR/xdg-desktop-portal-hyprland.spec"
-grep -qxF '%global commit 540fb9237d29c4c2aee5b0b42688ef31e097d2ce' "$XDPH" \
+grep -qxF '%global commit b9e0fd11ca56a96c917f02bd76e1ab904ce07471' "$XDPH" \
   && pass "portal builds the share-switch commit" || fail "portal builds the share-switch commit"
-grep -qxF '6a68f9c6f89270504df4f31a2a41996c46fb2a618023e6e0428e75ed7df188fb  xdg-desktop-portal-hyprland-540fb9237d29c4c2aee5b0b42688ef31e097d2ce.tar.gz' "$XDPH.sources" \
+grep -qxF '16c88119271abdc011194caa9620ebc35ea638ae3e348e0da17fb8b18a4e1f28  xdg-desktop-portal-hyprland-b9e0fd11ca56a96c917f02bd76e1ab904ce07471.tar.gz' "$XDPH.sources" \
   && pass "portal archive checksum is pinned" || fail "portal archive checksum is pinned"
 grep -qxF 'Epoch:          1' "$XDPH" \
   && pass "portal keeps Epoch 1" || fail "portal keeps Epoch 1"

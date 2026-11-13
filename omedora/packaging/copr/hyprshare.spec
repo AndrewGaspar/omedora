@@ -18,16 +18,16 @@
 # own and binds to the compositor's.
 
 %global hypxrland_evr 0.56.2^20261111.1.git7ac272db9-1%{?dist}
-%global commit f82d095e45dda325b7972039a9d6f273a45bc8c6
+%global commit cd93406952ff18656b64da41707667326be789c9
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
-%global snapshot 20261111
+%global snapshot 20261112
 %global lua_version 5.5.0
 # The Makefile builds with -fno-lto; keep rpm's LTO flags out as well.
 %global _lto_cflags %{nil}
 
 Name:           hyprshare
 Version:        0^%{snapshot}.git%{shortcommit}
-Release:        2%{?dist}
+Release:        1%{?dist}
 Summary:        Switch what a screenshare shows without restarting it, for HypXRland
 
 License:        BSD-3-Clause
@@ -93,10 +93,17 @@ export PKG_CONFIG_PATH=$PWD/lua/pkgconfig:%{_prefix}/lib/hypxrland/pkgconfig
 # -MD leaves the compiler's header list (build/*.d) for %%check.
 export CPPFLAGS="${CPPFLAGS:-} -MD"
 %make_build HYPRLAND_PC_DIR=%{_prefix}/lib/hypxrland/pkgconfig GLAZE_INCLUDE=
-test -f build/hyprshare-v4.so
+# The Makefile versions its output (build/hyprshare-v5.so) so a dev build never
+# overwrites a .so a live session has dlopened. Take the one it built.
+sos=(build/hyprshare*.so)
+if [ "${#sos[@]}" -ne 1 ] || [ ! -f "${sos[0]}" ]; then
+  echo "expected exactly one build/hyprshare*.so, found: ${sos[*]}" >&2
+  exit 1
+fi
+cp -p "${sos[0]}" %{name}.so
 
 %install
-install -Dpm0755 build/hyprshare-v4.so \
+install -Dpm0755 %{name}.so \
   %{buildroot}%{_prefix}/lib/hypxrland/plugins/%{name}/%{name}.so
 
 %check
@@ -111,12 +118,12 @@ if grep -qF '%{_includedir}/hyprland/' deps.txt; then
 fi
 grep -qF "$PWD/lua/include/lua.h" deps.txt
 # Lua comes from the compositor, never from a separate liblua.
-if objdump -p build/hyprshare-v4.so | grep -E 'NEEDED.*liblua'; then
+if objdump -p %{name}.so | grep -E 'NEEDED.*liblua'; then
   echo "hyprshare must not link its own Lua" >&2
   exit 1
 fi
 # Every Lua symbol it needs must be exported by the compositor.
-nm -D --undefined-only build/hyprshare-v4.so | awk '{print $2}' |
+nm -D --undefined-only %{name}.so | awk '{print $2}' |
   grep -E '^luaL?_' | sort -u >needed-lua
 nm -D --defined-only %{_libexecdir}/hypxrland/Hyprland | awk '{print $3}' |
   grep -E '^luaL?_' | sort -u >exported-lua
@@ -133,6 +140,13 @@ fi
 %{_prefix}/lib/hypxrland/plugins/%{name}/%{name}.so
 
 %changelog
+* Thu Nov 12 2026 omedora <noreply@omedora> - 0^20261112.gitcd9340695-1
+- Update to cd93406 (status-bar API v5): `hyprctl sharestatus` reports
+  capturing, sessions and sharedWindow; a hyprshare>>changed event;
+  `hyprctl sharefocus` and `hyprctl sharestop`; plugin:hyprshare:stop_grace_ms.
+- Install whichever single build/hyprshare*.so the Makefile builds (now
+  hyprshare-v5.so) to the same hyprshare.so path.
+
 * Wed Nov 11 2026 omedora <noreply@omedora> - 0^20261111.gitf82d095e4-2
 - Rebuild for HypXRland 0.56.2^20261111.1.git7ac272db9-1; hypxrland-devel
   now brings the OpenXR headers.
