@@ -53,7 +53,10 @@ Source0:        %{url}/archive/%{commit}/%{name}-%{commit}.tar.gz
 # Restore the one required submodule not supplied by an Omedora/Fedora package.
 Source1:        https://github.com/canihavesomecoffee/udis86/archive/%{udis86_commit}/udis86-%{udis86_commit}.tar.gz
 # Fedora 44 has Lua 5.4; Hyprland 0.56.x requires 5.5.
-Source2:        https://www.lua.org/ftp/lua-%{lua_version}.tar.gz
+# The lua.org release tarball, kept in this directory because lua.org is too
+# unreliable to fetch from at build time (its sha256 is pinned in hypxrland.spec.sources).
+# The name is literal: srpm.sh stages local sources without expanding macros.
+Source2:        lua-5.5.0.tar.gz
 # Package-owned launcher shared by the branded session packages.
 Source3:        hypxrland-session
 

@@ -33,7 +33,10 @@ Summary:        Switch what a screenshare shows without restarting it, for HypXR
 License:        BSD-3-Clause
 URL:            https://github.com/AndrewGaspar/hyprshare
 Source0:        %{url}/archive/%{commit}/%{name}-%{commit}.tar.gz
-Source1:        https://www.lua.org/ftp/lua-%{lua_version}.tar.gz
+# The lua.org release tarball, kept in this directory because lua.org is too
+# unreliable to fetch from at build time (its sha256 is pinned in hyprshare.spec.sources).
+# The name is literal: srpm.sh stages local sources without expanding macros.
+Source1:        lua-5.5.0.tar.gz
 
 BuildRequires:  gcc-c++
 BuildRequires:  make

@@ -28,7 +28,10 @@ Summary:        Titlebars for Omarchy's floating workspaces (Hyprland plugin)
 License:        BSD-3-Clause AND MIT
 URL:            https://github.com/omacom/omarchy-hyprland-titlebars
 Source0:        %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
-Source1:        https://www.lua.org/ftp/lua-%{lua_version}.tar.gz
+# The lua.org release tarball, kept in this directory because lua.org is too
+# unreliable to fetch from at build time (its sha256 is pinned in omarchy-hyprland-titlebars.spec.sources).
+# The name is literal: srpm.sh stages local sources without expanding macros.
+Source1:        lua-5.5.0.tar.gz
 
 BuildRequires:  cmake
 BuildRequires:  ninja-build

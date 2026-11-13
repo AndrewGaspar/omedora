@@ -176,6 +176,23 @@ grep -qxF 'sos=(build/hyprshare*.so)' "$COPR/hyprshare.spec" \
   && pass "hyprshare installs the one versioned .so its Makefile builds" \
   || fail "hyprshare installs the one versioned .so its Makefile builds"
 
+# lua.org is too unreliable to fetch from at SRPM time, so the Lua 5.5 release
+# tarball is committed beside the specs and every spec that bundles it names
+# that file literally (srpm.sh stages local sources without macro expansion).
+lua_tarball="$COPR/lua-5.5.0.tar.gz"
+lua_sha=$(sha256sum "$lua_tarball" 2>/dev/null | awk '{print $1}')
+for lua_spec in hyprland hypxrland omarchy-hyprland-titlebars omarchy-hyprland-titlebars-hypxr hyprshare; do
+  grep -qE '^Source[0-9]+:[[:space:]]+lua-5\.5\.0\.tar\.gz$' "$COPR/$lua_spec.spec" \
+    && grep -qxF "$lua_sha  lua-5.5.0.tar.gz" "$COPR/$lua_spec.spec.sources" \
+    && pass "$lua_spec bundles the committed Lua 5.5.0 tarball" \
+    || fail "$lua_spec bundles the committed Lua 5.5.0 tarball"
+done
+if grep -qE '^Source[0-9]*:.*lua\.org' "$COPR"/*.spec; then
+  fail "no spec fetches Lua from lua.org"
+else
+  pass "no spec fetches Lua from lua.org"
+fi
+
 XDPH="$COPR/xdg-desktop-portal-hyprland.spec"
 grep -qxF '%global commit b9e0fd11ca56a96c917f02bd76e1ab904ce07471' "$XDPH" \
   && pass "portal builds the share-switch commit" || fail "portal builds the share-switch commit"

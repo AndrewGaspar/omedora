@@ -38,7 +38,10 @@ Source0:        %{url}/releases/download/v%{version}/source-v%{version}.tar.gz
 Source1:        macros.hyprland
 # Lua 5.5 — Fedora 44 only has 5.4; Hyprland 0.55.x requires 5.5. Built static
 # in %build and exposed via pkg-config. MIT-licensed.
-Source2:        https://www.lua.org/ftp/lua-%{lua_version}.tar.gz
+# The lua.org release tarball, kept in this directory because lua.org is too
+# unreliable to fetch from at build time (its sha256 is pinned in hyprland.spec.sources).
+# The name is literal: srpm.sh stages local sources without expanding macros.
+Source2:        lua-5.5.0.tar.gz
 
 # https://fedoraproject.org/wiki/Changes/EncourageI686LeafRemoval
 ExcludeArch:    %{ix86}
