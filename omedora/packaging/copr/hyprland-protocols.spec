@@ -7,7 +7,7 @@
 # explicit Release + changelog.
 
 Name:           hyprland-protocols
-Version:        0.7.0
+Version:        0.8.0
 Release:        1%{?dist}
 Summary:        Wayland protocol extensions for Hyprland
 BuildArch:      noarch
@@ -16,7 +16,10 @@ License:        BSD-3-Clause
 URL:            https://github.com/hyprwm/hyprland-protocols
 Source0:        %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
 
-BuildRequires:  meson
+# 0.8.0 replaced meson with CMake; the project still enables C, so CMake
+# needs a C compiler to configure.
+BuildRequires:  cmake
+BuildRequires:  gcc
 
 %description
 %{summary}.
@@ -30,11 +33,11 @@ Summary:        Wayland protocol extensions for Hyprland
 %autosetup -p1
 
 %build
-%meson
-%meson_build
+%cmake
+%cmake_build
 
 %install
-%meson_install
+%cmake_install
 
 %files devel
 %license LICENSE
@@ -43,5 +46,9 @@ Summary:        Wayland protocol extensions for Hyprland
 %{_datadir}/%{name}/
 
 %changelog
+* Wed Nov 18 2026 omedora <noreply@omedora> - 0.8.0-1
+- Update to hyprland-protocols 0.8.0 (the version Omarchy stable ships),
+  which builds with CMake instead of meson.
+
 * Sat May 30 2026 omedora <noreply@omedora> - 0.7.0-1
 - Initial omedora build of hyprland-protocols (adapted from solopasha/hyprlandRPM).
