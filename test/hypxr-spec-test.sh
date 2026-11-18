@@ -249,13 +249,17 @@ grep -qx 'Slice=session.slice' "$MONADO_UNIT" \
   || fail "monado-xreal unit runs in session.slice, out of uresourced's app.slice"
 
 MONADO="$COPR/monado-xreal.spec"
-grep -qx '%global commit 76c63baca9771d77c3455c3eff81a3cd3fd20402' "$MONADO" \
-  && pass "monado-xreal pins the fork's hypxrland tip" \
-  || fail "monado-xreal pins the fork's hypxrland tip"
-grep -qx '%global snapshot 20261102.1' "$MONADO" \
-  && pass "monado-xreal uses the Nov 2 snapshot" \
-  || fail "monado-xreal uses the Nov 2 snapshot"
-grep -qF '6c4cfa27ab0b3dfe9edeeee2a927661bf29de6341ca3314e51c042813f0d1f69  monado-xreal-76c63baca9771d77c3455c3eff81a3cd3fd20402.tar.gz' \
+# HypXRland 7ac272db9's subprojects/monado submodule pin.
+grep -qx '%global commit 6a22af15e7e0be12b28db9f12071c20100fad476' "$MONADO" \
+  && pass "monado-xreal pins HypXRland's Monado submodule commit" \
+  || fail "monado-xreal pins HypXRland's Monado submodule commit"
+grep -qx '%global snapshot 20261103.1' "$MONADO" \
+  && pass "monado-xreal uses the Nov 3 snapshot" \
+  || fail "monado-xreal uses the Nov 3 snapshot"
+grep -qE '^BuildRequires:[[:space:]]+pkgconfig\(libzstd\)' "$MONADO" \
+  && pass "monado-xreal builds the flight recorder with zstd" \
+  || fail "monado-xreal builds the flight recorder with zstd"
+grep -qF '62335f5baa70cd4c6d99706160f36e3a683be6a424a3750eea1102b7f2387216  monado-xreal-6a22af15e7e0be12b28db9f12071c20100fad476.tar.gz' \
   "$COPR/monado-xreal.spec.sources" \
   && pass "monado-xreal archive checksum is pinned" \
   || fail "monado-xreal archive checksum is pinned"

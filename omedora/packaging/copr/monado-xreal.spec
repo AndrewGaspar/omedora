@@ -1,7 +1,7 @@
 # monado-xreal.spec — private XREAL Air runtime for HypXRland.
 
-%global snapshot 20261102.1
-%global commit 76c63baca9771d77c3455c3eff81a3cd3fd20402
+%global snapshot 20261103.1
+%global commit 6a22af15e7e0be12b28db9f12071c20100fad476
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 
 Name:           monado-xreal
@@ -46,6 +46,8 @@ BuildRequires:  pkgconfig(libdrm)
 # sd-bus, for asking rtkit for the render thread's real-time priority.
 BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  pkgconfig(libudev)
+# The flight recorder compresses its stereo frames with zstd (raw without it).
+BuildRequires:  pkgconfig(libzstd)
 BuildRequires:  pkgconfig(vulkan)
 BuildRequires:  pkgconfig(wayland-client)
 BuildRequires:  pkgconfig(wayland-scanner)
@@ -207,6 +209,9 @@ grep -q '^XRT_FEATURE_SERVICE_SYSTEMD:BOOL=OFF$' \
   %{__cmake_builddir}/CMakeCache.txt
 readelf -d %{buildroot}%{_libexecdir}/monado-xreal/monado-service |
   grep -q 'NEEDED.*\[libsystemd\.so'
+# The XREAL driver found zstd, so flight captures are compressed.
+readelf -d %{buildroot}%{_libexecdir}/monado-xreal/monado-service |
+  grep -q 'NEEDED.*\[libzstd\.so'
 if readelf -d %{buildroot}%{_libdir}/monado-xreal/libopenxr_monado_xreal.so |
   grep -q 'NEEDED.*\[libsystemd\.so'; then
   exit 1
@@ -271,6 +276,13 @@ done
 %{_datadir}/openxr/1/openxr_monado-xreal.json
 
 %changelog
+* Wed Nov 18 2026 omedora <noreply@omedora> - 25.1.0^20261103.1.git6a22af15e-1
+- Refresh to HypXRland's Monado submodule pin 6a22af1: the XREAL flight
+  recorder (on-demand captures with look-back, zstd-compressed stereo frames),
+  SLAM state in the flight status, skipped stereo pairs while the tracker is
+  behind, and xreal-slam-replay fixes.
+- BuildRequire libzstd; %%check confirms monado-service links it.
+
 * Mon Nov 02 2026 omedora <noreply@omedora> - 25.1.0^20261102.1.git76c63baca-1
 - Refresh to HypXRland's Monado submodule pin 76c63ba: bounded, rtkit-first
   real-time priority for the compositor render thread
