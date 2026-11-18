@@ -22,7 +22,7 @@
 # needs RPM Fusion's ffmpeg-libs or a VA-API driver that decodes H.264.
 
 Name:           owe
-Version:        0.2.12
+Version:        0.2.14
 Release:        1%{?dist}
 Summary:        High-performance wallpaper engine for Omarchy (mp4, gif, stills)
 
@@ -107,6 +107,9 @@ grep -q '^ExecStart=.*%{_bindir}/owed ' %{buildroot}%{_userunitdir}/owed.service
 %{_userunitdir}/owed.service
 
 %changelog
+* Wed Nov 18 2026 omedora <noreply@omedora> - 0.2.14-1
+- Bump to upstream 0.2.14 (owed.service gains KillMode=mixed).
+
 * Tue Oct 27 2026 omedora <noreply@omedora> - 0.2.12-1
 - Initial from-source (meson) build of owe, Omarchy 4.5's wallpaper engine
   (github.com/omacom/owe). Mirrors the omarchy-pkgs PKGBUILD without its
