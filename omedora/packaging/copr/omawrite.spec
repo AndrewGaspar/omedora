@@ -26,7 +26,7 @@
 %global debug_package %{nil}
 
 Name:           omawrite
-Version:        0.7.0
+Version:        0.7.2
 Release:        1%{?dist}
 Summary:        Dead-simple Markdown writing app
 
@@ -93,6 +93,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/omawrite.desktop
 %{_datadir}/applications/omawrite.desktop
 
 %changelog
+* Wed Nov 18 2026 omedora <noreply@omedora> - 0.7.2-1
+- Bump to upstream 0.7.2 (now links Qt Concurrent, part of qt6-qtbase).
+
 * Fri Oct 16 2026 omedora <noreply@omedora> - 0.7.0-1
 - Bump to upstream 0.7.0.
 
