@@ -29,11 +29,12 @@ if [[ "${OMARCHY_DISTRO:-$(omarchy-distro 2>/dev/null || echo arch)}" != "fedora
 fi
 
 # omacom-io/omarchy-pkgs commit that the retired omarchy-nvim.spec pins (the v4
-# omedora/packaging/copr/omarchy-nvim.spec pins the same commit). The omarchy
+# omedora/packaging/copr/omarchy-nvim.spec pins the same commit): the recipe
+# behind Omarchy's omarchy-nvim 2026.9.21-5. The omarchy
 # lua/plugin/lazyvim.json overrides + the setup steps come from
 # pkgbuilds/omarchy-nvim/ at this commit. Bump deliberately to re-vendor — keep
 # in sync with omarchy-nvim.spec's %global pkgs_commit.
-OMARCHY_NVIM_PKGS_COMMIT="3ee1cd94953d30ee441329190d41fd69662576e1"
+OMARCHY_NVIM_PKGS_COMMIT="60551aaddc098c34cd69862ed8c0569e1ce74d5f"
 # LazyVim starter commit the spec pins (the base config layer). Pinned (not a
 # moving branch) for reproducibility. Keep in sync with %global lazyvim_commit.
 OMARCHY_NVIM_LAZYVIM_COMMIT="803bc181d7c0d6d5eeba9274d9be49b287294d99"
@@ -94,8 +95,8 @@ omedora_nvim_bootstrap() {
   cp -r "$nvim_pkg/lua" "$CONFIG_DIR/"
   cp -r "$nvim_pkg/plugin" "$CONFIG_DIR/"
   cp "$nvim_pkg/lazyvim.json" "$CONFIG_DIR/"
-  echo "vim.opt.relativenumber = false" >>"$CONFIG_DIR/lua/config/options.lua"
-  echo "vim.g.autoformat = false" >>"$CONFIG_DIR/lua/config/options.lua"
+  # The overrides' lua/config/options.lua already sets relativenumber and
+  # autoformat off (and loads the remote clipboard), so nothing is appended.
 
   # Move aside (do NOT delete) any existing Neovim data/state/cache so Lazy
   # resolves cleanly against the new config. A user may have an existing nvim

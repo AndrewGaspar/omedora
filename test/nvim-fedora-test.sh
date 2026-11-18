@@ -151,16 +151,11 @@ assert_file_exists "omarchy lazyvim.json layered in" "$cfg/lazyvim.json"
 grep -q '"override":true' "$cfg/lazyvim.json" \
   && pass "lazyvim.json is the omarchy override, not the starter's" \
   || fail "lazyvim.json is the omarchy override, not the starter's"
-# options.lua gets the omarchy override copy PLUS the two appended settings.
-grep -q 'omarchy override' "$cfg/lua/config/options.lua" \
-  && pass "options.lua is the omarchy override layer" \
-  || fail "options.lua is the omarchy override layer"
-grep -q 'vim.opt.relativenumber = false' "$cfg/lua/config/options.lua" \
-  && pass "relativenumber=false appended to options.lua" \
-  || fail "relativenumber=false appended to options.lua"
-grep -q 'vim.g.autoformat = false' "$cfg/lua/config/options.lua" \
-  && pass "autoformat=false appended to options.lua" \
-  || fail "autoformat=false appended to options.lua"
+# options.lua is the omarchy override copy, unchanged: since omarchy-pkgs
+# 2026.9.21 it sets relativenumber/autoformat itself, so appending them again
+# would duplicate the lines.
+assert_equals "options.lua is exactly the omarchy override layer" \
+  "$(cat "$cfg/lua/config/options.lua")" "-- omarchy override"
 [[ -L "$cfg/lua/plugins/theme.lua" ]] \
   && pass "omarchy theme symlink created" \
   || fail "omarchy theme symlink created"

@@ -34,7 +34,7 @@
 # The Lazy sync step downloads plugins from GitHub at build time (network, like
 # swayosd's cargo fetch); a COPR host has network too.
 
-%global pkgs_commit 3ee1cd94953d30ee441329190d41fd69662576e1
+%global pkgs_commit 60551aaddc098c34cd69862ed8c0569e1ce74d5f
 # LazyVim starter pinned to a commit (not refs/heads/main) so the source is
 # reproducible and the .sources sha256 pin is stable. Bump deliberately when
 # re-vendoring against a newer starter (the starter is only the base config
@@ -42,7 +42,7 @@
 %global lazyvim_commit 803bc181d7c0d6d5eeba9274d9be49b287294d99
 
 Name:           omarchy-nvim
-Version:        2026.5.25
+Version:        2026.9.21
 Release:        1%{?dist}
 Summary:        omarchy's pre-built LazyVim configuration with cached plugins
 BuildArch:      noarch
@@ -111,8 +111,6 @@ rm -rf "$XDG_CONFIG_HOME/nvim/.git"
 cp -r "$PKG/lua" "$XDG_CONFIG_HOME/nvim/"
 cp -r "$PKG/plugin" "$XDG_CONFIG_HOME/nvim/"
 cp "$PKG/lazyvim.json" "$XDG_CONFIG_HOME/nvim/"
-echo "vim.opt.relativenumber = false" >>"$XDG_CONFIG_HOME/nvim/lua/config/options.lua"
-echo "vim.g.autoformat = false" >>"$XDG_CONFIG_HOME/nvim/lua/config/options.lua"
 
 # Download + install all plugins into the cache (network at build time).
 echo "Installing LazyVim plugins (headless)..."
@@ -143,6 +141,13 @@ install -Dm755 "$PKG/omarchy-nvim-setup" %{buildroot}%{_bindir}/omarchy-nvim-set
 %{_datadir}/%{name}
 
 %changelog
+* Wed Nov 18 2026 omedora <noreply@omedora> - 2026.9.21-1
+- Follow omarchy-pkgs to the omarchy-nvim 2026.9.21-5 recipe (60551aa): the
+  remote clipboard provider, transparent status and current lines, and an
+  options.lua that sets relativenumber and autoformat off itself, so the
+  appended lines are gone. Kept in sync with install/user/nvim-fedora.sh; this
+  spec stays retired.
+
 * Sat May 30 2026 omedora <noreply@omedora> - 2026.5.25-1
 - Initial from-source build of omarchy-nvim, reproducing the omarchy-pkgs
   PKGBUILD: LazyVim starter + omarchy lua/plugin overrides with the plugin
