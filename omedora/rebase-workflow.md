@@ -175,7 +175,7 @@ reviewed change:
 | Item | State on Fedora | Follow-up |
 | --- | --- | --- |
 | Timed passwordless sudo (`omarchy-sudo-passwordless MINUTES`, 4.5) | Fails closed with "Temporary sudo cleanup is unavailable"; permanent grants and `--disable` work | Ship `etc/tmpfiles.d/omarchy-nopasswd-sudo.conf`, add an RPM `%preun` that runs the package-removal revoke in place of the libalpm hook, give `verify_boot_cleanup` a Fedora branch, and add the patch-map row |
-| quickshell `0.3.2` | Works on Fedora's Qt 6.11.2; `shell.qml`'s `//@ pragma OmarchyLoadPatch` only logs a warning | Move to upstream `2b4501a28` plus Omarchy's `load_qtquick_611.patch` before Fedora ships Qt 6.12 (rawhide already has it) |
+| quickshell | Resolved: the COPR ships upstream `2b4501a28` plus Omarchy's `load_qtquick_611.patch`, so the pragma takes effect and the shell is ready for Qt 6.12 | `test/quickshell-spec-test.sh` fails if `shell.qml` drops the pragma; drop the patch then |
 | omarchy-hyprland-titlebars | Skip-mapped; floating mode runs without titlebars | Needs an exact-EVR `Requires: hyprland-no-session` and a rebuild with every hyprland.spec build |
 | gliff | Skip-mapped | Its crates build Cisco OpenH264 from source, which Fedora and COPR can't ship |
 | fprintd resume hook (migration 1791125650) | Gated; `bin/fedora/setup-lock` doesn't install it | Decide whether setup-lock adopts the hook and the stop-timeout drop-in |

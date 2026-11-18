@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# L1 static guard for the vendored Quickshell release Omarchy ships.
+# L1 static guard for the vendored Quickshell snapshot Omarchy ships.
 
 set -euo pipefail
 
@@ -9,27 +9,41 @@ ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 
 SPEC="$ROOT/omedora/packaging/copr/quickshell.spec"
 SOURCES="$ROOT/omedora/packaging/copr/quickshell.spec.sources"
-TAG_COMMIT=4f508be500dea6e5732cc3d50382a0048b17e7b1
-VERSION=0.3.2
-SHA256=946a27e2a276917a03c1079e5c60971af84ece73088c3661dee455d92eb420f7
+PATCH="$ROOT/omedora/packaging/copr/quickshell-load-qtquick-611.patch"
+# The upstream commit Omarchy's quickshell package pins (0.3.2.r7.g2b4501a).
+COMMIT=2b4501a282689792b62e94f3fb30d8f512324fe6
+VERSION='0.3.2^%{snapshot}.git%{shortcommit}'
+SHA256=e09495c73f8bfbb8637a28e6d73bf84063631b49bb3cb6d3c9702c80dfa78f31
+# omarchy-pkgs pkgbuilds/quickshell/load_qtquick_611.patch
+PATCH_SHA256=23b65d205d825f11a1cd8501acbc6e50250d09a6ce607e2ff8b3cf5d438bd0ce
 
 assert_file_exists "quickshell.spec exists" "$SPEC"
 assert_file_exists "quickshell.spec.sources exists" "$SOURCES"
+assert_file_exists "Omarchy's Qt 6.11 load patch is shipped" "$PATCH"
 
-grep -qF "%global tag_commit $TAG_COMMIT" "$SPEC" \
-  && pass "spec records the exact release tag commit" \
-  || fail "spec records the exact release tag commit"
+grep -qF "%global commit $COMMIT" "$SPEC" \
+  && pass "spec records Omarchy's exact upstream commit" \
+  || fail "spec records Omarchy's exact upstream commit"
 actual_version=$(awk '/^Version:/ {print $2; exit}' "$SPEC")
-assert_equals "release RPM version is exact" "$actual_version" "$VERSION"
-grep -qF 'Source0:            https://codeload.github.com/quickshell-mirror/quickshell/tar.gz/refs/tags/v%{version}#/%{name}-%{version}.tar.gz' "$SPEC" \
-  && pass "Source0 is the immutable tag archive" \
-  || fail "Source0 is the immutable tag archive"
-grep -qF '%autosetup -p1' "$SPEC" \
-  && pass "archive root follows the release tag" \
-  || fail "archive root follows the release tag"
-grep -qF -- '-DGIT_REVISION=%{tag_commit}' "$SPEC" \
-  && pass "binary revision reports the tag commit" \
-  || fail "binary revision reports the tag commit"
+assert_equals "snapshot RPM version sorts after the 0.3.2 release" "$actual_version" "$VERSION"
+grep -qF 'Source0:            https://codeload.github.com/quickshell-mirror/quickshell/tar.gz/%{commit}#/%{name}-%{commit}.tar.gz' "$SPEC" \
+  && pass "Source0 is the immutable commit archive" \
+  || fail "Source0 is the immutable commit archive"
+grep -qF '%autosetup -p1 -n %{name}-%{commit}' "$SPEC" \
+  && pass "archive root follows the commit" \
+  || fail "archive root follows the commit"
+grep -qxF 'Patch0:             quickshell-load-qtquick-611.patch' "$SPEC" \
+  && pass "spec applies the load patch by its literal name" \
+  || fail "spec applies the load patch by its literal name"
+assert_equals "load patch is byte-identical to Omarchy's" "$(sha256sum "$PATCH" | cut -d' ' -f1)" "$PATCH_SHA256"
+if grep -qxF '//@ pragma OmarchyLoadPatch' "$ROOT/shell/shell.qml"; then
+  pass "shell.qml still declares the pragma the patch acts on"
+else
+  fail "shell.qml still declares the pragma the patch acts on (drop the patch if Omarchy did)"
+fi
+grep -qF -- '-DGIT_REVISION=%{commit}' "$SPEC" \
+  && pass "binary revision reports the pinned commit" \
+  || fail "binary revision reports the pinned commit"
 grep -qF -- '-DCRASH_HANDLER=OFF' "$SPEC" \
   && pass "unavailable cpptrace crash handler stays disabled" \
   || fail "unavailable cpptrace crash handler stays disabled"
@@ -41,12 +55,12 @@ fi
 
 pin_hash=$(awk 'NF && $1 !~ /^#/ {print $1; exit}' "$SOURCES")
 pin_file=$(awk 'NF && $1 !~ /^#/ {print $2; exit}' "$SOURCES")
-assert_equals "release archive has the verified checksum" "$pin_hash" "$SHA256"
-assert_equals "source pin matches the renamed archive" "$pin_file" "quickshell-$VERSION.tar.gz"
-if grep -qF '5229069b0f1d375f34b0a04a4e6a69156e2f010995d9ec5a943793424e589b5d' "$SOURCES"; then
-  fail "stale 0.3.0 release checksum is absent"
+assert_equals "commit archive has the verified checksum" "$pin_hash" "$SHA256"
+assert_equals "source pin matches the renamed archive" "$pin_file" "quickshell-$COMMIT.tar.gz"
+if grep -qF '946a27e2a276917a03c1079e5c60971af84ece73088c3661dee455d92eb420f7' "$SOURCES"; then
+  fail "stale 0.3.2 release checksum is absent"
 else
-  pass "stale 0.3.0 release checksum is absent"
+  pass "stale 0.3.2 release checksum is absent"
 fi
 
 echo "# all quickshell-spec tests passed"

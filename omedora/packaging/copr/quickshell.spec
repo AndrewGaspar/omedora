@@ -4,15 +4,16 @@
 # (0.2.1^git20260209.dacfa9d — identical across stable/updates/testing/rawhide).
 # That snapshot predates upstream's 0.3.x releases. Quattro's shell restart
 # command requires synchronous `quickshell kill` (IpcClient::kill waits for
-# disconnect); 0.3.0 returned before the old shell exited, but the 0.3.2
-# release — the version Omarchy's own quickshell package ships — contains the
-# fix, so we now track the release instead of the 28771c7 snapshot.
+# disconnect); 0.3.0 returned before the old shell exited, and every release
+# from 0.3.2 contains the fix. We track the exact commit Omarchy's quickshell
+# package ships: 2b4501a, seven commits past 0.3.2 with the lock and screencopy
+# crash fixes, plus Omarchy's load_qtquick_611.patch (see Patch0).
 #
 # Recipe ADAPTED from Fedora's own quickshell.spec (Neal Gompa / Jan Grulich,
 # the authoritative BuildRequires + cmake-flags reference), advanced to the
-# upstream 0.3.2 release, with these deviations:
-#   * Source: pinned GitHub-mirror tag tarball (byte-stable archive), the
-#     omedora convention; sha256 in quickshell.spec.sources.
+# upstream snapshot Omarchy ships, with these deviations:
+#   * Source: commit-pinned GitHub-mirror archive (byte-stable), the omedora
+#     convention; sha256 in quickshell.spec.sources.
 #   * -DCRASH_HANDLER=OFF     — the crash handler needs cpptrace, which is NOT in
 #                              Fedora 44 (no cpptrace / cmake(cpptrace) provider).
 #                              The only in-Fedora alternative is -DVENDOR_CPPTRACE
@@ -34,18 +35,28 @@
 # Qt6 base already provides. All features stay enabled (upstream default); omarchy
 # -4 expects the full toolkit.
 
-%global tag_commit 4f508be500dea6e5732cc3d50382a0048b17e7b1
+%global commit 2b4501a282689792b62e94f3fb30d8f512324fe6
+%global shortcommit %(c=%{commit}; echo ${c:0:9})
+%global snapshot 20261017
 
 Name:               quickshell
-Version:            0.3.2
+Version:            0.3.2^%{snapshot}.git%{shortcommit}
 Release:            1%{?dist}
 Summary:            Flexible QtQuick based desktop shell toolkit
 # Code is LGPL, Hyprland protocols are BSD-3-Clause, wlr protocols are HPND-sell-variant
 License:            LGPL-3.0-only AND BSD-3-Clause AND HPND-sell-variant
 URL:                https://quickshell.org/
-# Upstream 0.3.2 release from the GitHub mirror (the version Omarchy's
-# quickshell package ships). Unpacks to quickshell-%{version}/.
-Source0:            https://codeload.github.com/quickshell-mirror/quickshell/tar.gz/refs/tags/v%{version}#/%{name}-%{version}.tar.gz
+# The upstream master commit Omarchy's quickshell package pins (omacom-io/
+# omarchy-pkgs pkgbuilds/quickshell, 0.3.2.r7.g2b4501a). Unpacks to
+# quickshell-<commit>/.
+Source0:            https://codeload.github.com/quickshell-mirror/quickshell/tar.gz/%{commit}#/%{name}-%{commit}.tar.gz
+# Omarchy's load_qtquick_611.patch, byte-identical to omarchy-pkgs. Qt 6.12
+# adds a QtQuick Color singleton that shadows the shell's own Color singleton.
+# The patch only acts on a config whose root file declares
+# `//@ pragma OmarchyLoadPatch` (Omarchy's shell.qml does): it pins that
+# config's unversioned `import QtQuick` lines to 6.11. Without it, Qt 6.11
+# merely warns about the unknown pragma, but Qt 6.12 breaks the shell.
+Patch0:             quickshell-load-qtquick-611.patch
 
 # https://fedoraproject.org/wiki/Changes/EncourageI686LeafRemoval
 ExcludeArch:        %{ix86}
@@ -106,7 +117,7 @@ It can be used alongside a Wayland compositor to build a complete desktop
 environment.
 
 %prep
-%autosetup -p1
+%autosetup -p1 -n %{name}-%{commit}
 
 %conf
 %cmake  -GNinja \
@@ -115,7 +126,7 @@ environment.
         -DDISTRIBUTOR="omedora COPR (agaspar/omedora-4)" \
         -DDISTRIBUTOR_DEBUGINFO_AVAILABLE=YES \
         -DINSTALL_QML_PREFIX=%{_lib}/qt6/qml \
-        -DGIT_REVISION=%{tag_commit} \
+        -DGIT_REVISION=%{commit} \
         -DCRASH_HANDLER=OFF \
         %{nil}
 
@@ -138,6 +149,12 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/*.desktop
 %{_qt6_qmldir}/Quickshell/
 
 %changelog
+* Wed Nov 18 2026 omedora <noreply@omedora> - 0.3.2^20261017.git2b4501a28-1
+- Follow Omarchy to upstream master 2b4501a (seven commits past 0.3.2: the
+  session-lock and screencopy crash fixes, Hyprland workspace id changes).
+- Apply Omarchy's load_qtquick_611.patch, which shell.qml's
+  `//@ pragma OmarchyLoadPatch` expects; it keeps the shell loading on Qt 6.12.
+
 * Fri Oct 16 2026 omedora <noreply@omedora> - 0.3.2-1
 - Move from Omarchy 4.0.0's 28771c7 snapshot to the upstream 0.3.2 release
   (the version omarchy-pkgs ships). 0.3.2 contains the synchronous
