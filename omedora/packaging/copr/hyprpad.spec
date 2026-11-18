@@ -31,10 +31,10 @@
 # the user unit, not the shell plugins; see the shipped README.package.md for
 # the one-time host setup (group membership, udev trigger, `systemctl enable`).
 
-%global         commit b3f9dc704f0a08e52b81dde95c9298699925ad76
+%global         commit 9e21289ef9590fbb510885b7cbe400624be6f119
 %global         shortcommit %(c=%{commit}; echo ${c:0:9})
 # Upstream commit date of the pin (snapshot versioning, as the hypxr specs).
-%global         snapshot 20261013
+%global         snapshot 20261117
 
 Name:           hyprpad
 Version:        0.1.0^%{snapshot}.git%{shortcommit}
@@ -283,6 +283,11 @@ udevadm verify packaging/udev/72-hyprpad-puck.rules
 %{_datadir}/hyprpad/shell
 
 %changelog
+* Wed Nov 18 2026 omedora <noreply@omedora> - 0.1.0^20261117.git9e21289ef-1
+- Refresh to upstream 9e21289: per-mode guide_tap, per-mode pad-to-pad
+  button remap, and an event feed that decodes lossily and resyncs after a
+  dropped connection.
+
 * Sun Nov 01 2026 omedora <noreply@omedora> - 0.1.0^20261013.gitb3f9dc704-1
 - Initial from-source (cargo) build of hyprpad at upstream commit b3f9dc7:
   daemon + standalone on-screen keyboard, built fully offline against two
