@@ -5,8 +5,8 @@
 # Version, explicit Release + changelog, soname via glob.
 
 Name:           hyprtoolkit
-Version:        0.5.4
-Release:        2%{?dist}
+Version:        0.6.0
+Release:        1%{?dist}
 Summary:        A modern C++ Wayland-native GUI toolkit
 
 License:        BSD-3-Clause
@@ -21,12 +21,14 @@ BuildRequires:  cmake(hyprwayland-scanner) >= 0.4.6
 BuildRequires:  gcc-c++
 BuildRequires:  mesa-libEGL-devel
 BuildRequires:  ninja-build
-BuildRequires:  pkgconfig(aquamarine)
+BuildRequires:  pkgconfig(aquamarine) >= 0.15.1
+# New in 0.6.0.
+BuildRequires:  pkgconfig(absl_flat_hash_map)
 BuildRequires:  pkgconfig(egl)
 BuildRequires:  pkgconfig(gbm)
 BuildRequires:  pkgconfig(hyprgraphics) >= 0.5.1
 BuildRequires:  pkgconfig(hyprlang) >= 0.6.8
-BuildRequires:  pkgconfig(hyprutils) >= 0.14.0
+BuildRequires:  pkgconfig(hyprutils) >= 0.14.2
 BuildRequires:  pkgconfig(iniparser)
 BuildRequires:  pkgconfig(libdrm)
 BuildRequires:  pkgconfig(pango)
@@ -70,6 +72,11 @@ Development files for %{name}.
 %{_libdir}/pkgconfig/%{name}.pc
 
 %changelog
+* Wed Nov 18 2026 omedora <noreply@omedora> - 0.6.0-1
+- Update to hyprtoolkit 0.6.0, the version Omarchy stable ships (SONAME
+  5 -> 6; hyprland-guiutils is rebuilt with it). Built against aquamarine
+  0.15.1 and hyprutils 0.14.2; BuildRequire abseil's flat_hash_map.
+
 * Mon Aug 03 2026 omedora <noreply@omedora> - 0.5.4-2
 - Rebuild against hyprutils 0.14.0 and aquamarine 0.14.0 (both SONAME 13).
 

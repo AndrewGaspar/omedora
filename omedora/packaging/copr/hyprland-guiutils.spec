@@ -10,7 +10,7 @@
 
 Name:           hyprland-guiutils
 Version:        0.2.2
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Hyprland's hyprtoolkit-based GUI utilities
 
 License:        BSD-3-Clause
@@ -25,7 +25,7 @@ BuildRequires:  gcc-c++
 BuildRequires:  ninja-build
 BuildRequires:  pkgconfig(hyprlang) >= 0.6.8
 BuildRequires:  pkgconfig(hyprutils) >= 0.14.0
-BuildRequires:  pkgconfig(hyprtoolkit)
+BuildRequires:  pkgconfig(hyprtoolkit) >= 0.6.0
 BuildRequires:  pkgconfig(pango)
 BuildRequires:  pkgconfig(cairo)
 # CMakeLists.txt pkg_check_modules also requires these (the build fails its
@@ -64,6 +64,9 @@ hyprtoolkit Wayland-native toolkit. It is the successor to hyprland-qtutils.
 %{_bindir}/hyprland-update-screen
 
 %changelog
+* Wed Nov 18 2026 omedora <noreply@omedora> - 0.2.2-2
+- Rebuild against hyprtoolkit 0.6.0 (SONAME 6).
+
 * Mon Aug 03 2026 omedora <noreply@omedora> - 0.2.2-1
 - Update to hyprland-guiutils 0.2.2 (Hyprland 0.56.1 wave).
 - Rebuilt against hyprutils 0.14.0 (SONAME 13).
