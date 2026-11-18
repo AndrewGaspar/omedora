@@ -22,7 +22,7 @@
 
 Name:           hyprland
 Version:        0.56.2
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Dynamic tiling Wayland compositor that doesn't sacrifice on its looks
 
 # hyprland: BSD-3-Clause
@@ -56,7 +56,7 @@ BuildRequires:  ninja-build
 # Without it CMake FetchContent-clones glaze — fatal in an offline build root.
 BuildRequires:  glaze-static
 BuildRequires:  glslang-devel
-BuildRequires:  pkgconfig(aquamarine)
+BuildRequires:  pkgconfig(aquamarine) >= 0.15.1
 BuildRequires:  pkgconfig(cairo)
 BuildRequires:  pkgconfig(egl)
 BuildRequires:  pkgconfig(gbm)
@@ -273,6 +273,10 @@ install -Dpm644 %{SOURCE1} -t %{buildroot}%{macrosdir}
 %{macrosdir}/macros.hyprland
 
 %changelog
+* Wed Nov 18 2026 omedora <noreply@omedora> - 0.56.2-2
+- Rebuild against aquamarine 0.15.1 (libaquamarine.so.14) and hyprutils
+  0.14.2, the versions Omarchy stable ships.
+
 * Fri Aug 21 2026 omedora <noreply@omedora> - 0.56.2-1
 - Update the stable fallback compositor to Hyprland 0.56.2 so it provides the
   exact shared dependency wave consumed by the rebased HypXRland package.

@@ -17,7 +17,7 @@
 # tarball hypxrland.spec builds, with no Libs, so the plugin links no Lua of its
 # own and binds to the compositor's.
 
-%global hypxrland_evr 0.56.2^20261111.1.git7ac272db9-1%{?dist}
+%global hypxrland_evr 0.56.2^20261111.1.git7ac272db9-2%{?dist}
 %global commit cd93406952ff18656b64da41707667326be789c9
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 %global snapshot 20261112
@@ -27,7 +27,7 @@
 
 Name:           hyprshare
 Version:        0^%{snapshot}.git%{shortcommit}
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Switch what a screenshare shows without restarting it, for HypXRland
 
 License:        BSD-3-Clause
@@ -43,7 +43,7 @@ BuildRequires:  make
 BuildRequires:  binutils
 # Hyprland's render headers include glslang's C interface.
 BuildRequires:  glslang-devel
-BuildRequires:  pkgconfig(aquamarine)
+BuildRequires:  pkgconfig(aquamarine) >= 0.15.1
 BuildRequires:  pkgconfig(cairo)
 BuildRequires:  pkgconfig(egl)
 BuildRequires:  pkgconfig(hyprcursor) >= 0.1.13
@@ -143,6 +143,9 @@ fi
 %{_prefix}/lib/hypxrland/plugins/%{name}/%{name}.so
 
 %changelog
+* Wed Nov 18 2026 omedora <noreply@omedora> - 0^20261112.gitcd9340695-2
+- Rebuild for HypXRland 0.56.2^20261111.1.git7ac272db9-2 (aquamarine 0.15.1).
+
 * Thu Nov 12 2026 omedora <noreply@omedora> - 0^20261112.gitcd9340695-1
 - Update to cd93406 (status-bar API v5): `hyprctl sharestatus` reports
   capturing, sessions and sharedWindow; a hyprshare>>changed event;

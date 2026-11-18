@@ -15,14 +15,14 @@
 # ships 5.4), so the 5.5.0 headers come from the release tarball hyprland.spec
 # builds. Nothing links Lua here: the compositor exports it to plugins.
 
-%global hyprland_evr 0.56.2-1%{?dist}
+%global hyprland_evr 0.56.2-2%{?dist}
 %global lua_version 5.5.0
 # Matches the Arch package (!lto) and upstream's plugin builds.
 %global _lto_cflags %{nil}
 
 Name:           omarchy-hyprland-titlebars
 Version:        0.2.2
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Titlebars for Omarchy's floating workspaces (Hyprland plugin)
 
 License:        BSD-3-Clause AND MIT
@@ -38,7 +38,7 @@ BuildRequires:  ninja-build
 BuildRequires:  gcc-c++
 # Hyprland's render headers include glslang's C interface.
 BuildRequires:  glslang-devel
-BuildRequires:  pkgconfig(aquamarine)
+BuildRequires:  pkgconfig(aquamarine) >= 0.15.1
 BuildRequires:  pkgconfig(cairo)
 BuildRequires:  pkgconfig(egl)
 BuildRequires:  pkgconfig(hyprcursor) >= 0.1.13
@@ -98,6 +98,9 @@ grep -qF "$PWD/lua-include/lua.h" deps.txt
 %{_prefix}/lib/%{name}/titlebars.so
 
 %changelog
+* Wed Nov 18 2026 omedora <noreply@omedora> - 0.2.2-2
+- Rebuild for Hyprland 0.56.2-2 (aquamarine 0.15.1).
+
 * Wed Nov 11 2026 omedora <noreply@omedora> - 0.2.2-1
 - Initial omedora build of omarchy-hyprland-titlebars 0.2.2 (Omarchy 4.5
   stable's version) for the stable Hyprland 0.56.2-1 build.

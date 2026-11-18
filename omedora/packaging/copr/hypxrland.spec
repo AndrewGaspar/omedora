@@ -37,7 +37,7 @@
 
 Name:           hypxrland
 Version:        %{base_version}^%{snapshot}.git%{shortcommit}
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Hyprland-based spatial OpenXR compositor
 
 # HypXRland/Hyprland: BSD-3-Clause
@@ -71,7 +71,7 @@ BuildRequires:  readline-devel
 BuildRequires:  glaze-static
 BuildRequires:  glslang-devel
 BuildRequires:  vulkan-headers
-BuildRequires:  pkgconfig(aquamarine)
+BuildRequires:  pkgconfig(aquamarine) >= 0.15.1
 BuildRequires:  pkgconfig(cairo)
 BuildRequires:  pkgconfig(egl)
 BuildRequires:  pkgconfig(gbm)
@@ -274,6 +274,10 @@ XDG_RUNTIME_DIR="$runtime_dir" %{__cmake_builddir}/Hyprland --version |
 %{_prefix}/lib/hypxrland/pkgconfig/
 
 %changelog
+* Wed Nov 18 2026 omedora <noreply@omedora> - 0.56.2^20261111.1.git7ac272db9-2
+- Rebuild against aquamarine 0.15.1 (libaquamarine.so.14) and hyprutils
+  0.14.2, the versions Omarchy stable ships.
+
 * Wed Nov 11 2026 omedora <noreply@omedora> - 0.56.2^20261111.1.git7ac272db9-1
 - Refresh to 7ac272db9: the plugin loader opens the HypXRland build in
   /usr/lib/hypxrland/plugins/<pkg>/<name>.so when a config asks for the

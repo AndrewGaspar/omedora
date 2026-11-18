@@ -11,14 +11,14 @@
 # bumped; test/hypxr-spec-test.sh checks the pin. Lua 5.5 headers as in
 # omarchy-hyprland-titlebars.spec.
 
-%global hypxrland_evr 0.56.2^20261111.1.git7ac272db9-1%{?dist}
+%global hypxrland_evr 0.56.2^20261111.1.git7ac272db9-2%{?dist}
 %global upstream_name omarchy-hyprland-titlebars
 %global lua_version 5.5.0
 %global _lto_cflags %{nil}
 
 Name:           omarchy-hyprland-titlebars-hypxr
 Version:        0.2.2
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Titlebars for Omarchy's floating workspaces, built for HypXRland
 
 License:        BSD-3-Clause AND MIT
@@ -34,7 +34,7 @@ BuildRequires:  ninja-build
 BuildRequires:  gcc-c++
 # Hyprland's render headers include glslang's C interface.
 BuildRequires:  glslang-devel
-BuildRequires:  pkgconfig(aquamarine)
+BuildRequires:  pkgconfig(aquamarine) >= 0.15.1
 BuildRequires:  pkgconfig(cairo)
 BuildRequires:  pkgconfig(egl)
 BuildRequires:  pkgconfig(hyprcursor) >= 0.1.13
@@ -98,6 +98,9 @@ grep -qF "$PWD/lua-include/lua.h" deps.txt
 %{_prefix}/lib/hypxrland/plugins/%{upstream_name}/titlebars.so
 
 %changelog
+* Wed Nov 18 2026 omedora <noreply@omedora> - 0.2.2-3
+- Rebuild for HypXRland 0.56.2^20261111.1.git7ac272db9-2 (aquamarine 0.15.1).
+
 * Wed Nov 11 2026 omedora <noreply@omedora> - 0.2.2-2
 - Rebuild for HypXRland 0.56.2^20261111.1.git7ac272db9-1, whose plugin loader
   opens this build when Omarchy asks for the stock titlebars path.

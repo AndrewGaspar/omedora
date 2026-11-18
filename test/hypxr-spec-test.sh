@@ -34,9 +34,10 @@ grep -qF '6f55c050fb6116d1cea62538968d249d9d55379dddca3ef8ad570db25caa02f3  hypx
   || fail "HypXRland current archive checksum is pinned"
 grep -qE '^%global base_version 0\.56\.2$' "$HYPXR" \
   && pass "HypXRland declares the 0.56.2 base" || fail "HypXRland declares the 0.56.2 base"
-grep -qE '^Release:[[:space:]]+1%\{\?dist\}$' "$HYPXR" \
-  && pass "HypXRland snapshot is release 1" \
-  || fail "HypXRland snapshot is release 1"
+# Release 2 is the rebuild against aquamarine 0.15.1 (libaquamarine.so.14).
+grep -qE '^Release:[[:space:]]+2%\{\?dist\}$' "$HYPXR" \
+  && pass "HypXRland snapshot is release 2" \
+  || fail "HypXRland snapshot is release 2"
 grep -qF "grep -qx 'HYPXR_PLUGIN_DIR:STRING=%{_prefix}/lib/hypxrland/plugins'" "$HYPXR" \
   && grep -qF -- '-DHYPXR_PLUGIN_DIR=%{_prefix}/lib/hypxrland/plugins' "$HYPXR" \
   && pass "HypXRland redirects stock plugin paths to /usr/lib/hypxrland/plugins" \
