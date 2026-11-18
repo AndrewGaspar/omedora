@@ -7,7 +7,7 @@
 %global zig_version 0.16.0
 
 Name:           herdr
-Version:        0.9.1
+Version:        0.9.5
 Release:        1%{?dist}
 Summary:        Terminal workspace manager for coding agents
 
@@ -102,6 +102,11 @@ export ZIG_GLOBAL_CACHE_DIR="$PWD/zig-cache"
 %{_bindir}/herdr
 
 %changelog
+* Wed Nov 18 2026 omedora <noreply@omedora> - 0.9.5-1
+- Update to the upstream 0.9.5 release Omarchy ships. Zig 0.16.0, the
+  libghostty-vt build flags and the uucode/simdutf license pins are
+  unchanged; the Cargo and Zig caches are regenerated.
+
 * Fri Oct 16 2026 omedora <noreply@omedora> - 0.9.1-1
 - Move from the omacom-io fork snapshot to the upstream herdrdev/herdr
   0.9.1 release Omarchy ships. The vendored libghostty-vt now requires
