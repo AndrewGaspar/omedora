@@ -16,7 +16,7 @@
 # desktop-file check doesn't cover for packaging.
 
 Name:           omasnap
-Version:        1.24.0
+Version:        1.25.0
 Release:        1%{?dist}
 Summary:        Native Wayland screenshot and annotation overlay for Hyprland
 
@@ -85,6 +85,9 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/omasnap.desktop
 %{_datadir}/applications/omasnap.desktop
 
 %changelog
+* Wed Nov 18 2026 omedora <noreply@omedora> - 1.25.0-1
+- Bump to upstream 1.25.0.
+
 * Tue Oct 27 2026 omedora <noreply@omedora> - 1.24.0-1
 - Initial from-source (CMake/Qt6) build of omasnap, Omarchy 4.5's screenshot
   and annotation overlay (github.com/omacom/omasnap). Mirrors the omarchy-pkgs
