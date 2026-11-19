@@ -26,8 +26,8 @@
 # 0.56.x requires 5.5.
 
 %global base_version 0.56.2
-%global snapshot 20261111.1
-%global commit 7ac272db9ac77dee5c1ddab0d78ecb9885b7b204
+%global snapshot 20261119.1
+%global commit 0af4a4fa202d59ed2fc66fca94f9acfd35509a2f
 %global shortcommit %(c=%{commit}; echo ${c:0:9})
 %global udis86_commit 5336633af70f3917760a6d441ff02d93477b0c86
 %global lua_version 5.5.0
@@ -37,7 +37,7 @@
 
 Name:           hypxrland
 Version:        %{base_version}^%{snapshot}.git%{shortcommit}
-Release:        2%{?dist}
+Release:        1%{?dist}
 Summary:        Hyprland-based spatial OpenXR compositor
 
 # HypXRland/Hyprland: BSD-3-Clause
@@ -199,10 +199,10 @@ export PKG_CONFIG_PATH="%{_builddir}/hypxrland-lua-prefix/lib/pkgconfig${PKG_CON
 export GIT_COMMIT_HASH=%{commit}
 export GIT_BRANCH=hypxrland
 export GIT_COMMIT_MESSAGE="packaged HypXRland snapshot %{shortcommit}"
-export GIT_COMMIT_DATE=2026-11-11
+export GIT_COMMIT_DATE=2026-11-19
 export GIT_DIRTY=clean
-export GIT_TAG=v%{base_version}-469-g%{shortcommit}
-export GIT_COMMITS=8130
+export GIT_TAG=v%{base_version}-475-g%{shortcommit}
+export GIT_COMMITS=8136
 
 %cmake \
   -GNinja \
@@ -274,6 +274,13 @@ XDG_RUNTIME_DIR="$runtime_dir" %{__cmake_builddir}/Hyprland --version |
 %{_prefix}/lib/hypxrland/pkgconfig/
 
 %changelog
+* Thu Nov 19 2026 omedora <noreply@omedora> - 0.56.2^20261119.1.git0af4a4fa2-1
+- Refresh to 0af4a4fa2: the stereo crop also reaches a subsurface that
+  covers its window, so per-window stereo works for Proton games on Wine's
+  Wayland driver. The plugin loader also maps
+  /usr/lib/hypxrland/plugins/<pkg>/<name>.so to HYPXR_PLUGIN_DIR (the same
+  directory in this build).
+
 * Wed Nov 18 2026 omedora <noreply@omedora> - 0.56.2^20261111.1.git7ac272db9-2
 - Rebuild against aquamarine 0.15.1 (libaquamarine.so.14) and hyprutils
   0.14.2, the versions Omarchy stable ships.

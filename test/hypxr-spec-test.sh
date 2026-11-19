@@ -23,21 +23,20 @@ done
 
 grep -qE '^Version:[[:space:]]+0\.56\.2$' "$COPR/hyprland.spec" \
   && pass "stable Hyprland is 0.56.2" || fail "stable Hyprland is 0.56.2"
-grep -qE '^%global commit 7ac272db9ac77dee5c1ddab0d78ecb9885b7b204$' "$HYPXR" \
+grep -qE '^%global commit 0af4a4fa202d59ed2fc66fca94f9acfd35509a2f$' "$HYPXR" \
   && pass "HypXRland current branch tip is pinned" || fail "HypXRland current branch tip is pinned"
-grep -qE '^%global snapshot 20261111\.1$' "$HYPXR" \
-  && pass "HypXRland uses the Nov 11 snapshot revision" \
-  || fail "HypXRland uses the Nov 11 snapshot revision"
-grep -qF '6f55c050fb6116d1cea62538968d249d9d55379dddca3ef8ad570db25caa02f3  hypxrland-7ac272db9ac77dee5c1ddab0d78ecb9885b7b204.tar.gz' \
+grep -qE '^%global snapshot 20261119\.1$' "$HYPXR" \
+  && pass "HypXRland uses the Nov 19 snapshot revision" \
+  || fail "HypXRland uses the Nov 19 snapshot revision"
+grep -qF '2ef67c0c8cdffe4b03d68b018fb83b43a2540b989b345c91937675b84ace5335  hypxrland-0af4a4fa202d59ed2fc66fca94f9acfd35509a2f.tar.gz' \
   "$COPR/hypxrland.spec.sources" \
   && pass "HypXRland current archive checksum is pinned" \
   || fail "HypXRland current archive checksum is pinned"
 grep -qE '^%global base_version 0\.56\.2$' "$HYPXR" \
   && pass "HypXRland declares the 0.56.2 base" || fail "HypXRland declares the 0.56.2 base"
-# Release 2 is the rebuild against aquamarine 0.15.1 (libaquamarine.so.14).
-grep -qE '^Release:[[:space:]]+2%\{\?dist\}$' "$HYPXR" \
-  && pass "HypXRland snapshot is release 2" \
-  || fail "HypXRland snapshot is release 2"
+grep -qE '^Release:[[:space:]]+1%\{\?dist\}$' "$HYPXR" \
+  && pass "HypXRland snapshot is release 1" \
+  || fail "HypXRland snapshot is release 1"
 grep -qF "grep -qx 'HYPXR_PLUGIN_DIR:STRING=%{_prefix}/lib/hypxrland/plugins'" "$HYPXR" \
   && grep -qF -- '-DHYPXR_PLUGIN_DIR=%{_prefix}/lib/hypxrland/plugins' "$HYPXR" \
   && pass "HypXRland redirects stock plugin paths to /usr/lib/hypxrland/plugins" \
@@ -250,7 +249,7 @@ grep -qx 'Slice=session.slice' "$MONADO_UNIT" \
   || fail "monado-xreal unit runs in session.slice, out of uresourced's app.slice"
 
 MONADO="$COPR/monado-xreal.spec"
-# HypXRland 7ac272db9's subprojects/monado submodule pin.
+# HypXRland 0af4a4fa2's subprojects/monado submodule pin.
 grep -qx '%global commit 6a22af15e7e0be12b28db9f12071c20100fad476' "$MONADO" \
   && pass "monado-xreal pins HypXRland's Monado submodule commit" \
   || fail "monado-xreal pins HypXRland's Monado submodule commit"
