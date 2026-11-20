@@ -231,7 +231,9 @@ verify_managed_candidates() {
   local package
   (( $# > 0 )) || return 0
 
-  if ! "${dnf_cmd[@]}" repoquery --available --qf '%{name}\n' "$@" >"$output"; then
+  # A managed target may be arch-qualified (mesa-vulkan-drivers.i686 from the
+  # lib32 map entries); dnf reports %{name} without the arch, so emit both forms.
+  if ! "${dnf_cmd[@]}" repoquery --available --qf '%{name}\n%{name}.%{arch}\n' "$@" >"$output"; then
     echo "Could not query candidates for Omedora-managed packages." >&2
     return 1
   fi
