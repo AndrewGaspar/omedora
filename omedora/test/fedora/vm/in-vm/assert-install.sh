@@ -101,6 +101,19 @@ if [[ -d "$HOME/.config/omarchy" ]]; then
 else
   fail "~/.config/omarchy seeded"
 fi
+# The shell env is sourced system-wide from /etc/profile.d/omarchy.sh, shipped
+# by omedora-settings; ~/.bashrc is never touched on this line (see plan.sh).
+if [[ -r /etc/profile.d/omarchy.sh ]]; then
+  pass "/etc/profile.d/omarchy.sh present (shell env sourcing)"
+  owner=$(rpm -qf /etc/profile.d/omarchy.sh 2>/dev/null || true)
+  if [[ "$owner" == omedora-settings-* ]]; then
+    pass "/etc/profile.d/omarchy.sh owned by omedora-settings ($owner)"
+  else
+    fail "/etc/profile.d/omarchy.sh owned by omedora-settings (got: ${owner:-<none>})"
+  fi
+else
+  fail "/etc/profile.d/omarchy.sh present (shell env sourcing)"
+fi
 n_backups=$(find "$HOME/.config" -maxdepth 3 -name '*.pre-omedora-*' 2>/dev/null | wc -l)
 echo "# config backups created (.pre-omedora-*): $n_backups"
 pass "config backup mechanism observable (n=$n_backups — non-gating; a clean base may have 0)"
